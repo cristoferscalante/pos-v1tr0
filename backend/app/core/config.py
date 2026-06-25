@@ -15,12 +15,18 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     EMAIL_ENABLED: bool = False
+    EMAIL_PROVIDER: str = "api"
     EMAIL_API_BASE_URL: str = "https://api.brevo.com/v3/smtp/email"
     EMAIL_API_TOKEN: str | None = None
     EMAIL_API_AUTH_HEADER: str = "api-key"
     EMAIL_FROM_EMAIL: str | None = None
     EMAIL_FROM_NAME: str = "V1TR0 POS"
     EMAIL_TIMEOUT_SECONDS: int = 10
+    EMAIL_SMTP_HOST: str | None = None
+    EMAIL_SMTP_PORT: int = 587
+    EMAIL_SMTP_USERNAME: str | None = None
+    EMAIL_SMTP_PASSWORD: str | None = None
+    EMAIL_SMTP_USE_TLS: bool = True
     FRONTEND_URL: str = "http://localhost:5173"
 
     LOW_STOCK_THRESHOLD: int = 5

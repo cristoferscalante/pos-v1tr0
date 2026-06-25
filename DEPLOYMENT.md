@@ -18,14 +18,30 @@ Variables obligatorias:
 
 ## Notas de correo
 
-El backend usa una API HTTP de correo compatible con `sender`, `to`, `subject`, `htmlContent` y `textContent`.
+El backend soporta dos modos:
 
-Valores esperados por defecto:
+1. `EMAIL_PROVIDER=api`
+2. `EMAIL_PROVIDER=smtp`
 
+### Hostinger SMTP
+
+Para Hostinger usa:
+
+- `EMAIL_PROVIDER=smtp`
+- `EMAIL_SMTP_HOST=smtp.hostinger.com`
+- `EMAIL_SMTP_PORT=587`
+- `EMAIL_SMTP_USERNAME=buzon@v1tr0.com`
+- `EMAIL_SMTP_PASSWORD=...`
+- `EMAIL_SMTP_USE_TLS=true`
+
+### API HTTP
+
+Si en el futuro usas un proveedor API tipo Brevo:
+
+- `EMAIL_PROVIDER=api`
 - `EMAIL_API_BASE_URL=https://api.brevo.com/v3/smtp/email`
 - `EMAIL_API_AUTH_HEADER=api-key`
-
-Si tu proveedor usa otra URL o cabecera, ajusta esas variables.
+- `EMAIL_API_TOKEN=...`
 
 ## Eventos implementados
 
