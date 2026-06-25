@@ -7,7 +7,7 @@ import {
 import { API_URL, authApi } from '../api/client';
 import { useToast } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
-import type { AuthUser, NotificationRule } from '../types';
+import type { AuthUser, NotificationLog, NotificationRule } from '../types';
 
 interface SettingsViewProps {
   user: AuthUser | null;
@@ -39,6 +39,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const [creatingCollab, setCreatingCollab] = useState(false);
   const [loadingCollaborators, setLoadingCollaborators] = useState(false);
   const [notificationRules, setNotificationRules] = useState<NotificationRule[]>([]);
+  const [notificationLogs, setNotificationLogs] = useState<NotificationLog[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
@@ -80,6 +81,14 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         })
         .finally(() => {
           setLoadingNotifications(false);
+        });
+
+      authApi.listNotificationLogs(token)
+        .then(data => {
+          setNotificationLogs(data);
+        })
+        .catch(() => {
+          error('Error al cargar la bitácora de correos');
         });
     }
   }, [user, token]);
@@ -570,6 +579,31 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   ))}
                 </div>
               )}
+
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Bitácora de correos</h3>
+                {notificationLogs.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No hay envíos registrados todavía.</p>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {notificationLogs.slice(0, 10).map(log => (
+                      <div key={log.id} style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px', background: 'rgba(255,255,255,0.02)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                          <div>
+                            <p style={{ margin: 0, fontSize: '13px', fontWeight: 600 }}>{log.subject}</p>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>{log.recipient} | {log.event_type}</p>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: log.status === 'sent' ? 'var(--success)' : 'var(--warning)' }}>{log.status}</p>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(log.created_at).toLocaleString('es-CO')}</p>
+                          </div>
+                        </div>
+                        {log.error_message && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--warning)' }}>{log.error_message}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

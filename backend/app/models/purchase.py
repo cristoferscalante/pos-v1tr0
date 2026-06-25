@@ -26,6 +26,7 @@ class Purchase(PurchaseBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
 
     details: list["PurchaseDetail"] = Relationship(back_populates="purchase")
+    payments: list["PurchasePayment"] = Relationship(back_populates="purchase")
 
 
 class PurchaseDetailBase(SQLModel):
@@ -40,6 +41,22 @@ class PurchaseDetail(PurchaseDetailBase, table=True):
     purchase_id: uuid.UUID = Field(foreign_key="purchase.id", index=True)
 
     purchase: Optional[Purchase] = Relationship(back_populates="details")
+
+
+class PurchasePaymentBase(SQLModel):
+    purchase_id: uuid.UUID = Field(foreign_key="purchase.id", index=True)
+    tenant_id: uuid.UUID = Field(foreign_key="tenant.id", index=True)
+    user_id: uuid.UUID = Field(foreign_key="user.id", index=True)
+    amount: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    payment_method: str = Field(default="transfer")
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class PurchasePayment(PurchasePaymentBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+
+    purchase: Optional[Purchase] = Relationship(back_populates="payments")
 
 
 class InventoryMovementBase(SQLModel):
@@ -111,6 +128,21 @@ class PurchaseReadDetailed(SQLModel):
     notes: Optional[str] = None
     created_at: datetime
     details: list[PurchaseDetailRead]
+    payments: list["PurchasePaymentRead"] = []
+
+
+class PurchasePaymentCreate(SQLModel):
+    amount: Decimal
+    payment_method: str = "transfer"
+    notes: Optional[str] = None
+
+
+class PurchasePaymentRead(SQLModel):
+    id: uuid.UUID
+    amount: Decimal
+    payment_method: str
+    notes: Optional[str] = None
+    created_at: datetime
 
 
 class ManualInventoryMovementCreate(SQLModel):

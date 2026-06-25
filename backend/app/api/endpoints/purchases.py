@@ -7,8 +7,9 @@ from sqlmodel import Session, select
 
 from app.api.deps import get_current_user
 from app.core.db import get_session
+from app.models.notification import NotificationLog
 from app.models.product import Product
-from app.models.purchase import InventoryMovement, ManualInventoryMovementCreate, Purchase, PurchaseCreate, PurchaseDetail, PurchaseDetailRead, PurchaseReadDetailed, PurchaseUpdate, SupplierReturnCreate
+from app.models.purchase import InventoryMovement, ManualInventoryMovementCreate, Purchase, PurchaseCreate, PurchaseDetail, PurchaseDetailRead, PurchasePayment, PurchasePaymentCreate, PurchasePaymentRead, PurchaseReadDetailed, PurchaseUpdate, SupplierReturnCreate
 from app.models.supplier import Supplier
 from app.models.user import User
 
@@ -18,6 +19,7 @@ router = APIRouter()
 def _serialize_purchase(session: Session, purchase: Purchase) -> PurchaseReadDetailed:
     supplier = session.get(Supplier, purchase.supplier_id)
     details = session.exec(select(PurchaseDetail).where(PurchaseDetail.purchase_id == purchase.id)).all()
+    payments = session.exec(select(PurchasePayment).where(PurchasePayment.purchase_id == purchase.id).order_by(PurchasePayment.created_at.desc())).all()
     detail_rows = []
     for detail in details:
         product = session.get(Product, detail.product_id)
@@ -48,6 +50,16 @@ def _serialize_purchase(session: Session, purchase: Purchase) -> PurchaseReadDet
         notes=purchase.notes,
         created_at=purchase.created_at,
         details=detail_rows,
+        payments=[
+            PurchasePaymentRead(
+                id=payment.id,
+                amount=payment.amount,
+                payment_method=payment.payment_method,
+                notes=payment.notes,
+                created_at=payment.created_at,
+            )
+            for payment in payments
+        ],
     )
 
 
@@ -138,6 +150,41 @@ def list_purchases(
         query = query.where(Purchase.balance_due > 0)
     purchases = session.exec(query.order_by(Purchase.created_at.desc())).all()
     return [_serialize_purchase(session, purchase) for purchase in purchases]
+
+
+@router.get("/accounts-payable/summary")
+def get_accounts_payable_summary(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    purchases = session.exec(
+        select(Purchase).where(
+            Purchase.tenant_id == current_user.tenant_id,
+            Purchase.balance_due > 0,
+            Purchase.status == "posted",
+        )
+    ).all()
+
+    overdue = []
+    upcoming = []
+    today = datetime.utcnow().date()
+    total_balance = Decimal("0")
+
+    for purchase in purchases:
+        total_balance += purchase.balance_due
+        item = _serialize_purchase(session, purchase)
+        if purchase.due_date and purchase.due_date < today:
+            overdue.append(item)
+        else:
+            upcoming.append(item)
+
+    return {
+        "total_balance": total_balance,
+        "overdue_count": len(overdue),
+        "upcoming_count": len(upcoming),
+        "overdue": overdue[:10],
+        "upcoming": upcoming[:10],
+    }
 
 
 @router.get("/{purchase_id}")
@@ -267,6 +314,40 @@ def cancel_purchase(
     return _serialize_purchase(session, purchase)
 
 
+@router.post("/{purchase_id}/payments", status_code=status.HTTP_201_CREATED)
+def create_purchase_payment(
+    purchase_id: uuid.UUID,
+    data: PurchasePaymentCreate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    purchase = session.get(Purchase, purchase_id)
+    if not purchase or purchase.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra no encontrada")
+    if purchase.status != "posted":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Solo se pueden pagar compras activas")
+    if data.amount <= 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El monto debe ser mayor a 0")
+
+    payment = PurchasePayment(
+        purchase_id=purchase.id,
+        tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
+        amount=data.amount,
+        payment_method=data.payment_method,
+        notes=data.notes,
+    )
+    session.add(payment)
+
+    purchase.paid_amount += data.amount
+    purchase.balance_due = max(Decimal("0"), purchase.total - purchase.paid_amount)
+    session.add(purchase)
+
+    session.commit()
+    session.refresh(purchase)
+    return _serialize_purchase(session, purchase)
+
+
 @router.get("/movements")
 def list_inventory_movements(
     session: Session = Depends(get_session),
@@ -276,6 +357,18 @@ def list_inventory_movements(
         select(InventoryMovement)
         .where(InventoryMovement.tenant_id == current_user.tenant_id)
         .order_by(InventoryMovement.created_at.desc())
+    ).all()
+
+
+@router.get("/notification-logs")
+def list_notification_logs(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    return session.exec(
+        select(NotificationLog)
+        .where(NotificationLog.tenant_id == current_user.tenant_id)
+        .order_by(NotificationLog.created_at.desc())
     ).all()
 
 

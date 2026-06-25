@@ -4,7 +4,7 @@
 import type {
   AuthResponse, ApiProduct, ApiSale,
   DashboardSummary, ChartDataPoint, TopProduct, LocalSale, CashSessionResponse, NotificationRule,
-  Supplier, Purchase, InventoryMovement
+  Supplier, Purchase, InventoryMovement, NotificationLog
 } from '../types';
 
 const rawApiUrl = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL.trim() : '';
@@ -116,6 +116,9 @@ export const authApi = {
 
   testNotificationEmail: (token: string, recipient: string): Promise<{ status: string; message: string }> =>
     request('/api/v1/auth/notifications/test', { method: 'POST', body: JSON.stringify({ recipient }) }, token),
+
+  listNotificationLogs: (token: string): Promise<NotificationLog[]> =>
+    request('/api/v1/purchases/notification-logs', {}, token),
 };
 
 // --- Products ---
@@ -187,6 +190,12 @@ export const purchasesApi = {
 
   cancel: (token: string, purchaseId: string): Promise<Purchase> =>
     request(`/api/v1/purchases/${purchaseId}/cancel`, { method: 'POST' }, token),
+
+  addPayment: (token: string, purchaseId: string, data: { amount: number; payment_method?: string; notes?: string }): Promise<Purchase> =>
+    request(`/api/v1/purchases/${purchaseId}/payments`, { method: 'POST', body: JSON.stringify(data) }, token),
+
+  accountsPayableSummary: (token: string): Promise<{ total_balance: number; overdue_count: number; upcoming_count: number; overdue: Purchase[]; upcoming: Purchase[] }> =>
+    request('/api/v1/purchases/accounts-payable/summary', {}, token),
 
   movements: (token: string): Promise<InventoryMovement[]> =>
     request('/api/v1/purchases/movements', {}, token),

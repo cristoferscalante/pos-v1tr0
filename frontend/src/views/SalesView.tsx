@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   BarChart2, Search, ChevronDown, ChevronRight,
   Wifi, WifiOff, Clock, CheckCircle, RefreshCw,
-  Banknote, CreditCard, ArrowLeftRight
+  Banknote, CreditCard, ArrowLeftRight, Trash2
 } from 'lucide-react';
 import { db } from '../db/pos-db';
 import { CustomSelect } from '../components/CustomSelect';
@@ -71,6 +71,13 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
       day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
+  };
+
+  const handleDeletePendingSale = async (sale: LocalSale) => {
+    if (sale.sync_status !== 'pending') return;
+    if (!confirm(`¿Eliminar la venta pendiente ${sale.sale_number}? Esta acción solo borra el registro local.`)) return;
+    await db.sales.delete(sale.id);
+    await loadSales();
   };
 
   return (
@@ -189,6 +196,17 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
                       ? <><Wifi size={12} /> Sincronizado</>
                       : <><WifiOff size={12} /> Pendiente</>}
                   </span>
+                  {sale.sync_status === 'pending' && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void handleDeletePendingSale(sale); }}
+                      className="btn-secondary"
+                      style={{ padding: '6px 10px' }}
+                      title="Eliminar venta pendiente local"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  )}
                   <span className="sale-total">${sale.total.toLocaleString('es-CO')}</span>
                   {expandedId === sale.id
                     ? <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />

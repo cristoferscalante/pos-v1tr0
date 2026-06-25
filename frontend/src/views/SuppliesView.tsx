@@ -30,6 +30,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [kardex, setKardex] = useState<InventoryMovement[]>([]);
+  const [accountsPayable, setAccountsPayable] = useState<{ total_balance: number; overdue_count: number; upcoming_count: number; overdue: Purchase[]; upcoming: Purchase[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [supplierForm, setSupplierForm] = useState({
@@ -59,6 +60,9 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
   const [savingSupplier, setSavingSupplier] = useState(false);
   const [savingPurchase, setSavingPurchase] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('0');
+  const [paymentMethod, setPaymentMethod] = useState('transfer');
+  const [paymentNotes, setPaymentNotes] = useState('');
 
   const load = async () => {
     if (!token || !isOnline) {
@@ -67,16 +71,18 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
     }
     setLoading(true);
     try {
-      const [suppliersData, productsData, purchasesData, movementsData] = await Promise.all([
+      const [suppliersData, productsData, purchasesData, movementsData, accountsPayableData] = await Promise.all([
         suppliersApi.list(token),
         productsApi.list(token),
         purchasesApi.list(token, { supplier_id: purchaseSupplierFilter || undefined, balance_only: balanceOnly }),
         purchasesApi.movements(token),
+        purchasesApi.accountsPayableSummary(token),
       ]);
       setSuppliers(suppliersData);
       setProducts(productsData);
       setPurchases(purchasesData);
       setMovements(movementsData);
+      setAccountsPayable(accountsPayableData);
 
       const firstSupplierId = suppliersData[0]?.id || '';
       const firstProductId = productsData[0]?.id || '';
@@ -273,6 +279,29 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
   const updatePurchaseLine = (index: number, key: keyof PurchaseLineForm, value: string) => setPurchaseLines(prev => prev.map((line, i) => i === index ? { ...line, [key]: value } : line));
   const removePurchaseLine = (index: number) => setPurchaseLines(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== index));
 
+  const handleAddPayment = async () => {
+    if (!token || !selectedPurchaseDetail) return;
+    if (Number(paymentAmount) <= 0) {
+      warning('El pago debe ser mayor a 0');
+      return;
+    }
+    try {
+      const updated = await purchasesApi.addPayment(token, selectedPurchaseDetail.id, {
+        amount: Number(paymentAmount),
+        payment_method: paymentMethod,
+        notes: paymentNotes || undefined,
+      });
+      success('Pago registrado correctamente');
+      setSelectedPurchaseDetail(updated);
+      setPaymentAmount('0');
+      setPaymentMethod('transfer');
+      setPaymentNotes('');
+      await load();
+    } catch (err: any) {
+      error(err.message || 'No se pudo registrar el pago');
+    }
+  };
+
   if (!isOnline) {
     return (
       <div className="view-container">
@@ -309,6 +338,39 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
             <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(34,211,238,0.15)' }}><History size={20} style={{ color: 'var(--accent)' }} /></div><div><p className="stat-value">{movements.length}</p><p className="stat-label">Movimientos</p></div></div>
             <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(245,158,11,0.15)' }}><Wallet size={20} style={{ color: 'var(--warning)' }} /></div><div><p className="stat-value">${purchases.reduce((sum, p) => sum + Number(p.balance_due || 0), 0).toLocaleString('es-CO')}</p><p className="stat-label">Cuentas por pagar</p></div></div>
           </div>
+
+          {accountsPayable && (
+            <div className="dashboard-grid">
+              <div className="dashboard-panel glass">
+                <div className="panel-header"><h3 className="panel-title">Vencidas</h3></div>
+                {accountsPayable.overdue.length === 0 ? <div className="empty-state-sm">Sin compras vencidas.</div> : (
+                  <div className="top-products-list">
+                    {accountsPayable.overdue.map(item => (
+                      <div key={item.id} className="top-product-item">
+                        <span className="top-rank"><Wallet size={14} /></span>
+                        <div className="top-product-info"><p className="top-product-name">{item.supplier_name || item.invoice_number || item.id}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vence: {item.due_date ? new Date(item.due_date).toLocaleDateString('es-CO') : '—'}</div></div>
+                        <div className="top-product-stats"><span className="top-revenue">${Number(item.balance_due).toLocaleString('es-CO')}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="dashboard-panel glass">
+                <div className="panel-header"><h3 className="panel-title">Por vencer</h3></div>
+                {accountsPayable.upcoming.length === 0 ? <div className="empty-state-sm">Sin compras pendientes por vencer.</div> : (
+                  <div className="top-products-list">
+                    {accountsPayable.upcoming.map(item => (
+                      <div key={item.id} className="top-product-item">
+                        <span className="top-rank"><Wallet size={14} /></span>
+                        <div className="top-product-info"><p className="top-product-name">{item.supplier_name || item.invoice_number || item.id}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vence: {item.due_date ? new Date(item.due_date).toLocaleDateString('es-CO') : '—'}</div></div>
+                        <div className="top-product-stats"><span className="top-revenue">${Number(item.balance_due).toLocaleString('es-CO')}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="settings-grid">
             <div className="settings-card glass">
@@ -469,6 +531,28 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="settings-card glass" style={{ padding: '16px' }}>
+                    <div className="settings-card-header"><Wallet size={18} style={{ color: 'var(--warning)' }} /><h2 className="settings-card-title">Historial de Pagos</h2></div>
+                    {(selectedPurchaseDetail.payments || []).length === 0 ? <div className="empty-state-sm">Sin pagos registrados.</div> : (
+                      <div className="top-products-list">
+                        {(selectedPurchaseDetail.payments || []).map(payment => (
+                          <div key={payment.id} className="top-product-item">
+                            <span className="top-rank"><Wallet size={14} /></span>
+                            <div className="top-product-info"><p className="top-product-name">{payment.payment_method}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(payment.created_at).toLocaleString('es-CO')}</div></div>
+                            <div className="top-product-stats"><span className="top-revenue">${Number(payment.amount).toLocaleString('es-CO')}</span></div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="pos-form" style={{ marginTop: '12px' }}>
+                      <div className="form-grid-2">
+                        <div className="form-group"><label className="form-label">Monto</label><input type="number" className="form-input" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} /></div>
+                        <div className="form-group"><label className="form-label">Método</label><select className="form-select" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}><option value="transfer">Transferencia</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></div>
+                      </div>
+                      <div className="form-group"><label className="form-label">Notas</label><input className="form-input" value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} /></div>
+                      <button type="button" onClick={handleAddPayment} className="btn-primary"><Plus size={15} /> Registrar pago</button>
+                    </div>
                   </div>
                 </div>
               </div>

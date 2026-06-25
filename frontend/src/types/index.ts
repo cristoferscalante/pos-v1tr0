@@ -161,6 +161,18 @@ export interface NotificationRule {
   updated_at: string;
 }
 
+export interface NotificationLog {
+  id: string;
+  tenant_id: string;
+  event_type: string;
+  recipient: string;
+  subject: string;
+  status: string;
+  error_message?: string | null;
+  payload?: Record<string, any>;
+  created_at: string;
+}
+
 export interface Supplier {
   id: string;
   tenant_id: string;
@@ -197,6 +209,13 @@ export interface Purchase {
     quantity: number;
     unit_cost: number;
     total_cost: number;
+  }>;
+  payments?: Array<{
+    id: string;
+    amount: number;
+    payment_method: string;
+    notes?: string | null;
+    created_at: string;
   }>;
   notes?: string | null;
   created_at: string;

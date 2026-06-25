@@ -25,6 +25,7 @@ const LEGACY_DEMO_PRODUCT_HINTS = [
   'med-01',
   'sham-01',
   'alim-01',
+  'veterinaria',
 ];
 
 // ========================
@@ -87,28 +88,31 @@ function AppInner() {
       const { productsApi } = await import('./api/client');
       const serverProducts = await productsApi.list(authToken);
 
-       if (serverProducts.length === 0) {
+      if (serverProducts.length === 0) {
         const localProducts = await db.products.toArray();
         const demoProductIds = new Set(
           localProducts
             .filter((product) => {
               const name = product.name.toLowerCase();
               const sku = (product.sku || '').toLowerCase();
-              return LEGACY_DEMO_PRODUCT_HINTS.some((hint) => name.includes(hint) || sku.includes(hint));
+              const category = (product.category || '').toLowerCase();
+              const tipo = String(product.meta_data?.tipo || '').toLowerCase();
+              return LEGACY_DEMO_PRODUCT_HINTS.some((hint) => name.includes(hint) || sku.includes(hint) || category.includes(hint) || tipo.includes(hint));
             })
             .map((product) => product.id)
         );
 
-        if (demoProductIds.size > 0) {
-          await db.products.bulkDelete(Array.from(demoProductIds));
+        const productIdsToDelete = demoProductIds.size > 0 ? Array.from(demoProductIds) : localProducts.map((product) => product.id);
+        if (productIdsToDelete.length > 0) {
+          await db.products.bulkDelete(productIdsToDelete);
 
           const localSales = await db.sales.toArray();
-          const demoSaleIds = localSales
-            .filter((sale) => sale.details.some((detail) => demoProductIds.has(detail.product_id)))
+          const saleIdsToDelete = localSales
+            .filter((sale) => sale.details.some((detail) => productIdsToDelete.includes(detail.product_id)))
             .map((sale) => sale.id);
 
-          if (demoSaleIds.length > 0) {
-            await db.sales.bulkDelete(demoSaleIds);
+          if (saleIdsToDelete.length > 0) {
+            await db.sales.bulkDelete(saleIdsToDelete);
           }
 
           await checkPending();
