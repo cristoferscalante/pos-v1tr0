@@ -140,8 +140,40 @@ function AppInner() {
   }, [loadProducts, checkPending]);
 
   // ---- Sync pending sales ----
+  const syncProducts = useCallback(async () => {
+    if (!isOnline || !token) return;
+
+    const pendingProducts = (await db.products.toArray()).filter((product) => product.sync_status === 'pending');
+    if (pendingProducts.length === 0) return;
+
+    for (const product of pendingProducts) {
+      try {
+        const created = await (await import('./api/client')).productsApi.create(token, {
+          id: product.id,
+          name: product.name,
+          sku: product.sku,
+          barcode: product.barcode,
+          price: product.price,
+          cost: product.cost,
+          stock: product.stock,
+          category: product.category,
+          image: product.image,
+          tax_rate: product.tax_rate,
+          meta_data: product.meta_data,
+        } as any);
+        await db.products.put({ ...(created as LocalProduct), sync_status: 'synced', sync_error: undefined });
+      } catch (error: any) {
+        product.sync_error = error?.message || 'Producto pendiente de sincronización';
+        await db.products.put(product);
+      }
+    }
+
+    await loadProducts();
+  }, [isOnline, token, loadProducts]);
+
   const syncSales = useCallback(async () => {
     if (!isOnline || !token || isSyncing) return;
+    await syncProducts();
     const pending = await db.sales.where('sync_status').equals('pending').toArray();
     if (pending.length === 0) {
       setPendingSync(0);
@@ -196,7 +228,7 @@ function AppInner() {
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, token, isSyncing, success, showError, checkPending]);
+  }, [isOnline, token, isSyncing, success, showError, checkPending, syncProducts]);
 
   useEffect(() => {
     void requestPersistentStorage();

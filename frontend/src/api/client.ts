@@ -126,7 +126,7 @@ export const productsApi = {
   list: (token: string): Promise<ApiProduct[]> =>
     request('/api/v1/products/', {}, token),
 
-  create: (token: string, data: Omit<ApiProduct, 'id' | 'tenant_id'>): Promise<ApiProduct> =>
+  create: (token: string, data: Omit<ApiProduct, 'tenant_id'>): Promise<ApiProduct> =>
     request('/api/v1/products/', { method: 'POST', body: JSON.stringify(data) }, token),
 
   update: (token: string, id: string, data: Partial<ApiProduct>): Promise<ApiProduct> =>

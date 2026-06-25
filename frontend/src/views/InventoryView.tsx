@@ -192,6 +192,8 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         category: prodCategory,
         image: productImage || undefined,
         tax_rate: form.tax_rate !== undefined ? Number(form.tax_rate) : 19,
+        sync_status: isOnline && token ? 'synced' : 'pending',
+        sync_error: undefined,
         meta_data: {
           tipo: prodCategory,
           detalle_especifico: metaExtra || undefined,
@@ -205,11 +207,16 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
       if (isOnline && token) {
         try {
           if (editingProduct) {
-            await productsApi.update(token, productData.id, productData);
+            const updated = await productsApi.update(token, productData.id, productData);
+            await db.products.put({ ...(updated as LocalProduct), sync_status: 'synced', sync_error: undefined });
           } else {
-            await productsApi.create(token, productData);
+            const created = await productsApi.create(token, productData as any);
+            await db.products.put({ ...(created as LocalProduct), sync_status: 'synced', sync_error: undefined });
           }
         } catch (e) {
+          productData.sync_status = 'pending';
+          productData.sync_error = 'Producto pendiente de sincronización';
+          await db.products.put(productData);
           warning('Guardado localmente. Se sincronizará cuando haya conexión.');
         }
       }

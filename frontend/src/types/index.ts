@@ -31,6 +31,8 @@ export interface LocalProduct {
   category?: string;
   image?: string;
   tax_rate?: number;
+  sync_status?: 'pending' | 'synced';
+  sync_error?: string;
   meta_data?: Record<string, any>;
 }
 

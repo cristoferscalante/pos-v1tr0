@@ -8,7 +8,7 @@ class POSDatabase extends Dexie {
 
   constructor() {
     super('POSDatabase');
-    this.version(2).stores({
+    this.version(3).stores({
       products: 'id, name, sku, barcode, category',
       sales: 'id, sale_number, sync_status, created_at, payment_method',
       customers: 'id, name, email',

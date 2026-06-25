@@ -24,7 +24,7 @@ class Product(ProductBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
 
 class ProductCreate(ProductBase):
-    pass
+    id: Optional[uuid.UUID] = None
 
 class ProductRead(ProductBase):
     id: uuid.UUID

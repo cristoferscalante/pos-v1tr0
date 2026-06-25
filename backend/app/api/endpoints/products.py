@@ -31,9 +31,20 @@ def create_product(
             detail="Acceso denegado: se requieren permisos de administrador para crear productos"
         )
     tenant_id = current_user.tenant_id
-    db_product = Product.model_validate(data)
+    product_data = data.model_dump(exclude_unset=True)
+    requested_id = product_data.pop("id", None)
+    db_product = Product.model_validate(product_data)
+    if requested_id is not None:
+        db_product.id = requested_id
     db_product.tenant_id = tenant_id
-    
+
+    existing_product = session.get(Product, db_product.id)
+    if existing_product:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un producto con ese identificador"
+        )
+     
     session.add(db_product)
     session.commit()
     session.refresh(db_product)
