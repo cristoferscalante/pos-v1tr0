@@ -20,6 +20,28 @@ DEFAULT_NOTIFICATION_RULES = {
 }
 
 
+def _json_safe(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, list | tuple | set):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if hasattr(value, "model_dump"):
+        return _json_safe(value.model_dump())
+    if hasattr(value, "__dict__"):
+        return {
+            key: _json_safe(item)
+            for key, item in vars(value).items()
+            if not key.startswith("_")
+        }
+    return str(value)
+
+
 def ensure_default_notification_rules(
     session: Session,
     tenant_id: uuid.UUID,
@@ -168,7 +190,7 @@ def _log_notification(
             subject=subject,
             status=status,
             error_message=error_message,
-            payload=payload,
+            payload=_json_safe(payload),
         )
     )
 
@@ -202,7 +224,7 @@ def notify_event(session: Session, tenant_id: uuid.UUID, event_type: str, contex
             recipient=recipient,
             subject=subject,
             status=status,
-            payload={"context": context},
+            payload={"context": _json_safe(context)},
             error_message=None if success else message,
         )
     session.commit()

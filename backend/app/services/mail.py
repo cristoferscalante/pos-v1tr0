@@ -40,6 +40,6 @@ def send_email(recipients: Iterable[str], subject: str, html: str, text: str) ->
         return True, "ok"
     except error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="ignore")
-        return False, f"HTTP {exc.code}: {detail}"
+        return False, f"HTTP {exc.code} [{settings.EMAIL_API_BASE_URL}] sender={settings.EMAIL_FROM_EMAIL} header={settings.EMAIL_API_AUTH_HEADER}: {detail}"
     except Exception as exc:  # pragma: no cover - red externa
         return False, str(exc)
