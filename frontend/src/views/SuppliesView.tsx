@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, History, Pencil, Plus, RefreshCw, RotateCcw, ShoppingBag, Truck, Wallet } from 'lucide-react';
+import { Building2, History, Pencil, Plus, RefreshCw, RotateCcw, ShoppingBag, Trash2, Truck, Wallet } from 'lucide-react';
 
 import { productsApi, purchasesApi, suppliersApi } from '../api/client';
 import { useToast } from '../components/Toast';
@@ -57,6 +57,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
   const [selectedPurchaseDetail, setSelectedPurchaseDetail] = useState<Purchase | null>(null);
   const [purchaseSupplierFilter, setPurchaseSupplierFilter] = useState('');
   const [balanceOnly, setBalanceOnly] = useState(false);
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
   const [savingSupplier, setSavingSupplier] = useState(false);
   const [savingPurchase, setSavingPurchase] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
@@ -122,20 +123,59 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
     }
     setSavingSupplier(true);
     try {
-      const supplier = await suppliersApi.create(token, {
+      const payload = {
         ...supplierForm,
         name: supplierForm.name.trim(),
         payment_terms_days: Number(supplierForm.payment_terms_days || 0),
-      });
-      success('Proveedor creado correctamente');
-      setSuppliers(prev => [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedSupplierId(supplier.id);
-      setReturnSupplierId(supplier.id);
+      };
+
+      if (editingSupplierId) {
+        const updated = await suppliersApi.update(token, editingSupplierId, payload);
+        success('Proveedor actualizado correctamente');
+        setSuppliers(prev => prev.map(item => item.id === updated.id ? updated : item).sort((a, b) => a.name.localeCompare(b.name)));
+      } else {
+        const supplier = await suppliersApi.create(token, payload);
+        success('Proveedor creado correctamente');
+        setSuppliers(prev => [...prev, supplier].sort((a, b) => a.name.localeCompare(b.name)));
+        setSelectedSupplierId(supplier.id);
+        setReturnSupplierId(supplier.id);
+      }
+
+      setEditingSupplierId(null);
       setSupplierForm({ name: '', contact_name: '', email: '', phone: '', document_number: '', address: '', city: '', payment_terms_days: '0', notes: '' });
     } catch (err: any) {
       error(err.message || 'No se pudo crear el proveedor');
     } finally {
       setSavingSupplier(false);
+    }
+  };
+
+  const handleEditSupplier = (supplier: Supplier) => {
+    setEditingSupplierId(supplier.id);
+    setSupplierForm({
+      name: supplier.name || '',
+      contact_name: supplier.contact_name || '',
+      email: supplier.email || '',
+      phone: supplier.phone || '',
+      document_number: supplier.document_number || '',
+      address: supplier.address || '',
+      city: supplier.city || '',
+      payment_terms_days: String(supplier.payment_terms_days || 0),
+      notes: supplier.notes || '',
+    });
+  };
+
+  const handleDeleteSupplier = async (supplier: Supplier) => {
+    if (!token) return;
+    if (!confirm(`¿Eliminar el proveedor ${supplier.name}?`)) return;
+    try {
+      await suppliersApi.delete(token, supplier.id);
+      success('Proveedor eliminado correctamente');
+      setSuppliers(prev => prev.filter(item => item.id !== supplier.id));
+      if (selectedSupplierId === supplier.id) setSelectedSupplierId('');
+      if (returnSupplierId === supplier.id) setReturnSupplierId('');
+    } catch (err: any) {
+      error(err.message || 'No se pudo eliminar el proveedor');
     }
   };
 
@@ -374,7 +414,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
           <div className="settings-grid">
             <div className="settings-card glass">
-              <div className="settings-card-header"><Building2 size={18} style={{ color: 'var(--primary)' }} /><h2 className="settings-card-title">Nuevo Proveedor</h2></div>
+              <div className="settings-card-header"><Building2 size={18} style={{ color: 'var(--primary)' }} /><h2 className="settings-card-title">{editingSupplierId ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2></div>
               <div className="pos-form">
                 <div className="form-group"><label className="form-label">Nombre</label><input className="form-input" value={supplierForm.name} onChange={e => setSupplierForm(prev => ({ ...prev, name: e.target.value }))} /></div>
                 <div className="form-grid-2">
@@ -391,7 +431,10 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                 </div>
                 <div className="form-group"><label className="form-label">Días de crédito</label><input type="number" className="form-input" value={supplierForm.payment_terms_days} onChange={e => setSupplierForm(prev => ({ ...prev, payment_terms_days: e.target.value }))} /></div>
                 <div className="form-group"><label className="form-label">Notas</label><textarea className="form-input" rows={2} value={supplierForm.notes} onChange={e => setSupplierForm(prev => ({ ...prev, notes: e.target.value }))} /></div>
-                <button type="button" onClick={handleCreateSupplier} disabled={savingSupplier} className="btn-primary"><Plus size={15} /> {savingSupplier ? 'Guardando...' : 'Crear proveedor'}</button>
+                <button type="button" onClick={handleCreateSupplier} disabled={savingSupplier} className="btn-primary"><Plus size={15} /> {savingSupplier ? 'Guardando...' : editingSupplierId ? 'Actualizar proveedor' : 'Crear proveedor'}</button>
+                {editingSupplierId && (
+                  <button type="button" onClick={() => { setEditingSupplierId(null); setSupplierForm({ name: '', contact_name: '', email: '', phone: '', document_number: '', address: '', city: '', payment_terms_days: '0', notes: '' }); }} className="btn-secondary">Cancelar edición</button>
+                )}
               </div>
             </div>
 
@@ -425,6 +468,27 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                 <button type="button" onClick={handleCreateOrUpdatePurchase} disabled={savingPurchase} className="btn-primary"><Plus size={15} /> {savingPurchase ? 'Guardando...' : editingPurchase ? 'Actualizar compra' : 'Registrar compra'}</button>
               </div>
             </div>
+          </div>
+
+          <div className="dashboard-panel glass">
+            <div className="panel-header"><h3 className="panel-title">Proveedores Guardados</h3></div>
+            {suppliers.length === 0 ? <div className="empty-state-sm">Aún no hay proveedores registrados.</div> : (
+              <div className="top-products-list">
+                {suppliers.map(supplier => (
+                  <div key={supplier.id} className="top-product-item">
+                    <span className="top-rank"><Building2 size={14} /></span>
+                    <div className="top-product-info">
+                      <p className="top-product-name">{supplier.name}</p>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{supplier.contact_name || 'Sin contacto'} {supplier.phone ? `| ${supplier.phone}` : ''} {supplier.payment_terms_days ? `| ${supplier.payment_terms_days} días` : ''}</div>
+                    </div>
+                    <div className="top-product-stats" style={{ flexDirection: 'row', gap: '8px' }}>
+                      <button type="button" className="btn-secondary" onClick={() => handleEditSupplier(supplier)}><Pencil size={13} /></button>
+                      <button type="button" className="btn-secondary" onClick={() => handleDeleteSupplier(supplier)}><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="dashboard-grid">

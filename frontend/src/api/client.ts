@@ -168,6 +168,9 @@ export const suppliersApi = {
 
   update: (token: string, supplierId: string, data: Partial<Supplier>): Promise<Supplier> =>
     request(`/api/v1/suppliers/${supplierId}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  delete: (token: string, supplierId: string): Promise<void> =>
+    request(`/api/v1/suppliers/${supplierId}`, { method: 'DELETE' }, token),
 };
 
 export const purchasesApi = {
