@@ -174,6 +174,10 @@ class TenantUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    display_name: Optional[str] = None
+    logo_url: Optional[str] = None
+    banner_url: Optional[str] = None
+    brand_color: Optional[str] = None
 
 class CollaboratorCreate(BaseModel):
     email: EmailStr
@@ -236,6 +240,18 @@ def update_tenant(
     if data.whatsapp_number is not None:
         meta = dict(tenant.meta_data or {})
         meta["whatsapp_number"] = data.whatsapp_number.strip()
+        tenant.meta_data = meta
+
+    if any(value is not None for value in [data.display_name, data.logo_url, data.banner_url, data.brand_color]):
+        meta = dict(tenant.meta_data or {})
+        if data.display_name is not None:
+            meta["display_name"] = data.display_name.strip()
+        if data.logo_url is not None:
+            meta["logo_url"] = data.logo_url.strip()
+        if data.banner_url is not None:
+            meta["banner_url"] = data.banner_url.strip()
+        if data.brand_color is not None:
+            meta["brand_color"] = data.brand_color.strip()
         tenant.meta_data = meta
         
     session.add(tenant)

@@ -94,16 +94,28 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
 
     const cleanNumber = whatsappNumber.replace(/[^\d+]/g, '');
 
-    let message = `*Pedido para ${tenant.name}*\n\n`;
+    let message = `*Pedido para ${tenant?.meta_data?.display_name || tenant.name}*\n\n`;
     cart.forEach(item => {
       const itemTotal = Number(item.product.price) * item.quantity;
       message += `• *${item.quantity}x* ${item.product.name} _(${formatCurrency(Number(item.product.price))} c/u)_ = *${formatCurrency(itemTotal)}*\n`;
     });
-    message += `\n*Total a pagar: ${formatCurrency(getCartTotal())}*\n\n_Enviado desde el catálogo público de V1TR0 POS._`;
+    message += `\n*Total a pagar: ${formatCurrency(getCartTotal())}*\n\n_Enviado desde el catálogo público de ${tenant?.meta_data?.display_name || tenant.name}._`;
 
     const encodedText = encodeURIComponent(message);
     const url = `https://wa.me/${cleanNumber}?text=${encodedText}`;
     window.open(url, '_blank');
+  };
+
+  const handleBuyNow = (product: ApiProduct) => {
+    const whatsappNumber = tenant?.meta_data?.whatsapp_number;
+    if (!whatsappNumber) {
+      alert('Este negocio no tiene configurado un número de WhatsApp para recibir pedidos.');
+      return;
+    }
+
+    const cleanNumber = whatsappNumber.replace(/[^\d+]/g, '');
+    const message = `*Compra directa para ${tenant?.meta_data?.display_name || tenant.name}*\n\n• *1x* ${product.name} = *${formatCurrency(Number(product.price))}*\n\n_Enviado desde el catálogo público._`;
+    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
   const filteredProducts = products.filter(p =>
@@ -137,14 +149,23 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
 
   return (
     <div className="public-catalog-container">
+      {tenant?.meta_data?.banner_url && (
+        <div style={{ width: '100%', maxHeight: '260px', overflow: 'hidden', borderBottom: '1px solid var(--border)' }}>
+          <img src={tenant.meta_data.banner_url} alt={tenant?.meta_data?.display_name || tenant.name} style={{ width: '100%', height: '260px', objectFit: 'cover', display: 'block' }} />
+        </div>
+      )}
       {/* Header */}
       <header className="catalog-header glass">
         <div className="header-info">
-          <div className="store-badge">
-            <Store size={24} />
+          <div className="store-badge" style={tenant?.meta_data?.brand_color ? { background: tenant.meta_data.brand_color } : undefined}>
+            {tenant?.meta_data?.logo_url ? (
+              <img src={tenant.meta_data.logo_url} alt={tenant?.meta_data?.display_name || tenant.name} style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 8 }} />
+            ) : (
+              <Store size={24} />
+            )}
           </div>
           <div>
-            <h1 className="store-name">{tenant.name}</h1>
+            <h1 className="store-name">{tenant?.meta_data?.display_name || tenant.name}</h1>
             <p className="store-type">
               {getBusinessTypeIcon(tenant.business_type, 14)} {getBusinessTypeLabel(tenant.business_type)}
             </p>
@@ -204,13 +225,15 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
                   <h3 className="product-card-title">{product.name}</h3>
                   <div className="product-card-footer">
                     <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
-                    <button
-                      className="btn-add-cart"
-                      onClick={() => addToCart(product)}
-                    >
-                      <Plus size={16} />
-                      Añadir
-                    </button>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <button className="btn-add-cart" onClick={() => addToCart(product)}>
+                        <Plus size={16} />
+                        Añadir
+                      </button>
+                      <button className="btn-secondary" onClick={() => handleBuyNow(product)}>
+                        Comprar
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

@@ -30,6 +30,10 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   // Tenant / Catalog config state
   const [tenantSlug, setTenantSlug] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [logoUrl, setLogoUrl] = useState('');
+  const [bannerUrl, setBannerUrl] = useState('');
+  const [brandColor, setBrandColor] = useState('#6366f1');
   const [savingTenant, setSavingTenant] = useState(false);
 
   // Collaborators management state
@@ -52,6 +56,10 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         .then(data => {
           setTenantSlug(data.slug || '');
           setWhatsappNumber(data.meta_data?.whatsapp_number || '');
+          setDisplayName(data.meta_data?.display_name || data.name || '');
+          setLogoUrl(data.meta_data?.logo_url || '');
+          setBannerUrl(data.meta_data?.banner_url || '');
+          setBrandColor(data.meta_data?.brand_color || '#6366f1');
         })
         .catch(() => {
           error('Error al cargar la configuración del negocio');
@@ -180,14 +188,19 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
     try {
       const data = await authApi.updateTenant(token, {
         slug: tenantSlug,
-        whatsapp_number: whatsappNumber
+        whatsapp_number: whatsappNumber,
+        display_name: displayName,
+        logo_url: logoUrl,
+        banner_url: bannerUrl,
+        brand_color: brandColor,
       });
       success('Configuración del catálogo actualizada correctamente');
       if (user && onUserUpdate) {
         onUserUpdate({
           ...user,
           slug: data.slug,
-          business_name: data.name
+          business_name: data.name,
+          meta_data: data.meta_data,
         });
       }
     } catch (err: any) {
@@ -347,6 +360,50 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   Número con código de país al que los clientes enviarán sus carritos de compra.
                 </span>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Nombre Comercial Visible</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  className="form-input"
+                  placeholder="Ej. Veterinaria Huellitas"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">URL del Logo</label>
+                <input
+                  type="text"
+                  value={logoUrl}
+                  onChange={e => setLogoUrl(e.target.value)}
+                  className="form-input"
+                  placeholder="https://.../logo.png"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">URL del Banner</label>
+                <input
+                  type="text"
+                  value={bannerUrl}
+                  onChange={e => setBannerUrl(e.target.value)}
+                  className="form-input"
+                  placeholder="https://.../banner.jpg"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Color de Marca</label>
+                <input
+                  type="color"
+                  value={brandColor}
+                  onChange={e => setBrandColor(e.target.value)}
+                  className="form-input"
+                  style={{ padding: '6px', height: '44px' }}
+                />
               </div>
 
               <div className="form-group">
