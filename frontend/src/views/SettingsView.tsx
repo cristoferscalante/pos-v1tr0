@@ -8,6 +8,7 @@ import { API_URL, authApi } from '../api/client';
 import { useToast } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import type { AuthUser, NotificationLog, NotificationRule } from '../types';
+import { fileToDataUrl } from '../utils/imageUpload';
 
 interface SettingsViewProps {
   user: AuthUser | null;
@@ -382,6 +383,21 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   className="form-input"
                   placeholder="https://.../logo.png"
                 />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setLogoUrl(await fileToDataUrl(file));
+                    } catch (err: any) {
+                      error(err.message || 'No se pudo cargar el logo');
+                    }
+                  }}
+                  className="form-input"
+                  style={{ marginTop: '8px' }}
+                />
               </div>
 
               <div className="form-group">
@@ -392,6 +408,21 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   onChange={e => setBannerUrl(e.target.value)}
                   className="form-input"
                   placeholder="https://.../banner.jpg"
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async e => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    try {
+                      setBannerUrl(await fileToDataUrl(file));
+                    } catch (err: any) {
+                      error(err.message || 'No se pudo cargar el banner');
+                    }
+                  }}
+                  className="form-input"
+                  style={{ marginTop: '8px' }}
                 />
               </div>
 

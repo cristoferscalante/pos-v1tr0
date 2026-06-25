@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.services.mail import send_email
+from app.services.notifications import _email_shell, _info_row
 
 
 def _hash_token(token: str) -> str:
@@ -48,11 +49,22 @@ def send_password_reset_email(session: Session, user: User) -> tuple[bool, str]:
         f"Usa este enlace: {reset_url}\n"
         f"El enlace vence en {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutos."
     )
-    html = (
-        "<h2>Recuperacion de contrasena</h2>"
-        "<p>Recibimos una solicitud para restablecer tu contrasena.</p>"
-        f"<p><a href=\"{reset_url}\">Restablecer contrasena</a></p>"
-        f"<p>El enlace vence en {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutos.</p>"
+    body = (
+        "<div style=\"font-size:14px;color:#374151;line-height:1.7;margin-bottom:20px;\">"
+        "Recibimos una solicitud para restablecer tu contraseña. Usa el botón o enlace de abajo para continuar."
+        "</div>"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;margin-bottom:24px;\">"
+        f"{_info_row('Cuenta', user.email)}"
+        f"{_info_row('Validez', f'{settings.PASSWORD_RESET_EXPIRE_MINUTES} minutos')}"
+        "</table>"
+        f"<div style=\"margin:24px 0;\"><a href=\"{reset_url}\" style=\"display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;\">Restablecer contraseña</a></div>"
+        f"<div style=\"font-size:12px;color:#6b7280;line-height:1.6;word-break:break-all;\">Si el botón no funciona, copia y pega este enlace en tu navegador:<br />{reset_url}</div>"
+    )
+    html = _email_shell(
+        "Recuperación de contraseña",
+        "Solicitud segura para restablecer el acceso a tu cuenta.",
+        body,
+        "Si no solicitaste este cambio, puedes ignorar este mensaje sin realizar ninguna acción.",
     )
     return send_email([user.email], subject, html, text)
 

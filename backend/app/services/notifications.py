@@ -20,6 +20,63 @@ DEFAULT_NOTIFICATION_RULES = {
 }
 
 
+def _format_currency(value: Any) -> str:
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    return f"${amount:,.2f}"
+
+
+def _info_row(label: str, value: str) -> str:
+    return (
+        "<tr>"
+        f"<td style=\"padding:10px 0;color:#6b7280;font-size:13px;\">{label}</td>"
+        f"<td style=\"padding:10px 0;color:#111827;font-size:13px;font-weight:600;text-align:right;\">{value}</td>"
+        "</tr>"
+    )
+
+
+def _email_shell(title: str, subtitle: str, body_html: str, footer: str) -> str:
+    return f"""
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 40px rgba(15,23,42,0.10);">
+            <tr>
+              <td style="padding:28px 32px 18px 32px;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#ffffff;">
+                <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.85;">V1TR0 POS</div>
+                <div style="font-size:28px;line-height:1.15;font-weight:700;margin-top:10px;">{title}</div>
+                <div style="font-size:14px;line-height:1.5;opacity:0.92;margin-top:10px;">{subtitle}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px 32px;">
+                {body_html}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:18px 32px 28px 32px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.6;">
+                {footer}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""
+
+
 def _json_safe(value: Any) -> Any:
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
@@ -92,17 +149,27 @@ def render_notification(event_type: str, context: dict[str, Any]) -> tuple[str, 
         subject = f"[{tenant_name}] Venta registrada {sale.sale_number}"
         text = (
             f"Se registro la venta {sale.sale_number}.\n"
-            f"Total: ${float(sale.total):,.2f}\n"
+            f"Total: {_format_currency(sale.total)}\n"
             f"Metodo de pago: {sale.payment_method}\n"
             f"Fecha: {sale.created_at.isoformat()}\n"
         )
-        html = (
-            f"<h2>Venta registrada</h2>"
-            f"<p><strong>Negocio:</strong> {tenant_name}</p>"
-            f"<p><strong>Venta:</strong> {sale.sale_number}</p>"
-            f"<p><strong>Total:</strong> ${float(sale.total):,.2f}</p>"
-            f"<p><strong>Metodo:</strong> {sale.payment_method}</p>"
-            f"<p><strong>Fecha:</strong> {sale.created_at.isoformat()}</p>"
+        body = (
+            "<div style=\"font-size:14px;color:#374151;line-height:1.7;margin-bottom:20px;\">"
+            f"Se ha registrado una nueva venta para <strong>{tenant_name}</strong>."
+            "</div>"
+            "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">"
+            f"{_info_row('Negocio', tenant_name)}"
+            f"{_info_row('Venta', sale.sale_number)}"
+            f"{_info_row('Total', _format_currency(sale.total))}"
+            f"{_info_row('Metodo', sale.payment_method)}"
+            f"{_info_row('Fecha', sale.created_at.strftime('%Y-%m-%d %H:%M'))}"
+            "</table>"
+        )
+        html = _email_shell(
+            "Venta registrada",
+            "Resumen simple de una venta confirmada en el sistema.",
+            body,
+            "Este correo fue generado automaticamente por el sistema POS.",
         )
         return subject, text, html
 
@@ -111,14 +178,24 @@ def render_notification(event_type: str, context: dict[str, Any]) -> tuple[str, 
         subject = f"[{tenant_name}] Caja abierta"
         text = (
             f"Se abrio una caja en {tenant_name}.\n"
-            f"Monto inicial: ${float(cash_session.opening_amount):,.2f}\n"
+            f"Monto inicial: {_format_currency(cash_session.opening_amount)}\n"
             f"Fecha: {cash_session.opened_at.isoformat()}\n"
         )
-        html = (
-            f"<h2>Caja abierta</h2>"
-            f"<p><strong>Negocio:</strong> {tenant_name}</p>"
-            f"<p><strong>Monto inicial:</strong> ${float(cash_session.opening_amount):,.2f}</p>"
-            f"<p><strong>Fecha:</strong> {cash_session.opened_at.isoformat()}</p>"
+        body = (
+            "<div style=\"font-size:14px;color:#374151;line-height:1.7;margin-bottom:20px;\">"
+            f"Se abrio una caja para <strong>{tenant_name}</strong>."
+            "</div>"
+            "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">"
+            f"{_info_row('Negocio', tenant_name)}"
+            f"{_info_row('Monto inicial', _format_currency(cash_session.opening_amount))}"
+            f"{_info_row('Fecha', cash_session.opened_at.strftime('%Y-%m-%d %H:%M'))}"
+            "</table>"
+        )
+        html = _email_shell(
+            "Caja abierta",
+            "Control de apertura de caja del negocio.",
+            body,
+            "Revision sugerida: valida el monto base y el usuario que abrio caja.",
         )
         return subject, text, html
 
@@ -127,16 +204,26 @@ def render_notification(event_type: str, context: dict[str, Any]) -> tuple[str, 
         subject = f"[{tenant_name}] Cierre de caja"
         text = (
             f"Se cerro una caja en {tenant_name}.\n"
-            f"Monto esperado: ${float(context.get('expected_amount', 0)) :,.2f}\n"
-            f"Monto declarado: ${float(cash_session.actual_closing_amount or 0):,.2f}\n"
+            f"Monto esperado: {_format_currency(context.get('expected_amount', 0))}\n"
+            f"Monto declarado: {_format_currency(cash_session.actual_closing_amount or 0)}\n"
             f"Ventas asociadas: {context.get('sales_count', 0)}\n"
         )
-        html = (
-            f"<h2>Cierre de caja</h2>"
-            f"<p><strong>Negocio:</strong> {tenant_name}</p>"
-            f"<p><strong>Monto esperado:</strong> ${float(context.get('expected_amount', 0)) :,.2f}</p>"
-            f"<p><strong>Monto declarado:</strong> ${float(cash_session.actual_closing_amount or 0):,.2f}</p>"
-            f"<p><strong>Ventas asociadas:</strong> {context.get('sales_count', 0)}</p>"
+        body = (
+            "<div style=\"font-size:14px;color:#374151;line-height:1.7;margin-bottom:20px;\">"
+            f"Se ha cerrado una caja en <strong>{tenant_name}</strong>."
+            "</div>"
+            "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">"
+            f"{_info_row('Negocio', tenant_name)}"
+            f"{_info_row('Monto esperado', _format_currency(context.get('expected_amount', 0)))}"
+            f"{_info_row('Monto declarado', _format_currency(cash_session.actual_closing_amount or 0))}"
+            f"{_info_row('Ventas asociadas', str(context.get('sales_count', 0)))}"
+            "</table>"
+        )
+        html = _email_shell(
+            "Cierre de caja",
+            "Resumen del cierre y diferencias declaradas.",
+            body,
+            "Si hay diferencias, compara el cierre con movimientos y ventas del turno.",
         )
         return subject, text, html
 
@@ -145,9 +232,22 @@ def render_notification(event_type: str, context: dict[str, Any]) -> tuple[str, 
         lines = [f"- {product['name']}: {product['stock']}" for product in products]
         subject = f"[{tenant_name}] Alerta de stock bajo"
         text = "Productos con stock bajo:\n" + "\n".join(lines)
-        html = "<h2>Alerta de stock bajo</h2><ul>" + "".join(
-            f"<li>{product['name']}: {product['stock']}</li>" for product in products
-        ) + "</ul>"
+        items = "".join(
+            f"<tr><td style=\"padding:10px 0;color:#111827;font-size:13px;font-weight:600;\">{product['name']}</td><td style=\"padding:10px 0;color:#b45309;font-size:13px;font-weight:700;text-align:right;\">{product['stock']}</td></tr>"
+            for product in products
+        )
+        body = (
+            "<div style=\"font-size:14px;color:#374151;line-height:1.7;margin-bottom:20px;\">"
+            f"Estos productos de <strong>{tenant_name}</strong> requieren reposicion."
+            "</div>"
+            f"<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">{items}</table>"
+        )
+        html = _email_shell(
+            "Stock bajo",
+            "Aviso preventivo para evitar quiebres de inventario.",
+            body,
+            "Recomendacion: revisa compras pendientes y proveedores activos.",
+        )
         return subject, text, html
 
     if event_type == "daily_summary":
@@ -155,20 +255,32 @@ def render_notification(event_type: str, context: dict[str, Any]) -> tuple[str, 
         subject = f"[{tenant_name}] Resumen diario"
         text = (
             f"Ventas del dia: {summary.get('sales_count', 0)}\n"
-            f"Ingresos: ${float(summary.get('revenue', 0)):,.2f}\n"
-            f"Ganancia: ${float(summary.get('profit', 0)):,.2f}"
+            f"Ingresos: {_format_currency(summary.get('revenue', 0))}\n"
+            f"Ganancia: {_format_currency(summary.get('profit', 0))}"
         )
-        html = (
-            "<h2>Resumen diario</h2>"
-            f"<p><strong>Ventas del dia:</strong> {summary.get('sales_count', 0)}</p>"
-            f"<p><strong>Ingresos:</strong> ${float(summary.get('revenue', 0)):,.2f}</p>"
-            f"<p><strong>Ganancia:</strong> ${float(summary.get('profit', 0)):,.2f}</p>"
+        body = (
+            "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"border-collapse:collapse;\">"
+            f"{_info_row('Ventas del dia', str(summary.get('sales_count', 0)))}"
+            f"{_info_row('Ingresos', _format_currency(summary.get('revenue', 0)))}"
+            f"{_info_row('Ganancia', _format_currency(summary.get('profit', 0)))}"
+            "</table>"
+        )
+        html = _email_shell(
+            "Resumen diario",
+            f"Cierre ejecutivo del dia para {tenant_name}.",
+            body,
+            "Este resumen se genera automaticamente segun la configuracion de notificaciones.",
         )
         return subject, text, html
 
     subject = f"[{tenant_name}] Notificacion del sistema"
     text = f"Notificacion generica enviada el {now}"
-    html = f"<p>Notificacion generica enviada el {now}</p>"
+    html = _email_shell(
+        "Notificacion del sistema",
+        "Mensaje automatico generado por el sistema POS.",
+        f"<div style=\"font-size:14px;color:#374151;line-height:1.7;\">Notificacion generica enviada el {now}</div>",
+        "V1TR0 POS",
+    )
     return subject, text, html
 
 

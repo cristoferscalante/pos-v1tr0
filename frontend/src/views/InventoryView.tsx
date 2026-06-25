@@ -8,6 +8,7 @@ import { productsApi } from '../api/client';
 import { useToast } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import { CustomSelect } from '../components/CustomSelect';
+import { fileToDataUrl } from '../utils/imageUpload';
 import type { SelectOption } from '../components/CustomSelect';
 import type { LocalProduct, AuthUser } from '../types';
 
@@ -485,12 +486,13 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                     <label className="image-upload-trigger">
                       <Plus size={16} />
                       <span>Subir archivo o seleccionar preset</span>
-                      <input type="file" accept="image/*" onChange={e => {
+                      <input type="file" accept="image/*" onChange={async e => {
                         const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => setProductImage(reader.result as string);
-                          reader.readAsDataURL(file);
+                        if (!file) return;
+                        try {
+                          setProductImage(await fileToDataUrl(file));
+                        } catch (err: any) {
+                          error(err.message || 'No se pudo cargar la imagen');
                         }
                       }} style={{ display: 'none' }} />
                     </label>

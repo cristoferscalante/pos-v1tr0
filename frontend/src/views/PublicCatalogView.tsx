@@ -207,7 +207,7 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
                 <div className="product-card-img-container">
                   {product.image ? (
                     <img
-                      src={product.image.startsWith('http') ? product.image : `${API_URL}${product.image}`}
+                      src={product.image.startsWith('http') || product.image.startsWith('data:') ? product.image : `${API_URL}${product.image}`}
                       alt={product.name}
                       className="product-card-img"
                       onError={(e) => {
