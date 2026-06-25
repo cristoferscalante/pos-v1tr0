@@ -61,6 +61,7 @@ function AppInner() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingSync, setPendingSync] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncErrorSignature, setLastSyncErrorSignature] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('pos_theme');
     return stored === 'light' ? 'light' : 'dark';
@@ -160,17 +161,27 @@ function AppInner() {
 
       if (result.synced_ids.length > 0) {
         success(`${result.synced_ids.length} venta(s) sincronizadas ✓`);
+        setLastSyncErrorSignature(null);
       }
       if ((result.errors || []).length > 0) {
-        showError(`Hay ${(result.errors || []).length} venta(s) con error de sincronización. Revisa el historial.`);
+        const errorSignature = JSON.stringify(
+          (result.errors || []).map((item) => `${item.sale_id}:${item.error}`)
+        );
+        if (lastSyncErrorSignature !== errorSignature) {
+          setLastSyncErrorSignature(errorSignature);
+          showError(`Hay ${(result.errors || []).length} venta(s) con error de sincronización. Revisa el historial.`);
+        }
       }
       await checkPending();
     } catch {
-      showError('Error de sincronización. Se reintentará automáticamente.');
+      if (lastSyncErrorSignature !== 'generic-sync-error') {
+        setLastSyncErrorSignature('generic-sync-error');
+        showError('Error de sincronización. Se reintentará automáticamente.');
+      }
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, token, isSyncing, success, showError, checkPending]);
+  }, [isOnline, token, isSyncing, success, showError, checkPending, lastSyncErrorSignature]);
 
   useEffect(() => {
     void requestPersistentStorage();

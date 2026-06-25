@@ -25,11 +25,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'info') => {
-    const id = crypto.randomUUID();
-    setToasts(prev => [...prev, { id, type, message }]);
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 4000);
+    setToasts(prev => {
+      const duplicate = prev.some(t => t.type === type && t.message === message);
+      if (duplicate) return prev;
+
+      const id = crypto.randomUUID();
+      setTimeout(() => {
+        setToasts(current => current.filter(t => t.id !== id));
+      }, 4000);
+
+      return [...prev, { id, type, message }];
+    });
   }, []);
 
   const success = useCallback((m: string) => showToast(m, 'success'), [showToast]);
