@@ -1,15 +1,15 @@
 """tenant scoped indexes
 
-Revision ID: 0002_tenant_scoped_indexes
-Revises: 0001_initial_schema
+Revision ID: 0002_tenant_idx
+Revises: 0001_init
 Create Date: 2026-06-25 00:20:00.000000
 """
 
 from alembic import op
 
 
-revision = "0002_tenant_scoped_indexes"
-down_revision = "0001_initial_schema"
+revision = "0002_tenant_idx"
+down_revision = "0001_init"
 branch_labels = None
 depends_on = None
 

@@ -1,7 +1,7 @@
 """purchase workflow and supplier fields
 
-Revision ID: 0004_purchase_workflow_and_supplier_fields
-Revises: 0003_supply_chain_tables
+Revision ID: 0004_purchase
+Revises: 0003_supply
 Create Date: 2026-06-25 17:10:00.000000
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0004_purchase_workflow_and_supplier_fields"
-down_revision = "0003_supply_chain_tables"
+revision = "0004_purchase"
+down_revision = "0003_supply"
 branch_labels = None
 depends_on = None
 

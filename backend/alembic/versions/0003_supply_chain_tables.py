@@ -1,7 +1,7 @@
 """supply chain tables
 
-Revision ID: 0003_supply_chain_tables
-Revises: 0002_tenant_scoped_indexes
+Revision ID: 0003_supply
+Revises: 0002_tenant_idx
 Create Date: 2026-06-25 16:00:00.000000
 """
 
@@ -9,8 +9,8 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0003_supply_chain_tables"
-down_revision = "0002_tenant_scoped_indexes"
+revision = "0003_supply"
+down_revision = "0002_tenant_idx"
 branch_labels = None
 depends_on = None
 

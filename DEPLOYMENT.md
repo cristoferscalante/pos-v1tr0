@@ -63,12 +63,14 @@ Cuando está activo, el backend envía el resumen diario por tenant a la hora in
 
 Revisiones actuales:
 
-- `0001_initial_schema`: baseline del esquema actual
-- `0002_tenant_scoped_indexes`: índices compuestos por tenant
+- `0001_init`: baseline del esquema actual
+- `0002_tenant_idx`: índices compuestos por tenant
+- `0003_supply`: proveedores, compras y movimientos base
+- `0004_purchase`: flujo ampliado de compras y campos extra de proveedor
 
 Comandos dentro de `backend`:
 
-- `alembic stamp 0001_initial_schema`
+- `alembic stamp 0001_init`
 - `alembic upgrade head`
 - `alembic revision -m "descripcion"`
 
@@ -76,10 +78,10 @@ Comandos dentro de `backend`:
 
 Usa esto una sola vez si la base ya fue creada antes de Alembic:
 
-1. `alembic stamp 0001_initial_schema`
+1. `alembic stamp 0001_init`
 2. `alembic upgrade head`
 
-Eso registra la base actual como baseline y luego aplica la migración incremental `0002_tenant_scoped_indexes`.
+Eso registra la base actual como baseline y luego aplica las migraciones incrementales siguientes.
 
 ### Producción con base nueva
 
