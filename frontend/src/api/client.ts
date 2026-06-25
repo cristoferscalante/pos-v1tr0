@@ -1,0 +1,176 @@
+// ========================
+// API CLIENT CENTRALIZADO V1TR0 POS
+// ========================
+import type {
+  AuthResponse, ApiProduct, ApiSale,
+  DashboardSummary, ChartDataPoint, TopProduct, LocalSale, CashSessionResponse, NotificationRule
+} from '../types';
+
+const rawApiUrl = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL.trim() : '';
+export const API_URL = rawApiUrl || '/api-proxy';
+
+class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = 'ApiError';
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  token?: string | null
+): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+
+  if (!res.ok) {
+    let detail = `HTTP ${res.status}`;
+    try {
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        detail = (await res.json()).detail || detail;
+      } else {
+        const text = await res.text();
+        detail = text || detail;
+      }
+    } catch { /* */ }
+    throw new ApiError(res.status, detail);
+  }
+
+  if (res.status === 204) return undefined as T;
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    return undefined as T;
+  }
+  return res.json();
+}
+
+// --- Auth ---
+export const authApi = {
+  login: (email: string, password: string): Promise<AuthResponse> => {
+    const formData = new URLSearchParams();
+    formData.append('username', email);
+    formData.append('password', password);
+    return fetch(`${API_URL}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formData.toString(),
+    }).then(async res => {
+      if (!res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        const detail = contentType.includes('application/json')
+          ? (await res.json()).detail || 'Error de autenticación'
+          : (await res.text()) || 'Error de autenticación';
+        throw new ApiError(res.status, detail);
+      }
+      return res.json();
+    });
+  },
+
+  register: (data: {
+    business_name: string;
+    business_type: string;
+    email: string;
+    password: string;
+  }): Promise<AuthResponse> =>
+    request('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+
+  forgotPassword: (email: string): Promise<{ status: string; message: string }> =>
+    request('/api/v1/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
+
+  resetPassword: (tokenValue: string, newPassword: string): Promise<{ status: string; message: string }> =>
+    request('/api/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: tokenValue, new_password: newPassword }) }),
+
+  getTenant: (token: string): Promise<any> =>
+    request('/api/v1/auth/tenant', {}, token),
+
+  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string }): Promise<any> =>
+    request('/api/v1/auth/tenant', { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  listCollaborators: (token: string): Promise<any[]> =>
+    request('/api/v1/auth/collaborators', {}, token),
+
+  createCollaborator: (token: string, data: { email: string; password: string }): Promise<any> =>
+    request('/api/v1/auth/collaborators', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  deleteCollaborator: (token: string, userId: string): Promise<void> =>
+    request(`/api/v1/auth/collaborators/${userId}`, { method: 'DELETE' }, token),
+
+  changePassword: (token: string, data: { current_password: string; new_password: string }): Promise<{ status: string }> =>
+    request('/api/v1/auth/change-password', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  listNotificationRules: (token: string): Promise<NotificationRule[]> =>
+    request('/api/v1/auth/notifications', {}, token),
+
+  updateNotificationRule: (token: string, ruleId: string, data: { enabled?: boolean; recipients?: string[]; meta_data?: Record<string, any> }): Promise<NotificationRule> =>
+    request(`/api/v1/auth/notifications/${ruleId}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  testNotificationEmail: (token: string, recipient: string): Promise<{ status: string; message: string }> =>
+    request('/api/v1/auth/notifications/test', { method: 'POST', body: JSON.stringify({ recipient }) }, token),
+};
+
+// --- Products ---
+export const productsApi = {
+  list: (token: string): Promise<ApiProduct[]> =>
+    request('/api/v1/products/', {}, token),
+
+  create: (token: string, data: Omit<ApiProduct, 'id' | 'tenant_id'>): Promise<ApiProduct> =>
+    request('/api/v1/products/', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  update: (token: string, id: string, data: Partial<ApiProduct>): Promise<ApiProduct> =>
+    request(`/api/v1/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  delete: (token: string, id: string): Promise<void> =>
+    request(`/api/v1/products/${id}`, { method: 'DELETE' }, token),
+};
+
+// --- Sales ---
+export const salesApi = {
+  list: (token: string): Promise<ApiSale[]> =>
+    request('/api/v1/sales/', {}, token),
+
+  syncOffline: (token: string, sales: LocalSale[]): Promise<{ synced_ids: string[]; errors: any[] }> =>
+    request('/api/v1/sales/sync', { method: 'POST', body: JSON.stringify({ sales }) }, token),
+};
+
+export const cashApi = {
+  current: (token: string): Promise<CashSessionResponse> =>
+    request('/api/v1/cash/current', {}, token),
+
+  list: (token: string): Promise<CashSessionResponse[]> =>
+    request('/api/v1/cash/', {}, token),
+
+  open: (token: string, data: { opening_amount: number; notes?: string }): Promise<CashSessionResponse> =>
+    request('/api/v1/cash/open', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  close: (token: string, sessionId: string, data: { actual_closing_amount: number; notes?: string }): Promise<CashSessionResponse> =>
+    request(`/api/v1/cash/${sessionId}/close`, { method: 'POST', body: JSON.stringify(data) }, token),
+};
+
+// --- Dashboard ---
+export const dashboardApi = {
+  summary: (token: string): Promise<DashboardSummary> =>
+    request('/api/v1/dashboard/summary', {}, token),
+
+  chart: (token: string, days = 7): Promise<ChartDataPoint[]> =>
+    request(`/api/v1/dashboard/chart?days=${days}`, {}, token),
+
+  topProducts: (token: string, limit = 5): Promise<TopProduct[]> =>
+    request(`/api/v1/dashboard/top-products?limit=${limit}`, {}, token),
+};
+
+// --- Public Catalog ---
+export const publicCatalogApi = {
+  fetch: (slug: string): Promise<{ tenant: any; products: ApiProduct[] }> =>
+    request(`/api/v1/products/public/${slug}`),
+};
+
+export { ApiError };
