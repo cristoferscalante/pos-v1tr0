@@ -28,6 +28,16 @@ const LEGACY_DEMO_PRODUCT_HINTS = [
   'veterinaria',
 ];
 
+function shouldDropInvalidPendingSale(errorMessage: string | undefined): boolean {
+  if (!errorMessage) return false;
+  const normalized = errorMessage.toLowerCase();
+  return (
+    normalized.includes('saledetail_product_id_fkey') ||
+    normalized.includes('foreignkeyviolation') ||
+    normalized.includes('key (product_id)=') && normalized.includes('is not present in table "product"')
+  );
+}
+
 // ========================
 // INNER APP (needs Toast context)
 // ========================
@@ -153,8 +163,13 @@ function AppInner() {
       for (const syncError of result.errors || []) {
         const failedSale = await db.sales.get(String(syncError.sale_id));
         if (failedSale) {
+          const syncErrorMessage = syncError.error || 'Error de sincronización';
+          if (shouldDropInvalidPendingSale(syncErrorMessage)) {
+            await db.sales.delete(failedSale.id);
+            continue;
+          }
           failedSale.sync_status = 'pending';
-          failedSale.sync_error = syncError.error || 'Error de sincronización';
+          failedSale.sync_error = syncErrorMessage;
           await db.sales.put(failedSale);
         }
       }
