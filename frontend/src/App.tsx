@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { QrCode } from 'lucide-react';
 import { db, requestPersistentStorage } from './db/pos-db';
 import { authApi, salesApi } from './api/client';
@@ -61,7 +61,7 @@ function AppInner() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [pendingSync, setPendingSync] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncErrorSignature, setLastSyncErrorSignature] = useState<string | null>(null);
+  const lastSyncErrorSignatureRef = useRef<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const stored = localStorage.getItem('pos_theme');
     return stored === 'light' ? 'light' : 'dark';
@@ -161,27 +161,27 @@ function AppInner() {
 
       if (result.synced_ids.length > 0) {
         success(`${result.synced_ids.length} venta(s) sincronizadas ✓`);
-        setLastSyncErrorSignature(null);
+        lastSyncErrorSignatureRef.current = null;
       }
       if ((result.errors || []).length > 0) {
         const errorSignature = JSON.stringify(
           (result.errors || []).map((item) => `${item.sale_id}:${item.error}`)
         );
-        if (lastSyncErrorSignature !== errorSignature) {
-          setLastSyncErrorSignature(errorSignature);
+        if (lastSyncErrorSignatureRef.current !== errorSignature) {
+          lastSyncErrorSignatureRef.current = errorSignature;
           showError(`Hay ${(result.errors || []).length} venta(s) con error de sincronización. Revisa el historial.`);
         }
       }
       await checkPending();
     } catch {
-      if (lastSyncErrorSignature !== 'generic-sync-error') {
-        setLastSyncErrorSignature('generic-sync-error');
+      if (lastSyncErrorSignatureRef.current !== 'generic-sync-error') {
+        lastSyncErrorSignatureRef.current = 'generic-sync-error';
         showError('Error de sincronización. Se reintentará automáticamente.');
       }
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, token, isSyncing, success, showError, checkPending, lastSyncErrorSignature]);
+  }, [isOnline, token, isSyncing, success, showError, checkPending]);
 
   useEffect(() => {
     void requestPersistentStorage();

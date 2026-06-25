@@ -23,13 +23,22 @@ export const ToastContext = React.createContext<ToastContextValue>({
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const recentToastTimestamps = React.useRef<Map<string, number>>(new Map());
 
   const showToast = useCallback((message: string, type: Toast['type'] = 'info') => {
+    const key = `${type}:${message}`;
+    const now = Date.now();
+    const lastShownAt = recentToastTimestamps.current.get(key) || 0;
+    if (now - lastShownAt < 10000) {
+      return;
+    }
+
     setToasts(prev => {
       const duplicate = prev.some(t => t.type === type && t.message === message);
       if (duplicate) return prev;
 
       const id = crypto.randomUUID();
+      recentToastTimestamps.current.set(key, now);
       setTimeout(() => {
         setToasts(current => current.filter(t => t.id !== id));
       }, 4000);
