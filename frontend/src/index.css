@@ -44,6 +44,8 @@
   --surface-soft: rgba(0,0,0,0.2);
   --surface-overlay: rgba(0,0,0,0.75);
   --surface-dropdown: rgba(13, 17, 28, 0.98);
+  --toast-bg: rgba(15,20,32,0.95);
+  --toast-shadow: 0 8px 32px rgba(0,0,0,0.4);
 
   --blur: blur(14px);
   --t-fast: 0.15s ease;
@@ -91,6 +93,8 @@
   --surface-soft: rgba(255,255,255,0.72);
   --surface-overlay: rgba(15, 23, 42, 0.35);
   --surface-dropdown: rgba(255,255,255,0.98);
+  --toast-bg: rgba(255,255,255,0.98);
+  --toast-shadow: 0 10px 24px rgba(15,23,42,0.12);
 }
 
 /* ============================
