@@ -11,6 +11,7 @@ export interface AuthUser {
   business_name: string;
   business_type: string;
   slug?: string;
+  meta_data?: Record<string, any>;
 }
 
 export interface AuthResponse {

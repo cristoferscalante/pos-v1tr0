@@ -74,6 +74,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     matchedProduct: string | null;
   } | null>(null);
   const [completedSale, setCompletedSale] = useState<LocalSale | null>(null);
+  const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('pos_user') || 'null') : null;
+  const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
 
   // Global keydown listener for barcode/QR scanner gun (Capture Phase)
   React.useEffect(() => {
@@ -613,7 +615,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       {completedSale && createPortal(
         <div id="print-ticket-area">
           <div style={{ textAlign: 'center', textTransform: 'uppercase', marginBottom: '8px' }}>
-            <strong>V1TR0 POS</strong>
+            <strong>{businessName}</strong>
           </div>
           <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
             Fecha: {new Date(completedSale.created_at).toLocaleString()}<br />
@@ -643,7 +645,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
           </div>
           <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '16px', borderTop: '1px dashed black', paddingTop: '8px' }}>
             Gracias por su compra<br />
-            V1TR0 POS - Multi-Negocio
+            {businessName}
           </div>
         </div>,
         document.body
@@ -661,7 +663,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             <div className="modal-body" style={{ padding: '20px' }}>
               <div className="ticket-virtual">
                 <div className="ticket-header">
-                  <h4 className="ticket-title">V1TR0 POS</h4>
+                  <h4 className="ticket-title">{businessName}</h4>
                   <p className="ticket-subtitle">Ticket de Venta</p>
                 </div>
                 <div className="ticket-meta">
@@ -693,7 +695,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 </div>
                 <div className="ticket-footer">
                   ¡Gracias por su compra!<br />
-                  V1TR0 POS — Offline-First
+                  {businessName}
                 </div>
               </div>
             </div>

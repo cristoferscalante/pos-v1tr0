@@ -80,7 +80,13 @@ function AppInner() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('pos_theme', theme);
-  }, [theme]);
+    const brandColor = user?.meta_data?.brand_color;
+    if (brandColor) {
+      document.documentElement.style.setProperty('--primary', brandColor);
+    } else {
+      document.documentElement.style.removeProperty('--primary');
+    }
+  }, [theme, user?.meta_data?.brand_color]);
 
   // ---- Load local products ----
   const loadProducts = useCallback(async () => {

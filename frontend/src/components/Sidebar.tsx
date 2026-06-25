@@ -3,6 +3,7 @@ import {
   ShoppingCart, Package, BarChart2, Settings, LayoutDashboard, Truck,
   QrCode, Wifi, WifiOff, RefreshCw, LogOut, ChevronRight, Sun, Moon
 } from 'lucide-react';
+import { getBusinessTypeLabel } from './BusinessTypeSelect';
 import type { View, AuthUser } from '../types';
 
 interface SidebarProps {
@@ -45,12 +46,19 @@ export function Sidebar({
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="logo-badge-sm">
-          <QrCode size={18} />
-        </div>
+        {user?.meta_data?.logo_url ? (
+          <div className="logo-badge-sm" style={{ background: 'rgba(255,255,255,0.95)', overflow: 'hidden' }}>
+            <img src={user.meta_data.logo_url} alt={user.meta_data.display_name || user.business_name} style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: 6 }} />
+          </div>
+        ) : (
+          <div className="logo-badge-sm" style={user?.meta_data?.brand_color ? { background: user.meta_data.brand_color } : undefined}>
+            <QrCode size={18} />
+          </div>
+        )}
         <div className="sidebar-brand">
-          <span className="sidebar-brand-name">V1TR0 POS</span>
-          <span className="sidebar-brand-sub">{user?.business_name || 'Mi Negocio'}</span>
+          <span className="sidebar-brand-name">{user?.meta_data?.display_name || user?.business_name || 'Mi Negocio'}</span>
+          <span className="sidebar-brand-sub">{getBusinessTypeLabel(user?.business_type || '') || 'Negocio'}</span>
+          <span className="sidebar-brand-meta">Hecho con V1TR0</span>
         </div>
       </div>
 
