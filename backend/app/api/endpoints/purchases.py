@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 import uuid
 
@@ -7,11 +8,47 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.core.db import get_session
 from app.models.product import Product
-from app.models.purchase import InventoryMovement, ManualInventoryMovementCreate, Purchase, PurchaseCreate, PurchaseDetail, PurchaseUpdate, SupplierReturnCreate
+from app.models.purchase import InventoryMovement, ManualInventoryMovementCreate, Purchase, PurchaseCreate, PurchaseDetail, PurchaseDetailRead, PurchaseReadDetailed, PurchaseUpdate, SupplierReturnCreate
 from app.models.supplier import Supplier
 from app.models.user import User
 
 router = APIRouter()
+
+
+def _serialize_purchase(session: Session, purchase: Purchase) -> PurchaseReadDetailed:
+    supplier = session.get(Supplier, purchase.supplier_id)
+    details = session.exec(select(PurchaseDetail).where(PurchaseDetail.purchase_id == purchase.id)).all()
+    detail_rows = []
+    for detail in details:
+        product = session.get(Product, detail.product_id)
+        detail_rows.append(
+            PurchaseDetailRead(
+                product_id=detail.product_id,
+                name=product.name if product else "Producto eliminado",
+                quantity=detail.quantity,
+                unit_cost=detail.unit_cost,
+                total_cost=detail.total_cost,
+            )
+        )
+
+    return PurchaseReadDetailed(
+        id=purchase.id,
+        tenant_id=purchase.tenant_id,
+        supplier_id=purchase.supplier_id,
+        supplier_name=supplier.name if supplier else "Proveedor desconocido",
+        user_id=purchase.user_id,
+        invoice_number=purchase.invoice_number,
+        subtotal=purchase.subtotal,
+        tax=purchase.tax,
+        total=purchase.total,
+        paid_amount=purchase.paid_amount,
+        balance_due=purchase.balance_due,
+        status=purchase.status,
+        due_date=purchase.due_date,
+        notes=purchase.notes,
+        created_at=purchase.created_at,
+        details=detail_rows,
+    )
 
 
 def _create_inventory_movement(
@@ -89,14 +126,18 @@ def _apply_purchase_lines(session: Session, purchase: Purchase, details, current
 
 @router.get("/")
 def list_purchases(
+    supplier_id: uuid.UUID | None = None,
+    balance_only: bool = False,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    return session.exec(
-        select(Purchase)
-        .where(Purchase.tenant_id == current_user.tenant_id)
-        .order_by(Purchase.created_at.desc())
-    ).all()
+    query = select(Purchase).where(Purchase.tenant_id == current_user.tenant_id)
+    if supplier_id is not None:
+        query = query.where(Purchase.supplier_id == supplier_id)
+    if balance_only:
+        query = query.where(Purchase.balance_due > 0)
+    purchases = session.exec(query.order_by(Purchase.created_at.desc())).all()
+    return [_serialize_purchase(session, purchase) for purchase in purchases]
 
 
 @router.get("/{purchase_id}")
@@ -108,7 +149,7 @@ def get_purchase(
     purchase = session.get(Purchase, purchase_id)
     if not purchase or purchase.tenant_id != current_user.tenant_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra no encontrada")
-    return purchase
+    return _serialize_purchase(session, purchase)
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -133,6 +174,7 @@ def create_purchase(
         tax=data.tax,
         paid_amount=data.paid_amount,
         balance_due=0,
+        due_date=data.due_date,
         notes=data.notes,
         subtotal=0,
         total=0,
@@ -145,10 +187,12 @@ def create_purchase(
     purchase.subtotal = subtotal
     purchase.total = subtotal + data.tax
     purchase.balance_due = purchase.total - data.paid_amount
+    if not purchase.due_date and supplier.payment_terms_days > 0:
+        purchase.due_date = (purchase.created_at + timedelta(days=supplier.payment_terms_days)).date()
     session.add(purchase)
     session.commit()
     session.refresh(purchase)
-    return purchase
+    return _serialize_purchase(session, purchase)
 
 
 @router.put("/{purchase_id}")
@@ -170,6 +214,8 @@ def update_purchase(
         purchase.tax = data.tax
     if data.paid_amount is not None:
         purchase.paid_amount = data.paid_amount
+    if data.due_date is not None:
+        purchase.due_date = data.due_date
     if data.notes is not None:
         purchase.notes = data.notes
 
@@ -177,7 +223,7 @@ def update_purchase(
     session.add(purchase)
     session.commit()
     session.refresh(purchase)
-    return purchase
+    return _serialize_purchase(session, purchase)
 
 
 @router.post("/{purchase_id}/cancel")
@@ -218,7 +264,7 @@ def cancel_purchase(
     session.add(purchase)
     session.commit()
     session.refresh(purchase)
-    return purchase
+    return _serialize_purchase(session, purchase)
 
 
 @router.get("/movements")

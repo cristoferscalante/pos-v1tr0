@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 import uuid
@@ -17,6 +17,7 @@ class PurchaseBase(SQLModel):
     paid_amount: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     balance_due: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     status: str = Field(default="posted", index=True)
+    due_date: Optional[date] = Field(default=None, index=True)
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -71,6 +72,7 @@ class PurchaseCreate(SQLModel):
     invoice_number: Optional[str] = None
     tax: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     paid_amount: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    due_date: Optional[date] = None
     notes: Optional[str] = None
     details: list[PurchaseCreateDetail]
 
@@ -79,8 +81,36 @@ class PurchaseUpdate(SQLModel):
     invoice_number: Optional[str] = None
     tax: Optional[Decimal] = None
     paid_amount: Optional[Decimal] = None
+    due_date: Optional[date] = None
     notes: Optional[str] = None
     details: Optional[list[PurchaseCreateDetail]] = None
+
+
+class PurchaseDetailRead(SQLModel):
+    product_id: uuid.UUID
+    name: str
+    quantity: float
+    unit_cost: Decimal
+    total_cost: Decimal
+
+
+class PurchaseReadDetailed(SQLModel):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    supplier_id: uuid.UUID
+    supplier_name: str
+    user_id: uuid.UUID
+    invoice_number: Optional[str] = None
+    subtotal: Decimal
+    tax: Decimal
+    total: Decimal
+    paid_amount: Decimal
+    balance_due: Decimal
+    status: str
+    due_date: Optional[date] = None
+    notes: Optional[str] = None
+    created_at: datetime
+    details: list[PurchaseDetailRead]
 
 
 class ManualInventoryMovementCreate(SQLModel):

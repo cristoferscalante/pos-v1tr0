@@ -180,6 +180,7 @@ export interface Purchase {
   id: string;
   tenant_id: string;
   supplier_id: string;
+  supplier_name?: string;
   user_id: string;
   invoice_number?: string | null;
   subtotal: number;
@@ -188,6 +189,14 @@ export interface Purchase {
   paid_amount: number;
   balance_due: number;
   status: string;
+  due_date?: string | null;
+  details?: Array<{
+    product_id: string;
+    name: string;
+    quantity: number;
+    unit_cost: number;
+    total_cost: number;
+  }>;
   notes?: string | null;
   created_at: string;
 }

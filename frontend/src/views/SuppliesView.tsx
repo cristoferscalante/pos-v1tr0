@@ -43,6 +43,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
   const [purchasePaidAmount, setPurchasePaidAmount] = useState('0');
   const [purchaseInvoice, setPurchaseInvoice] = useState('');
   const [purchaseNotes, setPurchaseNotes] = useState('');
+  const [purchaseDueDate, setPurchaseDueDate] = useState('');
   const [manualMovementType, setManualMovementType] = useState('adjustment_in');
   const [manualQty, setManualQty] = useState('1');
   const [manualCost, setManualCost] = useState('0');
@@ -52,6 +53,9 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
   const [returnCost, setReturnCost] = useState('0');
   const [returnNotes, setReturnNotes] = useState('');
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
+  const [selectedPurchaseDetail, setSelectedPurchaseDetail] = useState<Purchase | null>(null);
+  const [purchaseSupplierFilter, setPurchaseSupplierFilter] = useState('');
+  const [balanceOnly, setBalanceOnly] = useState(false);
   const [savingSupplier, setSavingSupplier] = useState(false);
   const [savingPurchase, setSavingPurchase] = useState(false);
   const [savingMovement, setSavingMovement] = useState(false);
@@ -66,7 +70,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
       const [suppliersData, productsData, purchasesData, movementsData] = await Promise.all([
         suppliersApi.list(token),
         productsApi.list(token),
-        purchasesApi.list(token),
+        purchasesApi.list(token, { supplier_id: purchaseSupplierFilter || undefined, balance_only: balanceOnly }),
         purchasesApi.movements(token),
       ]);
       setSuppliers(suppliersData);
@@ -92,7 +96,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
     }
   };
 
-  useEffect(() => { load(); }, [token, isOnline]);
+  useEffect(() => { load(); }, [token, isOnline, purchaseSupplierFilter, balanceOnly]);
 
   const loadKardex = async (productId: string) => {
     if (!token || !productId) return;
@@ -161,6 +165,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
           invoice_number: purchaseInvoice || undefined,
           tax: Number(purchaseTax || 0),
           paid_amount: Number(purchasePaidAmount || 0),
+          due_date: purchaseDueDate || undefined,
           notes: purchaseNotes || undefined,
           details: normalizedLines,
         });
@@ -172,6 +177,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
       setPurchaseNotes('');
       setPurchaseTax('0');
       setPurchasePaidAmount('0');
+      setPurchaseDueDate('');
       setPurchaseLines([{ product_id: products[0]?.id || '', quantity: '1', unit_cost: '0' }]);
       await load();
       onProductsChange();
@@ -201,6 +207,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
     setPurchaseInvoice(purchase.invoice_number || '');
     setPurchaseTax(String(Number(purchase.tax || 0)));
     setPurchasePaidAmount(String(Number(purchase.paid_amount || 0)));
+    setPurchaseDueDate(purchase.due_date || '');
     setPurchaseNotes(purchase.notes || '');
   };
 
@@ -351,6 +358,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                   <div className="form-group"><label className="form-label">Impuesto</label><input type="number" className="form-input" value={purchaseTax} onChange={e => setPurchaseTax(e.target.value)} /></div>
                   <div className="form-group"><label className="form-label">Abono/Pagado</label><input type="number" className="form-input" value={purchasePaidAmount} onChange={e => setPurchasePaidAmount(e.target.value)} /></div>
                 </div>
+                <div className="form-group"><label className="form-label">Fecha de vencimiento</label><input type="date" className="form-input" value={purchaseDueDate} onChange={e => setPurchaseDueDate(e.target.value)} /></div>
                 <div className="form-group"><label className="form-label">Notas</label><textarea className="form-input" rows={3} value={purchaseNotes} onChange={e => setPurchaseNotes(e.target.value)} /></div>
                 <button type="button" onClick={handleCreateOrUpdatePurchase} disabled={savingPurchase} className="btn-primary"><Plus size={15} /> {savingPurchase ? 'Guardando...' : editingPurchase ? 'Actualizar compra' : 'Registrar compra'}</button>
               </div>
@@ -360,6 +368,16 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
           <div className="dashboard-grid">
             <div className="dashboard-panel glass">
               <div className="panel-header"><h3 className="panel-title">Compras y Cuentas por Pagar</h3></div>
+              <div className="filters-row">
+                <select className="form-select" value={purchaseSupplierFilter} onChange={e => setPurchaseSupplierFilter(e.target.value)} style={{ maxWidth: '240px' }}>
+                  <option value="">Todos los proveedores</option>
+                  {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={balanceOnly} onChange={e => setBalanceOnly(e.target.checked)} />
+                  Solo cuentas por pagar
+                </label>
+              </div>
               {purchases.length === 0 ? <div className="empty-state-sm">Aún no hay compras registradas.</div> : (
                 <div className="top-products-list">
                   {purchases.slice(0, 10).map(purchase => (
@@ -367,11 +385,12 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                       <span className="top-rank"><ShoppingBag size={14} /></span>
                       <div className="top-product-info">
                         <p className="top-product-name">{purchase.invoice_number || 'Sin factura'} {purchase.status === 'cancelled' ? '(Anulada)' : ''}</p>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Saldo: ${Number(purchase.balance_due || 0).toLocaleString('es-CO')}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{purchase.supplier_name || 'Proveedor'} | Saldo: ${Number(purchase.balance_due || 0).toLocaleString('es-CO')} {purchase.due_date ? `| Vence: ${new Date(purchase.due_date).toLocaleDateString('es-CO')}` : ''}</div>
                       </div>
                       <div className="top-product-stats">
                         <span className="top-revenue">${Number(purchase.total).toLocaleString('es-CO')}</span>
                         <div style={{ display: 'flex', gap: '8px' }}>
+                          <button type="button" className="btn-secondary" onClick={() => setSelectedPurchaseDetail(purchase)}><History size={13} /></button>
                           {purchase.status === 'posted' && <button type="button" className="btn-secondary" onClick={() => handleEditPurchase(purchase)}><Pencil size={13} /></button>}
                           {purchase.status === 'posted' && <button type="button" className="btn-secondary" onClick={() => handleCancelPurchase(purchase)}><RotateCcw size={13} /></button>}
                         </div>
@@ -421,6 +440,40 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
               </div>
             )}
           </div>
+
+          {selectedPurchaseDetail && (
+            <div className="modal-backdrop" onClick={() => setSelectedPurchaseDetail(null)}>
+              <div className="modal-box glass" onClick={e => e.stopPropagation()}>
+                <div className="modal-header">
+                  <h2 className="modal-title">Detalle de Compra</h2>
+                  <button onClick={() => setSelectedPurchaseDetail(null)} className="modal-close">x</button>
+                </div>
+                <div className="pos-form">
+                  <div className="settings-info-grid">
+                    <div className="info-item"><span className="info-label">Factura</span><span className="info-value">{selectedPurchaseDetail.invoice_number || 'Sin factura'}</span></div>
+                    <div className="info-item"><span className="info-label">Proveedor</span><span className="info-value">{selectedPurchaseDetail.supplier_name || 'Proveedor'}</span></div>
+                    <div className="info-item"><span className="info-label">Total</span><span className="info-value">${Number(selectedPurchaseDetail.total).toLocaleString('es-CO')}</span></div>
+                    <div className="info-item"><span className="info-label">Saldo</span><span className="info-value">${Number(selectedPurchaseDetail.balance_due).toLocaleString('es-CO')}</span></div>
+                  </div>
+                  <div className="table-wrapper glass">
+                    <table className="data-table">
+                      <thead><tr><th>Producto</th><th>Cant.</th><th>Costo</th><th>Total</th></tr></thead>
+                      <tbody>
+                        {(selectedPurchaseDetail.details || []).map((detail, index) => (
+                          <tr key={`${detail.product_id}-${index}`} className="table-row">
+                            <td>{detail.name}</td>
+                            <td>{detail.quantity}</td>
+                            <td>${Number(detail.unit_cost).toLocaleString('es-CO')}</td>
+                            <td>${Number(detail.total_cost).toLocaleString('es-CO')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

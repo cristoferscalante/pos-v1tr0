@@ -168,16 +168,21 @@ export const suppliersApi = {
 };
 
 export const purchasesApi = {
-  list: (token: string): Promise<Purchase[]> =>
-    request('/api/v1/purchases/', {}, token),
+  list: (token: string, params?: { supplier_id?: string; balance_only?: boolean }): Promise<Purchase[]> => {
+    const search = new URLSearchParams();
+    if (params?.supplier_id) search.set('supplier_id', params.supplier_id);
+    if (params?.balance_only) search.set('balance_only', 'true');
+    const suffix = search.toString() ? `?${search.toString()}` : '';
+    return request(`/api/v1/purchases/${suffix}`, {}, token);
+  },
 
   get: (token: string, purchaseId: string): Promise<Purchase> =>
     request(`/api/v1/purchases/${purchaseId}`, {}, token),
 
-  create: (token: string, data: { supplier_id: string; invoice_number?: string; tax?: number; paid_amount?: number; notes?: string; details: { product_id: string; quantity: number; unit_cost: number }[] }): Promise<Purchase> =>
+  create: (token: string, data: { supplier_id: string; invoice_number?: string; tax?: number; paid_amount?: number; due_date?: string; notes?: string; details: { product_id: string; quantity: number; unit_cost: number }[] }): Promise<Purchase> =>
     request('/api/v1/purchases/', { method: 'POST', body: JSON.stringify(data) }, token),
 
-  update: (token: string, purchaseId: string, data: { invoice_number?: string; tax?: number; paid_amount?: number; notes?: string }): Promise<Purchase> =>
+  update: (token: string, purchaseId: string, data: { invoice_number?: string; tax?: number; paid_amount?: number; due_date?: string; notes?: string }): Promise<Purchase> =>
     request(`/api/v1/purchases/${purchaseId}`, { method: 'PUT', body: JSON.stringify(data) }, token),
 
   cancel: (token: string, purchaseId: string): Promise<Purchase> =>
