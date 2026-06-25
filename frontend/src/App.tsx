@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { QrCode } from 'lucide-react';
-import { db } from './db/pos-db';
+import { db, requestPersistentStorage } from './db/pos-db';
 import { authApi, salesApi } from './api/client';
 import { ToastProvider, useToast } from './components/Toast';
 import { Sidebar } from './components/Sidebar';
@@ -82,9 +82,13 @@ function AppInner() {
 
   // ---- Sync pending sales ----
   const syncSales = useCallback(async () => {
-    if (!isOnline || !token) return;
+    if (!isOnline || !token || isSyncing) return;
     const pending = await db.sales.where('sync_status').equals('pending').toArray();
-    if (pending.length === 0) return;
+    if (pending.length === 0) {
+      setPendingSync(0);
+      return;
+    }
+
     setIsSyncing(true);
     try {
       const result = await salesApi.syncOffline(token, pending);
@@ -95,32 +99,70 @@ function AppInner() {
       if (result.synced_ids.length > 0) {
         success(`${result.synced_ids.length} venta(s) sincronizadas ✓`);
       }
-      checkPending();
+      await checkPending();
     } catch {
       showError('Error de sincronización. Se reintentará automáticamente.');
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, token, success, showError, checkPending]);
+  }, [isOnline, token, isSyncing, success, showError, checkPending]);
+
+  useEffect(() => {
+    void requestPersistentStorage();
+  }, []);
 
   // ---- Network events ----
   useEffect(() => {
-    const onOnline = () => { setIsOnline(true); syncSales(); };
+    const onOnline = () => {
+      setIsOnline(true);
+      if (token) {
+        void pullProducts(token);
+      }
+      void syncSales();
+    };
     const onOffline = () => { setIsOnline(false); info('Sin conexión — ventas guardadas localmente'); };
+
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
     return () => {
       window.removeEventListener('online', onOnline);
       window.removeEventListener('offline', onOffline);
     };
-  }, [syncSales, info]);
+  }, [syncSales, info, token, pullProducts]);
+
+  useEffect(() => {
+    if (!token || !isOnline) return;
+
+    const intervalId = window.setInterval(() => {
+      void syncSales();
+    }, 15000);
+
+    const syncOnVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void pullProducts(token);
+        void syncSales();
+      }
+    };
+
+    window.addEventListener('focus', syncOnVisibility);
+    document.addEventListener('visibilitychange', syncOnVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncOnVisibility);
+      document.removeEventListener('visibilitychange', syncOnVisibility);
+    };
+  }, [token, isOnline, syncSales, pullProducts]);
 
   // ---- Init ----
   useEffect(() => {
-    loadProducts();
-    checkPending();
-    if (token && isOnline) pullProducts(token);
-  }, [token]);
+    void loadProducts();
+    void checkPending();
+    if (token && isOnline) {
+      void pullProducts(token);
+      void syncSales();
+    }
+  }, [token, isOnline, loadProducts, checkPending, pullProducts, syncSales]);
 
   // ---- Auth Handlers ----
   const handleLogin = async (e: React.FormEvent) => {

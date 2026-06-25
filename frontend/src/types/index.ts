@@ -169,6 +169,9 @@ export interface Supplier {
   phone?: string | null;
   document_number?: string | null;
   address?: string | null;
+  city?: string | null;
+  payment_terms_days: number;
+  notes?: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -182,6 +185,9 @@ export interface Purchase {
   subtotal: number;
   tax: number;
   total: number;
+  paid_amount: number;
+  balance_due: number;
+  status: string;
   notes?: string | null;
   created_at: string;
 }

@@ -36,6 +36,9 @@ def create_supplier(
         phone=data.phone,
         document_number=data.document_number,
         address=data.address,
+        city=data.city,
+        payment_terms_days=data.payment_terms_days,
+        notes=data.notes,
     )
     session.add(supplier)
     session.commit()

@@ -14,6 +14,9 @@ class PurchaseBase(SQLModel):
     subtotal: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     tax: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     total: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    paid_amount: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    balance_due: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    status: str = Field(default="posted", index=True)
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
@@ -67,5 +70,30 @@ class PurchaseCreate(SQLModel):
     supplier_id: uuid.UUID
     invoice_number: Optional[str] = None
     tax: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    paid_amount: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     notes: Optional[str] = None
     details: list[PurchaseCreateDetail]
+
+
+class PurchaseUpdate(SQLModel):
+    invoice_number: Optional[str] = None
+    tax: Optional[Decimal] = None
+    paid_amount: Optional[Decimal] = None
+    notes: Optional[str] = None
+    details: Optional[list[PurchaseCreateDetail]] = None
+
+
+class ManualInventoryMovementCreate(SQLModel):
+    product_id: uuid.UUID
+    movement_type: str
+    quantity: float
+    unit_cost: Optional[Decimal] = None
+    notes: Optional[str] = None
+
+
+class SupplierReturnCreate(SQLModel):
+    supplier_id: uuid.UUID
+    product_id: uuid.UUID
+    quantity: float
+    unit_cost: Optional[Decimal] = None
+    notes: Optional[str] = None

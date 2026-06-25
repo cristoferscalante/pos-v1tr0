@@ -160,7 +160,7 @@ export const suppliersApi = {
   list: (token: string): Promise<Supplier[]> =>
     request('/api/v1/suppliers/', {}, token),
 
-  create: (token: string, data: { name: string; contact_name?: string; email?: string; phone?: string; document_number?: string; address?: string }): Promise<Supplier> =>
+  create: (token: string, data: { name: string; contact_name?: string; email?: string; phone?: string; document_number?: string; address?: string; city?: string; payment_terms_days?: number; notes?: string }): Promise<Supplier> =>
     request('/api/v1/suppliers/', { method: 'POST', body: JSON.stringify(data) }, token),
 
   update: (token: string, supplierId: string, data: Partial<Supplier>): Promise<Supplier> =>
@@ -171,11 +171,29 @@ export const purchasesApi = {
   list: (token: string): Promise<Purchase[]> =>
     request('/api/v1/purchases/', {}, token),
 
-  create: (token: string, data: { supplier_id: string; invoice_number?: string; tax?: number; notes?: string; details: { product_id: string; quantity: number; unit_cost: number }[] }): Promise<Purchase> =>
+  get: (token: string, purchaseId: string): Promise<Purchase> =>
+    request(`/api/v1/purchases/${purchaseId}`, {}, token),
+
+  create: (token: string, data: { supplier_id: string; invoice_number?: string; tax?: number; paid_amount?: number; notes?: string; details: { product_id: string; quantity: number; unit_cost: number }[] }): Promise<Purchase> =>
     request('/api/v1/purchases/', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  update: (token: string, purchaseId: string, data: { invoice_number?: string; tax?: number; paid_amount?: number; notes?: string }): Promise<Purchase> =>
+    request(`/api/v1/purchases/${purchaseId}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  cancel: (token: string, purchaseId: string): Promise<Purchase> =>
+    request(`/api/v1/purchases/${purchaseId}/cancel`, { method: 'POST' }, token),
 
   movements: (token: string): Promise<InventoryMovement[]> =>
     request('/api/v1/purchases/movements', {}, token),
+
+  kardex: (token: string, productId: string): Promise<InventoryMovement[]> =>
+    request(`/api/v1/purchases/products/${productId}/kardex`, {}, token),
+
+  manualMovement: (token: string, data: { product_id: string; movement_type: string; quantity: number; unit_cost?: number; notes?: string }): Promise<any> =>
+    request('/api/v1/purchases/movements/manual', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  supplierReturn: (token: string, data: { supplier_id: string; product_id: string; quantity: number; unit_cost?: number; notes?: string }): Promise<any> =>
+    request('/api/v1/purchases/returns', { method: 'POST', body: JSON.stringify(data) }, token),
 };
 
 // --- Dashboard ---

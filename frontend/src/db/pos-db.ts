@@ -19,6 +19,23 @@ class POSDatabase extends Dexie {
 export const db = new POSDatabase();
 export type { POSDatabase };
 
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (!('storage' in navigator) || typeof navigator.storage.persist !== 'function') {
+    return false;
+  }
+
+  try {
+    if (typeof navigator.storage.persisted === 'function') {
+      const alreadyPersistent = await navigator.storage.persisted();
+      if (alreadyPersistent) return true;
+    }
+
+    return navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 // Re-export types for backwards compat (avoid breaking existing imports)
 export type { LocalProduct, LocalSale, LocalCustomer };
 export type { LocalSaleDetail } from '../types';

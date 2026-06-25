@@ -12,6 +12,9 @@ class SupplierBase(SQLModel):
     phone: Optional[str] = None
     document_number: Optional[str] = Field(default=None, index=True)
     address: Optional[str] = None
+    city: Optional[str] = None
+    payment_terms_days: int = Field(default=0)
+    notes: Optional[str] = None
     tenant_id: uuid.UUID = Field(foreign_key="tenant.id", index=True)
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -28,6 +31,9 @@ class SupplierCreate(SQLModel):
     phone: Optional[str] = None
     document_number: Optional[str] = None
     address: Optional[str] = None
+    city: Optional[str] = None
+    payment_terms_days: int = 0
+    notes: Optional[str] = None
 
 
 class SupplierUpdate(SQLModel):
@@ -37,4 +43,7 @@ class SupplierUpdate(SQLModel):
     phone: Optional[str] = None
     document_number: Optional[str] = None
     address: Optional[str] = None
+    city: Optional[str] = None
+    payment_terms_days: Optional[int] = None
+    notes: Optional[str] = None
     is_active: Optional[bool] = None
