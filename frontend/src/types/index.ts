@@ -160,8 +160,50 @@ export interface NotificationRule {
   updated_at: string;
 }
 
+export interface Supplier {
+  id: string;
+  tenant_id: string;
+  name: string;
+  contact_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  document_number?: string | null;
+  address?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface Purchase {
+  id: string;
+  tenant_id: string;
+  supplier_id: string;
+  user_id: string;
+  invoice_number?: string | null;
+  subtotal: number;
+  tax: number;
+  total: number;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  tenant_id: string;
+  product_id: string;
+  user_id: string;
+  movement_type: string;
+  quantity: number;
+  previous_stock: number;
+  new_stock: number;
+  unit_cost?: number | null;
+  reference_type?: string | null;
+  reference_id?: string | null;
+  notes?: string | null;
+  created_at: string;
+}
+
 // --- UI ---
-export type View = 'pos' | 'inventory' | 'sales' | 'dashboard' | 'settings';
+export type View = 'pos' | 'inventory' | 'supplies' | 'sales' | 'dashboard' | 'settings';
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 export type BusinessType = 'veterinaria' | 'restaurante' | 'tienda' | 'farmacia' | 'otro';
 

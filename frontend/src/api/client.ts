@@ -3,7 +3,8 @@
 // ========================
 import type {
   AuthResponse, ApiProduct, ApiSale,
-  DashboardSummary, ChartDataPoint, TopProduct, LocalSale, CashSessionResponse, NotificationRule
+  DashboardSummary, ChartDataPoint, TopProduct, LocalSale, CashSessionResponse, NotificationRule,
+  Supplier, Purchase, InventoryMovement
 } from '../types';
 
 const rawApiUrl = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL.trim() : '';
@@ -153,6 +154,28 @@ export const cashApi = {
 
   close: (token: string, sessionId: string, data: { actual_closing_amount: number; notes?: string }): Promise<CashSessionResponse> =>
     request(`/api/v1/cash/${sessionId}/close`, { method: 'POST', body: JSON.stringify(data) }, token),
+};
+
+export const suppliersApi = {
+  list: (token: string): Promise<Supplier[]> =>
+    request('/api/v1/suppliers/', {}, token),
+
+  create: (token: string, data: { name: string; contact_name?: string; email?: string; phone?: string; document_number?: string; address?: string }): Promise<Supplier> =>
+    request('/api/v1/suppliers/', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  update: (token: string, supplierId: string, data: Partial<Supplier>): Promise<Supplier> =>
+    request(`/api/v1/suppliers/${supplierId}`, { method: 'PUT', body: JSON.stringify(data) }, token),
+};
+
+export const purchasesApi = {
+  list: (token: string): Promise<Purchase[]> =>
+    request('/api/v1/purchases/', {}, token),
+
+  create: (token: string, data: { supplier_id: string; invoice_number?: string; tax?: number; notes?: string; details: { product_id: string; quantity: number; unit_cost: number }[] }): Promise<Purchase> =>
+    request('/api/v1/purchases/', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  movements: (token: string): Promise<InventoryMovement[]> =>
+    request('/api/v1/purchases/movements', {}, token),
 };
 
 // --- Dashboard ---

@@ -7,6 +7,7 @@ import { Sidebar } from './components/Sidebar';
 import { BusinessTypeSelect } from './components/BusinessTypeSelect';
 import { POSView } from './views/POSView';
 import { InventoryView } from './views/InventoryView';
+import { SuppliesView } from './views/SuppliesView';
 import { SalesView } from './views/SalesView';
 import { DashboardView } from './views/DashboardView';
 import { SettingsView } from './views/SettingsView';
@@ -372,6 +373,13 @@ function AppInner() {
             isOnline={isOnline}
             onProductsChange={loadProducts}
             user={user}
+          />
+        )}
+        {view === 'supplies' && (
+          <SuppliesView
+            token={token}
+            isOnline={isOnline}
+            onProductsChange={loadProducts}
           />
         )}
         {view === 'sales' && (

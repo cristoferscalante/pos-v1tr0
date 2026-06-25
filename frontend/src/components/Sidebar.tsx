@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  ShoppingCart, Package, BarChart2, Settings, LayoutDashboard,
+  ShoppingCart, Package, BarChart2, Settings, LayoutDashboard, Truck,
   QrCode, Wifi, WifiOff, RefreshCw, LogOut, ChevronRight, Sun, Moon
 } from 'lucide-react';
 import type { View, AuthUser } from '../types';
@@ -31,6 +31,7 @@ export function Sidebar({
   const navItems: NavItem[] = [
     { view: 'pos',       icon: <ShoppingCart size={20} />,    label: 'Punto de Venta' },
     { view: 'inventory', icon: <Package size={20} />,         label: 'Inventario'     },
+    { view: 'supplies',  icon: <Truck size={20} />,           label: 'Compras'        },
     { view: 'sales',     icon: <BarChart2 size={20} />,       label: 'Ventas',        badge: pendingSync || undefined },
     { view: 'dashboard', icon: <LayoutDashboard size={20} />, label: 'Dashboard'      },
     { view: 'settings',  icon: <Settings size={20} />,        label: 'Configuración'  },
