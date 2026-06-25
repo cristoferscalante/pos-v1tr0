@@ -224,6 +224,11 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
                     <span>IVA (19%): ${sale.tax.toLocaleString('es-CO')}</span>
                     <strong>Total: ${sale.total.toLocaleString('es-CO')}</strong>
                   </div>
+                  {sale.sync_error && (
+                    <div style={{ marginTop: '10px', color: 'var(--warning)', fontSize: '12px' }}>
+                      Error de sync: {sale.sync_error}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

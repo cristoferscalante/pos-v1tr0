@@ -14,6 +14,19 @@ import { SettingsView } from './views/SettingsView';
 import { PublicCatalogView } from './views/PublicCatalogView';
 import type { AuthUser, LocalProduct, View, BusinessType } from './types';
 
+const LEGACY_DEMO_PRODUCT_HINTS = [
+  'vacuna parvovirus',
+  'collar antipulgas',
+  'desparasitante canino',
+  'shampoo medicado',
+  'alimento premium perros',
+  'vac-05',
+  'coll-02',
+  'med-01',
+  'sham-01',
+  'alim-01',
+];
+
 // ========================
 // INNER APP (needs Toast context)
 // ========================
@@ -73,12 +86,43 @@ function AppInner() {
     try {
       const { productsApi } = await import('./api/client');
       const serverProducts = await productsApi.list(authToken);
+
+       if (serverProducts.length === 0) {
+        const localProducts = await db.products.toArray();
+        const demoProductIds = new Set(
+          localProducts
+            .filter((product) => {
+              const name = product.name.toLowerCase();
+              const sku = (product.sku || '').toLowerCase();
+              return LEGACY_DEMO_PRODUCT_HINTS.some((hint) => name.includes(hint) || sku.includes(hint));
+            })
+            .map((product) => product.id)
+        );
+
+        if (demoProductIds.size > 0) {
+          await db.products.bulkDelete(Array.from(demoProductIds));
+
+          const localSales = await db.sales.toArray();
+          const demoSaleIds = localSales
+            .filter((sale) => sale.details.some((detail) => demoProductIds.has(detail.product_id)))
+            .map((sale) => sale.id);
+
+          if (demoSaleIds.length > 0) {
+            await db.sales.bulkDelete(demoSaleIds);
+          }
+
+          await checkPending();
+          await loadProducts();
+        }
+        return;
+      }
+
       for (const p of serverProducts) {
         await db.products.put(p as LocalProduct);
       }
       loadProducts();
     } catch { /* offline OK */ }
-  }, [loadProducts]);
+  }, [loadProducts, checkPending]);
 
   // ---- Sync pending sales ----
   const syncSales = useCallback(async () => {
@@ -94,10 +138,27 @@ function AppInner() {
       const result = await salesApi.syncOffline(token, pending);
       for (const id of result.synced_ids) {
         const sale = await db.sales.get(String(id));
-        if (sale) { sale.sync_status = 'synced'; await db.sales.put(sale); }
+        if (sale) {
+          sale.sync_status = 'synced';
+          sale.sync_error = undefined;
+          await db.sales.put(sale);
+        }
       }
+
+      for (const syncError of result.errors || []) {
+        const failedSale = await db.sales.get(String(syncError.sale_id));
+        if (failedSale) {
+          failedSale.sync_status = 'pending';
+          failedSale.sync_error = syncError.error || 'Error de sincronización';
+          await db.sales.put(failedSale);
+        }
+      }
+
       if (result.synced_ids.length > 0) {
         success(`${result.synced_ids.length} venta(s) sincronizadas ✓`);
+      }
+      if ((result.errors || []).length > 0) {
+        showError(`Hay ${(result.errors || []).length} venta(s) con error de sincronización. Revisa el historial.`);
       }
       await checkPending();
     } catch {

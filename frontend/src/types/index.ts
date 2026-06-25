@@ -52,6 +52,7 @@ export interface LocalSale {
   created_at: string;
   sync_status: 'pending' | 'synced';
   cash_session_id?: string;
+  sync_error?: string;
   meta_data?: Record<string, any>;
   details: LocalSaleDetail[];
 }

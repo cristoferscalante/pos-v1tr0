@@ -303,6 +303,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         payment_method: paymentMethod,
         created_at: now,
         sync_status: 'pending',
+        sync_error: undefined,
         details,
         meta_data: { dian_status: 'pending_sync' },
       };
@@ -325,7 +326,17 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
           const result = await salesApi.syncOffline(token, [sale]);
           if (result.synced_ids.length > 0) {
             const saved = await db.sales.get(saleId);
-            if (saved) { saved.sync_status = 'synced'; await db.sales.put(saved); }
+            if (saved) {
+              saved.sync_status = 'synced';
+              saved.sync_error = undefined;
+              await db.sales.put(saved);
+            }
+          } else if ((result.errors || []).length > 0) {
+            const saved = await db.sales.get(saleId);
+            if (saved) {
+              saved.sync_error = result.errors[0]?.error || 'Error de sincronización';
+              await db.sales.put(saved);
+            }
           }
         } catch { /* Will sync later */ }
       }
