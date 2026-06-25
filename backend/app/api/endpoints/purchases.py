@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 import uuid
 
@@ -185,18 +185,6 @@ def get_accounts_payable_summary(
         "overdue": overdue[:10],
         "upcoming": upcoming[:10],
     }
-
-
-@router.get("/{purchase_id}")
-def get_purchase(
-    purchase_id: uuid.UUID,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    purchase = session.get(Purchase, purchase_id)
-    if not purchase or purchase.tenant_id != current_user.tenant_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra no encontrada")
-    return _serialize_purchase(session, purchase)
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -390,6 +378,18 @@ def get_product_kardex(
         )
         .order_by(InventoryMovement.created_at.desc())
     ).all()
+
+
+@router.get("/{purchase_id}")
+def get_purchase(
+    purchase_id: uuid.UUID,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    purchase = session.get(Purchase, purchase_id)
+    if not purchase or purchase.tenant_id != current_user.tenant_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Compra no encontrada")
+    return _serialize_purchase(session, purchase)
 
 
 @router.post("/movements/manual", status_code=status.HTTP_201_CREATED)
