@@ -9,6 +9,7 @@ import { useToast } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import type { AuthUser, NotificationLog, NotificationRule } from '../types';
 import { fileToDataUrl } from '../utils/imageUpload';
+import '../styles/branding-upload.css';
 
 interface SettingsViewProps {
   user: AuthUser | null;
@@ -211,6 +212,19 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
     }
   };
 
+  const handleBrandImageChange = async (
+    file: File | undefined,
+    setter: React.Dispatch<React.SetStateAction<string>>,
+    label: string,
+  ) => {
+    if (!file) return;
+    try {
+      setter(await fileToDataUrl(file));
+    } catch (err: any) {
+      error(err.message || `No se pudo cargar el ${label}`);
+    }
+  };
+
   const handleCreateCollaborator = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -375,55 +389,77 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
               </div>
 
               <div className="form-group">
-                <label className="form-label">URL del Logo</label>
-                <input
-                  type="text"
-                  value={logoUrl}
-                  onChange={e => setLogoUrl(e.target.value)}
-                  className="form-input"
-                  placeholder="https://.../logo.png"
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={async e => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      setLogoUrl(await fileToDataUrl(file));
-                    } catch (err: any) {
-                      error(err.message || 'No se pudo cargar el logo');
-                    }
-                  }}
-                  className="form-input"
-                  style={{ marginTop: '8px' }}
-                />
+                <label className="form-label">Logo del negocio</label>
+                <div className="brand-image-field">
+                  <div className="brand-image-preview brand-image-preview-logo">
+                    {logoUrl ? (
+                      <img src={logoUrl} alt="Vista previa del logo" className="brand-image-preview-img brand-image-preview-img-logo" />
+                    ) : (
+                      <div className="brand-image-placeholder">
+                        <Building2 size={20} />
+                        <span>Sin logo cargado</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="brand-image-actions">
+                    <label className="brand-upload-button">
+                      <Plus size={15} />
+                      {logoUrl ? 'Cambiar archivo' : 'Seleccionar archivo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async e => {
+                          await handleBrandImageChange(e.target.files?.[0], setLogoUrl, 'logo');
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {logoUrl && (
+                      <button type="button" className="brand-clear-button" onClick={() => setLogoUrl('')}>
+                        <Trash2 size={15} />
+                        Quitar imagen
+                      </button>
+                    )}
+                  </div>
+                  <span className="brand-upload-hint">PNG, JPG o WEBP. Tamano maximo 1 MB.</span>
+                </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">URL del Banner</label>
-                <input
-                  type="text"
-                  value={bannerUrl}
-                  onChange={e => setBannerUrl(e.target.value)}
-                  className="form-input"
-                  placeholder="https://.../banner.jpg"
-                />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={async e => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    try {
-                      setBannerUrl(await fileToDataUrl(file));
-                    } catch (err: any) {
-                      error(err.message || 'No se pudo cargar el banner');
-                    }
-                  }}
-                  className="form-input"
-                  style={{ marginTop: '8px' }}
-                />
+                <label className="form-label">Banner del catalogo</label>
+                <div className="brand-image-field">
+                  <div className="brand-image-preview brand-image-preview-banner">
+                    {bannerUrl ? (
+                      <img src={bannerUrl} alt="Vista previa del banner" className="brand-image-preview-img brand-image-preview-img-banner" />
+                    ) : (
+                      <div className="brand-image-placeholder">
+                        <Globe size={20} />
+                        <span>Sin banner cargado</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="brand-image-actions">
+                    <label className="brand-upload-button">
+                      <Plus size={15} />
+                      {bannerUrl ? 'Cambiar archivo' : 'Seleccionar archivo'}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async e => {
+                          await handleBrandImageChange(e.target.files?.[0], setBannerUrl, 'banner');
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {bannerUrl && (
+                      <button type="button" className="brand-clear-button" onClick={() => setBannerUrl('')}>
+                        <Trash2 size={15} />
+                        Quitar imagen
+                      </button>
+                    )}
+                  </div>
+                  <span className="brand-upload-hint">Usa una imagen horizontal para que se vea mejor en el catalogo publico.</span>
+                </div>
               </div>
 
               <div className="form-group">
