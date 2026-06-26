@@ -35,6 +35,12 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [printMode, setPrintMode] = useState<'receipt' | 'invoice'>('receipt');
+  const [customerDocumentCode, setCustomerDocumentCode] = useState('13');
+  const [customerIdentification, setCustomerIdentification] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('pos_user') || 'null') : null;
   const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
@@ -337,6 +343,16 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
 
   const handleCheckout = async () => {
     if (cart.length === 0) { warning('El carrito está vacío'); return; }
+    if (requiresElectronicInvoice) {
+      if (!isOnline || !token) {
+        warning('La facturación electrónica requiere conexión a internet y sesión activa.');
+        return;
+      }
+      if (!customerIdentification.trim() || !customerName.trim()) {
+        warning('Para emitir factura electrónica debes completar documento y nombre del comprador');
+        return;
+      }
+    }
     setIsCheckingOut(true);
     try {
       const count = await db.sales.count();
@@ -350,6 +366,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         quantity: i.quantity,
         price: i.product.price,
         total: i.product.price * i.quantity,
+        tax_rate: i.product.tax_rate,
       }));
 
       const sale: LocalSale = {
@@ -366,6 +383,12 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         meta_data: {
           requires_electronic_invoice: requiresElectronicInvoice,
           dian_status: requiresElectronicInvoice ? 'pending_sync' : 'not_requested',
+          customer_document_code: customerDocumentCode,
+          customer_identification: customerIdentification.trim(),
+          customer_name: customerName.trim(),
+          customer_email: customerEmail.trim() || undefined,
+          customer_phone: customerPhone.trim() || undefined,
+          customer_address: customerAddress.trim() || undefined,
         },
       };
 
@@ -408,6 +431,12 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       setCompletedSale(sale); // Mostrar modal de recibo
       setPrintMode('receipt');
       setRequiresElectronicInvoice(false);
+      setCustomerDocumentCode('13');
+      setCustomerIdentification('');
+      setCustomerName('');
+      setCustomerEmail('');
+      setCustomerPhone('');
+      setCustomerAddress('');
       clearCart();
       onSaleComplete();
     } catch (e) {
@@ -645,9 +674,39 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 Activar facturación electrónica para esta venta
               </label>
               {requiresElectronicInvoice && (
-                <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
-                  Esta venta liquidara IVA y sera reportada a la DIAN dentro del flujo de factura electronica.
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                  <p style={{ fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5, margin: 0 }}>
+                    Esta venta liquidara IVA y sera reportada a la DIAN dentro del flujo de factura electronica.
+                  </p>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Tipo de documento</label>
+                    <select className="form-select" value={customerDocumentCode} onChange={e => setCustomerDocumentCode(e.target.value)}>
+                      <option value="13">Cédula de ciudadanía</option>
+                      <option value="31">NIT</option>
+                      <option value="41">Pasaporte</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Documento del comprador *</label>
+                    <input className="form-input" value={customerIdentification} onChange={e => setCustomerIdentification(e.target.value)} placeholder="Ej. 1399995" />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Nombre o razón social *</label>
+                    <input className="form-input" value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Ej. Consumidor Final" />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Correo</label>
+                    <input className="form-input" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="cliente@correo.com" />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Teléfono</label>
+                    <input className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="3001234567" />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Dirección</label>
+                    <input className="form-input" value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} placeholder="Dirección del comprador" />
+                  </div>
+                </div>
               )}
             </div>
           )}

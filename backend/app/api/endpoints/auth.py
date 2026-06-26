@@ -186,6 +186,7 @@ class TenantUpdate(BaseModel):
     factus_client_secret: Optional[str] = None
     factus_username: Optional[str] = None
     factus_password: Optional[str] = None
+    factus_numbering_range_id: Optional[int] = None
 
 class CollaboratorCreate(BaseModel):
     email: EmailStr
@@ -263,6 +264,7 @@ def update_tenant(
         data.factus_client_secret,
         data.factus_username,
         data.factus_password,
+        data.factus_numbering_range_id,
     ]):
         meta = dict(tenant.meta_data or {})
         if data.display_name is not None:
@@ -296,6 +298,8 @@ def update_tenant(
             meta["factus_username"] = data.factus_username.strip()
         if data.factus_password is not None:
             meta["factus_password"] = data.factus_password.strip()
+        if data.factus_numbering_range_id is not None:
+            meta["factus_numbering_range_id"] = data.factus_numbering_range_id
         tenant.meta_data = meta
         
     session.add(tenant)

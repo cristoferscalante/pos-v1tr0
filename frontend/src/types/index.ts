@@ -20,6 +20,7 @@ export interface AuthUser {
     factus_client_secret?: string;
     factus_username?: string;
     factus_password?: string;
+    factus_numbering_range_id?: number;
     [key: string]: any;
   };
 }
@@ -53,6 +54,7 @@ export interface LocalSaleDetail {
   quantity: number;
   price: number;
   total: number;
+  tax_rate?: number;
 }
 
 export interface LocalSale {

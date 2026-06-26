@@ -50,6 +50,46 @@ class FactusService:
         )
 
     @classmethod
+    async def get_acquirer(
+        cls,
+        *,
+        environment: str,
+        access_token: str,
+        identification_document_code: str,
+        identification_number: str,
+    ) -> dict[str, Any]:
+        return await cls._get(
+            environment=environment,
+            access_token=access_token,
+            path="/v2/dian/acquirer",
+            params={
+                "identification_document_code": identification_document_code,
+                "identification_number": identification_number,
+            },
+        )
+
+    @classmethod
+    async def create_bill(
+        cls,
+        *,
+        environment: str,
+        access_token: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.post(
+                f"{cls.get_base_url(environment)}/v2/bills/validate",
+                headers={
+                    "Accept": "application/json",
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            response.raise_for_status()
+            return response.json()
+
+    @classmethod
     async def _get(
         cls,
         *,

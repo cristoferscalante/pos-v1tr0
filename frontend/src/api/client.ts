@@ -93,7 +93,7 @@ export const authApi = {
   getTenant: (token: string): Promise<any> =>
     request('/api/v1/auth/tenant', {}, token),
 
-  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string; display_name?: string; logo_url?: string; banner_url?: string; brand_color?: string; product_categories?: string[]; electronic_invoicing_enabled?: boolean; electronic_invoicing_provider?: string; electronic_invoicing_environment?: string; factus_client_id?: string; factus_client_secret?: string; factus_username?: string; factus_password?: string }): Promise<any> =>
+  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string; display_name?: string; logo_url?: string; banner_url?: string; brand_color?: string; product_categories?: string[]; electronic_invoicing_enabled?: boolean; electronic_invoicing_provider?: string; electronic_invoicing_environment?: string; factus_client_id?: string; factus_client_secret?: string; factus_username?: string; factus_password?: string; factus_numbering_range_id?: number | null }): Promise<any> =>
     request('/api/v1/auth/tenant', { method: 'PUT', body: JSON.stringify(data) }, token),
 
   listCollaborators: (token: string): Promise<any[]> =>

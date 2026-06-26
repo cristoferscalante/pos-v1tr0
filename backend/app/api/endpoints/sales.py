@@ -11,8 +11,10 @@ from app.api.deps import get_current_tenant_id, get_current_user
 from app.models.cash_session import CashSession
 from app.models.sale import Sale, SaleDetail, SaleReadWithDetails, SaleDetailRead
 from app.models.product import Product
+from app.models.tenant import Tenant
 from app.models.user import User
 from app.services.dian import DianService
+from app.services.factus import FactusService
 from app.services.notifications import notify_low_stock, notify_sale_created
 from app.core.config import settings
 
@@ -24,6 +26,8 @@ class SaleDetailSync(BaseModel):
     quantity: float
     price: Decimal
     total: Decimal
+    name: str | None = None
+    tax_rate: Decimal | None = None
 
 class SaleSync(BaseModel):
     id: uuid.UUID  # Generado en el cliente para mantener consistencia
@@ -108,7 +112,32 @@ def sync_offline_sales(
             # 4. Transmitir e integrar con la DIAN
             if sale_data.meta_data.get("requires_electronic_invoice"):
                 try:
-                    DianService.transmit_to_dian(new_sale, session)
+                    tenant = session.get(Tenant, tenant_id)
+                    tenant_meta = dict(tenant.meta_data or {}) if tenant else {}
+                    if tenant_meta.get("electronic_invoicing_enabled") and tenant_meta.get("electronic_invoicing_provider") == "factus":
+                        factus_result = _emit_with_factus(
+                            sale=new_sale,
+                            details=sale_data.details,
+                            tenant_meta=tenant_meta,
+                            session=session,
+                        )
+                        current_metadata = dict(new_sale.meta_data or {})
+                        current_metadata.update({
+                            "dian_status": "validated" if factus_result.get("data", {}).get("is_validated") else "submitted",
+                            "cufe": factus_result.get("data", {}).get("cufe"),
+                            "qr_url": factus_result.get("data", {}).get("links", {}).get("qr"),
+                            "factus_status": factus_result.get("status"),
+                            "factus_message": factus_result.get("message"),
+                            "factus_bill_number": factus_result.get("data", {}).get("number"),
+                            "factus_public_url": factus_result.get("data", {}).get("links", {}).get("public_url"),
+                            "factus_payload_preview": factus_result,
+                        })
+                        new_sale.meta_data = current_metadata
+                        session.add(new_sale)
+                        session.commit()
+                        session.refresh(new_sale)
+                    else:
+                        DianService.transmit_to_dian(new_sale, session)
                 except Exception as dian_error:
                     print(f"Error en transmisión DIAN para venta {new_sale.id}: {dian_error}")
 
@@ -217,3 +246,148 @@ def get_sale(
         meta_data=sale.meta_data,
         details=details_read
     )
+
+
+def _emit_with_factus(*, sale: Sale, details: List[SaleDetailSync], tenant_meta: Dict[str, Any], session: Session) -> dict[str, Any]:
+    import asyncio
+
+    environment = tenant_meta.get("electronic_invoicing_environment") or "sandbox"
+    client_id = tenant_meta.get("factus_client_id")
+    client_secret = tenant_meta.get("factus_client_secret")
+    username = tenant_meta.get("factus_username")
+    password = tenant_meta.get("factus_password")
+    numbering_range_id = tenant_meta.get("factus_numbering_range_id")
+
+    if not all([client_id, client_secret, username, password]):
+        raise ValueError("Factus no está completamente configurado para este cliente")
+
+    customer_document_code = str((sale.meta_data or {}).get("customer_document_code") or "13")
+    customer_identification = str((sale.meta_data or {}).get("customer_identification") or "22222222222")
+    customer_name = str((sale.meta_data or {}).get("customer_name") or "Consumidor Final")
+    customer_email = (sale.meta_data or {}).get("customer_email")
+    customer_phone = (sale.meta_data or {}).get("customer_phone")
+    customer_address = (sale.meta_data or {}).get("customer_address")
+
+    async def _run() -> dict[str, Any]:
+        token_data = await FactusService.authenticate(
+            environment=environment,
+            client_id=client_id,
+            client_secret=client_secret,
+            username=username,
+            password=password,
+        )
+
+        access_token = token_data["access_token"]
+        if customer_document_code in {"13", "31"}:
+            try:
+                acquirer_data = await FactusService.get_acquirer(
+                    environment=environment,
+                    access_token=access_token,
+                    identification_document_code=customer_document_code,
+                    identification_number=customer_identification,
+                )
+                acquirer = acquirer_data.get("data") or {}
+                customer_name_resolved = acquirer.get("name") or customer_name
+                customer_email_resolved = customer_email or acquirer.get("email")
+            except Exception:
+                customer_name_resolved = customer_name
+                customer_email_resolved = customer_email
+        else:
+            customer_name_resolved = customer_name
+            customer_email_resolved = customer_email
+
+        payload: dict[str, Any] = {
+            "reference_code": sale.id.hex,
+            "document": "01",
+            "operation_type": "10",
+            "send_email": False,
+            "observation": f"Venta POS {sale.sale_number}",
+            "payment_details": [{
+                "payment_form": "1",
+                "payment_method_code": _map_payment_method(sale.payment_method),
+                "reference_code": sale.sale_number,
+                "amount": f"{sale.total:.2f}",
+            }],
+            "customer": _build_customer_payload(
+                identification_document_code=customer_document_code,
+                identification=customer_identification,
+                name=customer_name_resolved,
+                email=customer_email_resolved,
+                phone=customer_phone,
+                address=customer_address,
+            ),
+            "items": [_build_item_payload(detail, session) for detail in details],
+        }
+        if numbering_range_id:
+            payload["numbering_range_id"] = numbering_range_id
+
+        return await FactusService.create_bill(
+            environment=environment,
+            access_token=access_token,
+            payload=payload,
+        )
+
+    return asyncio.run(_run())
+
+
+def _map_payment_method(payment_method: str) -> str:
+    return {
+        "cash": "10",
+        "card": "48",
+        "transfer": "47",
+    }.get(payment_method, "10")
+
+
+def _build_customer_payload(
+    *,
+    identification_document_code: str,
+    identification: str,
+    name: str,
+    email: str | None,
+    phone: str | None,
+    address: str | None,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
+        "identification_document_code": identification_document_code,
+        "identification": identification,
+    }
+    if identification_document_code == "31":
+        payload.update({
+            "legal_organization_code": "1",
+            "tribute_code": "ZZ",
+            "company": name,
+        })
+    else:
+        payload.update({
+            "legal_organization_code": "2",
+            "names": name,
+        })
+    if email:
+        payload["email"] = email
+    if phone:
+        payload["phone"] = phone
+    if address:
+        payload["address"] = address
+    return payload
+
+
+def _build_item_payload(detail: SaleDetailSync, session: Session) -> Dict[str, Any]:
+    product = session.get(Product, detail.product_id)
+    tax_rate = float(detail.tax_rate if detail.tax_rate is not None else (product.tax_rate if product and product.tax_rate is not None else 19))
+    gross_price = float(detail.price)
+    net_price = gross_price / (1 + tax_rate / 100) if tax_rate > 0 else gross_price
+    item_name = detail.name or (product.name if product else f"Producto {str(detail.product_id)[:8]}")
+
+    return {
+        "code_reference": str(detail.product_id),
+        "name": item_name,
+        "quantity": f"{detail.quantity:.2f}",
+        "discount_rate": "0.00",
+        "price": f"{net_price:.2f}",
+        "unit_measure_code": "94",
+        "standard_code": "999",
+        "taxes": [{
+            "code": "01",
+            "rate": f"{tax_rate:.2f}",
+        }],
+    }

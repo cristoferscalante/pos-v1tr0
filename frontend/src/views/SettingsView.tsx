@@ -19,6 +19,19 @@ interface SettingsViewProps {
 
 export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const { success, error, warning } = useToast();
+
+  const getElectronicInvoicingErrorMessage = (err: any, fallback: string) => {
+    if (err?.status === 401) {
+      return 'Tu sesión venció o no está autenticada. Vuelve a iniciar sesión e inténtalo nuevamente.';
+    }
+    if (err?.status === 404) {
+      return 'La ruta de facturación electrónica no está disponible en el backend desplegado.';
+    }
+    if (typeof err?.message === 'string' && err.message.trim()) {
+      return `Factus respondió: ${err.message}`;
+    }
+    return fallback;
+  };
   
   // Password change state
   const [currentPwd, setCurrentPwd] = useState('');
@@ -60,6 +73,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const [factusRangesResult, setFactusRangesResult] = useState<FactusNumberingRangesResult | null>(null);
   const [electronicInvoicingEnabled, setElectronicInvoicingEnabled] = useState(false);
   const [savingElectronicInvoicing, setSavingElectronicInvoicing] = useState(false);
+  const [selectedFactusRangeId, setSelectedFactusRangeId] = useState<string>('');
 
   // Load tenant details and collaborators if admin
   useEffect(() => {
@@ -79,6 +93,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
           setFactusClientSecret(data.meta_data?.factus_client_secret || '');
           setFactusUsername(data.meta_data?.factus_username || '');
           setFactusPassword(data.meta_data?.factus_password || '');
+          setSelectedFactusRangeId(data.meta_data?.factus_numbering_range_id ? String(data.meta_data?.factus_numbering_range_id) : '');
         })
         .catch(() => {
           error('Error al cargar la configuración del negocio');
@@ -220,7 +235,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
       success('Conexión con Factus validada correctamente');
     } catch (err: any) {
       setFactusConnectionResult(null);
-      error(err.message || 'No se pudo validar la conexión con Factus');
+      error(getElectronicInvoicingErrorMessage(err, 'No se pudo validar la conexión con Factus'));
     } finally {
       setFactusTesting(false);
     }
@@ -236,7 +251,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
       success('Rangos de numeración consultados correctamente');
     } catch (err: any) {
       setFactusRangesResult(null);
-      error(err.message || 'No se pudieron consultar los rangos en Factus');
+      error(getElectronicInvoicingErrorMessage(err, 'No se pudieron consultar los rangos en Factus'));
     } finally {
       setFactusLoadingRanges(false);
     }
@@ -259,6 +274,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         factus_client_secret: factusClientSecret,
         factus_username: factusUsername,
         factus_password: factusPassword,
+        factus_numbering_range_id: selectedFactusRangeId ? Number(selectedFactusRangeId) : null,
       });
       success(electronicInvoicingEnabled ? 'Facturación electrónica habilitada para este cliente' : 'Facturación electrónica deshabilitada para este cliente');
       if (user && onUserUpdate) {
@@ -908,6 +924,17 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Rangos activos reportados por Factus</h3>
                   {Array.isArray(factusRangesResult.ranges?.data?.data) && factusRangesResult.ranges.data.data.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      <div className="form-group" style={{ marginBottom: '8px' }}>
+                        <label className="form-label">Rango activo para emitir</label>
+                        <select className="form-select" value={selectedFactusRangeId} onChange={e => setSelectedFactusRangeId(e.target.value)}>
+                          <option value="">Selecciona un rango</option>
+                          {factusRangesResult.ranges.data.data.map((range: any) => (
+                            <option key={range.id} value={String(range.id)}>
+                              {range.prefix} {range.current} | Resolución {range.resolution_number}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       {factusRangesResult.ranges.data.data.map((range: any) => (
                         <div key={range.id} style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
                           <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>{range.prefix} {range.current}</p>
