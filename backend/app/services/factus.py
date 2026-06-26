@@ -38,7 +38,7 @@ class FactusService:
 
     @classmethod
     async def get_company(cls, *, environment: str, access_token: str) -> dict[str, Any]:
-        return await cls._get(environment=environment, access_token=access_token, path="/v2/companies/me")
+        return await cls._get(environment=environment, access_token=access_token, path="/v2/companies")
 
     @classmethod
     async def get_numbering_ranges(cls, *, environment: str, access_token: str) -> dict[str, Any]:
