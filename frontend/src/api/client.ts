@@ -4,7 +4,7 @@
 import type {
   AuthResponse, ApiProduct, ApiSale,
   DashboardSummary, ChartDataPoint, TopProduct, LocalSale, CashSessionResponse, NotificationRule,
-  Supplier, Purchase, InventoryMovement, NotificationLog
+  Supplier, Purchase, InventoryMovement, NotificationLog, FactusConnectionResult, FactusNumberingRangesResult
 } from '../types';
 
 const rawApiUrl = typeof import.meta.env.VITE_API_URL === 'string' ? import.meta.env.VITE_API_URL.trim() : '';
@@ -93,7 +93,7 @@ export const authApi = {
   getTenant: (token: string): Promise<any> =>
     request('/api/v1/auth/tenant', {}, token),
 
-  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string; display_name?: string; logo_url?: string; banner_url?: string; brand_color?: string; product_categories?: string[] }): Promise<any> =>
+  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string; display_name?: string; logo_url?: string; banner_url?: string; brand_color?: string; product_categories?: string[]; electronic_invoicing_enabled?: boolean; electronic_invoicing_provider?: string; electronic_invoicing_environment?: string; factus_client_id?: string; factus_client_secret?: string; factus_username?: string; factus_password?: string }): Promise<any> =>
     request('/api/v1/auth/tenant', { method: 'PUT', body: JSON.stringify(data) }, token),
 
   listCollaborators: (token: string): Promise<any[]> =>
@@ -226,6 +226,14 @@ export const dashboardApi = {
 
   topProducts: (token: string, limit = 5): Promise<TopProduct[]> =>
     request(`/api/v1/dashboard/top-products?limit=${limit}`, {}, token),
+};
+
+export const einvoiceApi = {
+  factusTestConnection: (token: string, data: { environment: 'sandbox' | 'production'; client_id: string; client_secret: string; username: string; password: string }): Promise<FactusConnectionResult> =>
+    request('/api/v1/einvoice/factus/test-connection', { method: 'POST', body: JSON.stringify(data) }, token),
+
+  factusNumberingRanges: (token: string, data: { environment: 'sandbox' | 'production'; client_id: string; client_secret: string; username: string; password: string }): Promise<FactusNumberingRangesResult> =>
+    request('/api/v1/einvoice/factus/numbering-ranges', { method: 'POST', body: JSON.stringify(data) }, token),
 };
 
 // --- Public Catalog ---

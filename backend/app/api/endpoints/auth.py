@@ -179,6 +179,13 @@ class TenantUpdate(BaseModel):
     banner_url: Optional[str] = None
     brand_color: Optional[str] = None
     product_categories: Optional[List[str]] = None
+    electronic_invoicing_enabled: Optional[bool] = None
+    electronic_invoicing_provider: Optional[str] = None
+    electronic_invoicing_environment: Optional[str] = None
+    factus_client_id: Optional[str] = None
+    factus_client_secret: Optional[str] = None
+    factus_username: Optional[str] = None
+    factus_password: Optional[str] = None
 
 class CollaboratorCreate(BaseModel):
     email: EmailStr
@@ -243,7 +250,20 @@ def update_tenant(
         meta["whatsapp_number"] = data.whatsapp_number.strip()
         tenant.meta_data = meta
 
-    if any(value is not None for value in [data.display_name, data.logo_url, data.banner_url, data.brand_color, data.product_categories]):
+    if any(value is not None for value in [
+        data.display_name,
+        data.logo_url,
+        data.banner_url,
+        data.brand_color,
+        data.product_categories,
+        data.electronic_invoicing_enabled,
+        data.electronic_invoicing_provider,
+        data.electronic_invoicing_environment,
+        data.factus_client_id,
+        data.factus_client_secret,
+        data.factus_username,
+        data.factus_password,
+    ]):
         meta = dict(tenant.meta_data or {})
         if data.display_name is not None:
             meta["display_name"] = data.display_name.strip()
@@ -262,6 +282,20 @@ def update_tenant(
                     cleaned_categories.append(category)
                     seen_categories.add(category.lower())
             meta["product_categories"] = cleaned_categories
+        if data.electronic_invoicing_enabled is not None:
+            meta["electronic_invoicing_enabled"] = data.electronic_invoicing_enabled
+        if data.electronic_invoicing_provider is not None:
+            meta["electronic_invoicing_provider"] = data.electronic_invoicing_provider.strip()
+        if data.electronic_invoicing_environment is not None:
+            meta["electronic_invoicing_environment"] = data.electronic_invoicing_environment.strip()
+        if data.factus_client_id is not None:
+            meta["factus_client_id"] = data.factus_client_id.strip()
+        if data.factus_client_secret is not None:
+            meta["factus_client_secret"] = data.factus_client_secret.strip()
+        if data.factus_username is not None:
+            meta["factus_username"] = data.factus_username.strip()
+        if data.factus_password is not None:
+            meta["factus_password"] = data.factus_password.strip()
         tenant.meta_data = meta
         
     session.add(tenant)

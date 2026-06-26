@@ -36,6 +36,9 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [printMode, setPrintMode] = useState<'receipt' | 'invoice'>('receipt');
   const searchRef = useRef<HTMLInputElement>(null);
+  const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('pos_user') || 'null') : null;
+  const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
+  const isElectronicInvoicingAvailable = Boolean(storedUser?.meta_data?.electronic_invoicing_enabled);
 
   // Categories from products
   const categories = ['all', ...Array.from(new Set(
@@ -77,8 +80,6 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     matchedProduct: string | null;
   } | null>(null);
   const [completedSale, setCompletedSale] = useState<LocalSale | null>(null);
-  const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('pos_user') || 'null') : null;
-  const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
 
   // Global keydown listener for barcode/QR scanner gun (Capture Phase)
   React.useEffect(() => {
@@ -274,7 +275,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
 
   // Totals
   const total = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
-  const tax = requiresElectronicInvoice
+  const tax = requiresElectronicInvoice && isElectronicInvoicingAvailable
     ? Math.round(cart.reduce((s, i) => {
         const rate = i.product.tax_rate !== undefined ? i.product.tax_rate : 19;
         const itemTotal = i.product.price * i.quantity;
@@ -287,6 +288,11 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const handleElectronicInvoiceToggle = (checked: boolean) => {
     if (!checked) {
       setRequiresElectronicInvoice(false);
+      return;
+    }
+
+    if (!isElectronicInvoicingAvailable) {
+      warning('Este cliente no tiene habilitado el servicio de facturación electrónica.');
       return;
     }
 
@@ -627,22 +633,24 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             </div>
           </div>
 
-          <div className="payment-section">
-            <label className="section-label">Factura electrónica</label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-              <input
-                type="checkbox"
-                checked={requiresElectronicInvoice}
-                onChange={e => handleElectronicInvoiceToggle(e.target.checked)}
-              />
-              Activar facturación electrónica para esta venta
-            </label>
-            {requiresElectronicInvoice && (
-              <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
-                Esta venta liquidara IVA y sera reportada a la DIAN dentro del flujo de factura electronica.
-              </p>
-            )}
-          </div>
+          {isElectronicInvoicingAvailable && (
+            <div className="payment-section">
+              <label className="section-label">Factura electrónica</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <input
+                  type="checkbox"
+                  checked={requiresElectronicInvoice}
+                  onChange={e => handleElectronicInvoiceToggle(e.target.checked)}
+                />
+                Activar facturación electrónica para esta venta
+              </label>
+              {requiresElectronicInvoice && (
+                <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
+                  Esta venta liquidara IVA y sera reportada a la DIAN dentro del flujo de factura electronica.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Totals */}
           <div className="totals-box">

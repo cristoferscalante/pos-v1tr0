@@ -13,6 +13,13 @@ export interface AuthUser {
   slug?: string;
   meta_data?: {
     product_categories?: string[];
+    electronic_invoicing_enabled?: boolean;
+    electronic_invoicing_provider?: string;
+    electronic_invoicing_environment?: 'sandbox' | 'production' | string;
+    factus_client_id?: string;
+    factus_client_secret?: string;
+    factus_username?: string;
+    factus_password?: string;
     [key: string]: any;
   };
 }
@@ -241,6 +248,22 @@ export interface InventoryMovement {
   reference_id?: string | null;
   notes?: string | null;
   created_at: string;
+}
+
+export interface FactusConnectionResult {
+  status: string;
+  provider: string;
+  environment: 'sandbox' | 'production';
+  token_type?: string;
+  expires_in?: number;
+  company?: any;
+}
+
+export interface FactusNumberingRangesResult {
+  status: string;
+  provider: string;
+  environment: 'sandbox' | 'production';
+  ranges: any;
 }
 
 // --- UI ---

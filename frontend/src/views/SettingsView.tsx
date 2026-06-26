@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Settings, Save, KeyRound, Building2, Info, Shield, 
-  Crown, User, Printer, Trash2, Users, Globe, MessageSquare, Plus, ExternalLink, Mail, Send 
+  Crown, User, Printer, Trash2, Users, Globe, MessageSquare, Plus, ExternalLink, Mail, Send, ReceiptText, RefreshCw
 } from 'lucide-react';
-import { API_URL, authApi } from '../api/client';
+import { API_URL, authApi, einvoiceApi } from '../api/client';
 import { useToast } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
-import type { AuthUser, NotificationLog, NotificationRule } from '../types';
+import type { AuthUser, FactusConnectionResult, FactusNumberingRangesResult, NotificationLog, NotificationRule } from '../types';
 import { fileToDataUrl } from '../utils/imageUpload';
 import '../styles/branding-upload.css';
 
@@ -49,6 +49,17 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const [loadingNotifications, setLoadingNotifications] = useState(false);
   const [testEmail, setTestEmail] = useState('');
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
+  const [factusEnvironment, setFactusEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [factusClientId, setFactusClientId] = useState('');
+  const [factusClientSecret, setFactusClientSecret] = useState('');
+  const [factusUsername, setFactusUsername] = useState('');
+  const [factusPassword, setFactusPassword] = useState('');
+  const [factusTesting, setFactusTesting] = useState(false);
+  const [factusLoadingRanges, setFactusLoadingRanges] = useState(false);
+  const [factusConnectionResult, setFactusConnectionResult] = useState<FactusConnectionResult | null>(null);
+  const [factusRangesResult, setFactusRangesResult] = useState<FactusNumberingRangesResult | null>(null);
+  const [electronicInvoicingEnabled, setElectronicInvoicingEnabled] = useState(false);
+  const [savingElectronicInvoicing, setSavingElectronicInvoicing] = useState(false);
 
   // Load tenant details and collaborators if admin
   useEffect(() => {
@@ -62,6 +73,12 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
           setLogoUrl(data.meta_data?.logo_url || '');
           setBannerUrl(data.meta_data?.banner_url || '');
           setBrandColor(data.meta_data?.brand_color || '#6366f1');
+          setElectronicInvoicingEnabled(Boolean(data.meta_data?.electronic_invoicing_enabled));
+          setFactusEnvironment(data.meta_data?.electronic_invoicing_environment === 'production' ? 'production' : 'sandbox');
+          setFactusClientId(data.meta_data?.factus_client_id || '');
+          setFactusClientSecret(data.meta_data?.factus_client_secret || '');
+          setFactusUsername(data.meta_data?.factus_username || '');
+          setFactusPassword(data.meta_data?.factus_password || '');
         })
         .catch(() => {
           error('Error al cargar la configuración del negocio');
@@ -172,6 +189,90 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
       error(err.message || 'No se pudo enviar el correo de prueba');
     } finally {
       setSendingTestEmail(false);
+    }
+  };
+
+  const getFactusCredentialsPayload = () => ({
+    environment: factusEnvironment,
+    client_id: factusClientId.trim(),
+    client_secret: factusClientSecret.trim(),
+    username: factusUsername.trim(),
+    password: factusPassword,
+  });
+
+  const ensureFactusCredentials = () => {
+    const payload = getFactusCredentialsPayload();
+    if (!token) return null;
+    if (!payload.client_id || !payload.client_secret || !payload.username || !payload.password) {
+      warning('Completa las credenciales de Factus antes de probar la conexión');
+      return null;
+    }
+    return payload;
+  };
+
+  const handleFactusTestConnection = async () => {
+    const payload = ensureFactusCredentials();
+    if (!payload || !token) return;
+    setFactusTesting(true);
+    try {
+      const result = await einvoiceApi.factusTestConnection(token, payload);
+      setFactusConnectionResult(result);
+      success('Conexión con Factus validada correctamente');
+    } catch (err: any) {
+      setFactusConnectionResult(null);
+      error(err.message || 'No se pudo validar la conexión con Factus');
+    } finally {
+      setFactusTesting(false);
+    }
+  };
+
+  const handleFactusLoadRanges = async () => {
+    const payload = ensureFactusCredentials();
+    if (!payload || !token) return;
+    setFactusLoadingRanges(true);
+    try {
+      const result = await einvoiceApi.factusNumberingRanges(token, payload);
+      setFactusRangesResult(result);
+      success('Rangos de numeración consultados correctamente');
+    } catch (err: any) {
+      setFactusRangesResult(null);
+      error(err.message || 'No se pudieron consultar los rangos en Factus');
+    } finally {
+      setFactusLoadingRanges(false);
+    }
+  };
+
+  const handleElectronicInvoicingSave = async () => {
+    if (!token) return;
+    if (electronicInvoicingEnabled && (!factusClientId.trim() || !factusClientSecret.trim() || !factusUsername.trim() || !factusPassword)) {
+      warning('Para habilitar facturación electrónica debes completar primero las credenciales de Factus');
+      return;
+    }
+
+    setSavingElectronicInvoicing(true);
+    try {
+      const data = await authApi.updateTenant(token, {
+        electronic_invoicing_enabled: electronicInvoicingEnabled,
+        electronic_invoicing_provider: 'factus',
+        electronic_invoicing_environment: factusEnvironment,
+        factus_client_id: factusClientId,
+        factus_client_secret: factusClientSecret,
+        factus_username: factusUsername,
+        factus_password: factusPassword,
+      });
+      success(electronicInvoicingEnabled ? 'Facturación electrónica habilitada para este cliente' : 'Facturación electrónica deshabilitada para este cliente');
+      if (user && onUserUpdate) {
+        onUserUpdate({
+          ...user,
+          slug: data.slug,
+          business_name: data.name,
+          meta_data: data.meta_data,
+        });
+      }
+    } catch (err: any) {
+      error(err.message || 'No se pudo guardar la configuración de facturación electrónica');
+    } finally {
+      setSavingElectronicInvoicing(false);
     }
   };
 
@@ -728,6 +829,97 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {user?.role === 'admin' && (
+          <div className="settings-card glass" style={{ gridColumn: 'span 2' }}>
+            <div className="settings-card-header">
+              <ReceiptText size={18} style={{ color: 'var(--warning)' }} />
+              <h2 className="settings-card-title">Facturación Electrónica por Empresa</h2>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div className="info-note">
+                <Info size={14} />
+                <span>La facturación electrónica es opcional por cliente. Si no la activas, este negocio usará solo el POS sin DIAN. Si la activas, podrás probar Factus sandbox y preparar la emisión electrónica.</span>
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                <input type="checkbox" checked={electronicInvoicingEnabled} onChange={e => setElectronicInvoicingEnabled(e.target.checked)} />
+                Habilitar facturación electrónica para este cliente
+              </label>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Proveedor</label>
+                  <input className="form-input" value="Factus" disabled />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Ambiente</label>
+                  <select className="form-select" value={factusEnvironment} onChange={e => setFactusEnvironment(e.target.value as 'sandbox' | 'production')}>
+                    <option value="sandbox">Sandbox</option>
+                    <option value="production">Producción</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Client ID</label>
+                  <input className="form-input" value={factusClientId} onChange={e => setFactusClientId(e.target.value)} placeholder="Client ID de Factus" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Client Secret</label>
+                  <input className="form-input" value={factusClientSecret} onChange={e => setFactusClientSecret(e.target.value)} placeholder="Client Secret de Factus" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Usuario / Correo</label>
+                  <input className="form-input" value={factusUsername} onChange={e => setFactusUsername(e.target.value)} placeholder="usuario@empresa.com" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Contraseña</label>
+                  <input type="password" className="form-input" value={factusPassword} onChange={e => setFactusPassword(e.target.value)} placeholder="Contraseña Factus" />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button type="button" onClick={handleElectronicInvoicingSave} disabled={savingElectronicInvoicing} className="btn-primary">
+                  <Save size={15} />
+                  {savingElectronicInvoicing ? 'Guardando...' : 'Guardar servicio FE'}
+                </button>
+                <button type="button" onClick={handleFactusTestConnection} disabled={factusTesting} className="btn-primary">
+                  <Globe size={15} />
+                  {factusTesting ? 'Validando...' : 'Probar conexión'}
+                </button>
+                <button type="button" onClick={handleFactusLoadRanges} disabled={factusLoadingRanges} className="btn-secondary">
+                  <RefreshCw size={15} />
+                  {factusLoadingRanges ? 'Consultando...' : 'Consultar rangos'}
+                </button>
+              </div>
+
+              {factusConnectionResult && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', background: 'rgba(16,185,129,0.06)' }}>
+                  <p style={{ margin: 0, fontSize: '13px', fontWeight: 700, color: 'var(--success)' }}>Conexión verificada</p>
+                  <p style={{ margin: '6px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>Ambiente: {factusConnectionResult.environment} | Token: {factusConnectionResult.token_type || 'Bearer'} | Vigencia: {factusConnectionResult.expires_in || 0}s</p>
+                </div>
+              )}
+
+              {factusRangesResult && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: '12px', padding: '16px', background: 'rgba(255,255,255,0.02)' }}>
+                  <h3 style={{ margin: '0 0 12px 0', fontSize: '14px', color: 'var(--text-primary)' }}>Rangos activos reportados por Factus</h3>
+                  {Array.isArray(factusRangesResult.ranges?.data?.data) && factusRangesResult.ranges.data.data.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {factusRangesResult.ranges.data.data.map((range: any) => (
+                        <div key={range.id} style={{ border: '1px solid var(--border)', borderRadius: '10px', padding: '12px 14px' }}>
+                          <p style={{ margin: 0, fontSize: '13px', fontWeight: 700 }}>{range.prefix} {range.current}</p>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>Resolución: {range.resolution_number} | Rango: {range.from} - {range.to}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>No se encontraron rangos activos en la respuesta.</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
