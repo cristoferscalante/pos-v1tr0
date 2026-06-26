@@ -13,6 +13,7 @@ import { DashboardView } from './views/DashboardView';
 import { SettingsView } from './views/SettingsView';
 import { PublicCatalogView } from './views/PublicCatalogView';
 import type { AuthUser, LocalProduct, View, BusinessType } from './types';
+import { getProductCategory } from './utils/productCategories';
 
 const LEGACY_DEMO_PRODUCT_HINTS = [
   'vacuna parvovirus',
@@ -112,9 +113,8 @@ function AppInner() {
             .filter((product) => {
               const name = product.name.toLowerCase();
               const sku = (product.sku || '').toLowerCase();
-              const category = (product.category || '').toLowerCase();
-              const tipo = String(product.meta_data?.tipo || '').toLowerCase();
-              return LEGACY_DEMO_PRODUCT_HINTS.some((hint) => name.includes(hint) || sku.includes(hint) || category.includes(hint) || tipo.includes(hint));
+              const category = getProductCategory(product).toLowerCase();
+              return LEGACY_DEMO_PRODUCT_HINTS.some((hint) => name.includes(hint) || sku.includes(hint) || category.includes(hint));
             })
             .map((product) => product.id)
         );

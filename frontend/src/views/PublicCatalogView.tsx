@@ -3,6 +3,7 @@ import { ShoppingCart, Search, Plus, Minus, Trash2, Store, X, MessageCircle, Arr
 import { publicCatalogApi, API_URL } from '../api/client';
 import type { ApiProduct } from '../types';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
+import { getProductCategory } from '../utils/productCategories';
 
 interface PublicCatalogViewProps {
   slug: string;
@@ -120,14 +121,14 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
   };
 
   const categories = useMemo(() => {
-    const values = Array.from(new Set(products.map(p => String(p.meta_data?.tipo || p.category || 'General').trim()).filter(Boolean)));
+    const values = Array.from(new Set(products.map(p => getProductCategory(p)).filter(Boolean)));
     return ['all', ...values];
   }, [products]);
 
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-    const productCategory = String(p.meta_data?.tipo || p.category || 'General').trim();
+    const productCategory = getProductCategory(p);
     const matchesCategory = selectedCategory === 'all' || productCategory === selectedCategory;
     return matchesSearch && matchesCategory;
   });

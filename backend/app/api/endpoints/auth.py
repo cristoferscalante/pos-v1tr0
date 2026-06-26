@@ -178,6 +178,7 @@ class TenantUpdate(BaseModel):
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
     brand_color: Optional[str] = None
+    product_categories: Optional[List[str]] = None
 
 class CollaboratorCreate(BaseModel):
     email: EmailStr
@@ -242,7 +243,7 @@ def update_tenant(
         meta["whatsapp_number"] = data.whatsapp_number.strip()
         tenant.meta_data = meta
 
-    if any(value is not None for value in [data.display_name, data.logo_url, data.banner_url, data.brand_color]):
+    if any(value is not None for value in [data.display_name, data.logo_url, data.banner_url, data.brand_color, data.product_categories]):
         meta = dict(tenant.meta_data or {})
         if data.display_name is not None:
             meta["display_name"] = data.display_name.strip()
@@ -252,6 +253,15 @@ def update_tenant(
             meta["banner_url"] = data.banner_url.strip()
         if data.brand_color is not None:
             meta["brand_color"] = data.brand_color.strip()
+        if data.product_categories is not None:
+            cleaned_categories = []
+            seen_categories = set()
+            for raw_category in data.product_categories:
+                category = " ".join((raw_category or "").strip().split())
+                if category and category.lower() not in seen_categories:
+                    cleaned_categories.append(category)
+                    seen_categories.add(category.lower())
+            meta["product_categories"] = cleaned_categories
         tenant.meta_data = meta
         
     session.add(tenant)

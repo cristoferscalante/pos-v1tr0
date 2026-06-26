@@ -4,13 +4,14 @@ import {
   TrendingUp, AlertTriangle, ChevronUp, ChevronDown, Barcode
 } from 'lucide-react';
 import { db } from '../db/pos-db';
-import { productsApi } from '../api/client';
+import { authApi, productsApi } from '../api/client';
 import { useToast } from '../components/Toast';
-import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
+import { getBusinessTypeIcon } from '../components/BusinessTypeSelect';
 import { CustomSelect } from '../components/CustomSelect';
 import { fileToDataUrl } from '../utils/imageUpload';
 import type { SelectOption } from '../components/CustomSelect';
 import type { LocalProduct, AuthUser } from '../types';
+import { buildCategoryOptions, getProductCategory, getTenantProductCategories, normalizeCategoryName } from '../utils/productCategories';
 
 interface InventoryViewProps {
   products: LocalProduct[];
@@ -45,6 +46,12 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const [metaExtra, setMetaExtra] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [tenantCategories, setTenantCategories] = useState<string[]>(() => getTenantProductCategories(user));
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  useEffect(() => {
+    setTenantCategories(getTenantProductCategories(user));
+  }, [user]);
 
   // Global keydown listener when modal is open to capture barcode scanner gun
   useEffect(() => {
@@ -162,26 +169,68 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
   const openCreate = () => {
     setEditingProduct(null);
-    setForm(EMPTY_FORM);
+    const defaultCategory = tenantCategories[0] || 'General';
+    setForm({ ...EMPTY_FORM, category: defaultCategory });
     setMetaExtra('');
     setProductImage('');
+    setNewCategoryName('');
     setShowForm(true);
   };
 
   const openEdit = (p: LocalProduct) => {
     setEditingProduct(p);
-    setForm({ ...p });
+    setForm({ ...p, category: getProductCategory(p) });
     setProductImage(p.image || '');
     setMetaExtra(p.meta_data?.detalle_especifico || '');
+    setNewCategoryName('');
     setShowForm(true);
+  };
+
+  const syncTenantCategories = async (categories: string[]) => {
+    const normalized = buildCategoryOptions(categories);
+    setTenantCategories(normalized);
+    if (!token) return normalized;
+
+    const updatedTenant = await authApi.updateTenant(token, { product_categories: normalized });
+    const refreshedCategories = buildCategoryOptions(updatedTenant.meta_data?.product_categories || normalized);
+    setTenantCategories(refreshedCategories);
+    return refreshedCategories;
+  };
+
+  const handleCreateCategory = async () => {
+    const category = normalizeCategoryName(newCategoryName);
+    if (!category) {
+      warning('Escribe un nombre para la categoría');
+      return;
+    }
+
+    if (tenantCategories.some(item => item.toLowerCase() === category.toLowerCase())) {
+      warning('Esa categoría ya existe');
+      setForm(prev => ({ ...prev, category }));
+      setNewCategoryName('');
+      return;
+    }
+
+    try {
+      const syncedCategories = await syncTenantCategories([...tenantCategories, category]);
+      setForm(prev => ({ ...prev, category }));
+      setNewCategoryName('');
+      success('Categoría creada correctamente');
+      if (user) {
+        user.meta_data = { ...(user.meta_data || {}), product_categories: syncedCategories };
+      }
+    } catch (err: any) {
+      error(err.message || 'No se pudo crear la categoría');
+    }
   };
 
   const handleSave = async () => {
     if (!form.name) { warning('El nombre del producto es obligatorio'); return; }
     if (!form.price || form.price <= 0) { warning('El precio debe ser mayor a 0'); return; }
+    const selectedCategory = normalizeCategoryName(String(form.category || ''));
+    if (!selectedCategory) { warning('Selecciona una categoría'); return; }
     setIsSaving(true);
     try {
-      const prodCategory = editingProduct?.category || user?.business_type || 'tienda';
       const productData: LocalProduct = {
         id: editingProduct?.id || crypto.randomUUID(),
         name: form.name!,
@@ -190,16 +239,23 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         price: Number(form.price),
         cost: Number(form.cost) || 0,
         stock: Number(form.stock) || 0,
-        category: prodCategory,
+        category: selectedCategory,
         image: productImage || undefined,
         tax_rate: form.tax_rate !== undefined ? Number(form.tax_rate) : 19,
         sync_status: isOnline && token ? 'synced' : 'pending',
         sync_error: undefined,
         meta_data: {
-          tipo: prodCategory,
+          tipo: selectedCategory,
           detalle_especifico: metaExtra || undefined,
         },
       };
+
+      if (!tenantCategories.some(category => category.toLowerCase() === selectedCategory.toLowerCase())) {
+        const syncedCategories = await syncTenantCategories([...tenantCategories, selectedCategory]);
+        if (user) {
+          user.meta_data = { ...(user.meta_data || {}), product_categories: syncedCategories };
+        }
+      }
 
       // Save/update in IndexedDB
       await db.products.put(productData);
@@ -418,8 +474,8 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                   </td>
                   <td>
                     <span className="cat-tag-icon">
-                      {getBusinessTypeIcon(product.meta_data?.tipo || product.category || 'otro', 13)}
-                      {getBusinessTypeLabel(product.meta_data?.tipo || product.category || '')}
+                      {getBusinessTypeIcon(user?.business_type || 'otro', 13)}
+                      {getProductCategory(product)}
                     </span>
                   </td>
                   <td>
@@ -533,6 +589,39 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
               <div className="form-group">
                 <label className="form-label">Stock inicial</label>
                 <input type="number" className="form-input" value={form.stock || ''} onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))} placeholder="0" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Categoría *</label>
+                <CustomSelect
+                  options={tenantCategories.map(category => ({
+                    value: category,
+                    label: category,
+                    icon: getBusinessTypeIcon(user?.business_type || 'otro', 14),
+                  }))}
+                  value={String(form.category || tenantCategories[0] || 'General')}
+                  onChange={value => setForm(f => ({ ...f, category: value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Crear nueva categoría</label>
+                <div className="inventory-category-create-row">
+                  <input
+                    className="form-input"
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    placeholder="Ej. Snacks, Combos, Accesorios"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void handleCreateCategory();
+                      }
+                    }}
+                  />
+                  <button type="button" onClick={() => void handleCreateCategory()} className="btn-secondary inventory-category-create-btn">
+                    <Plus size={14} />
+                    Crear
+                  </button>
+                </div>
               </div>
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

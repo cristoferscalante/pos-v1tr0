@@ -10,6 +10,7 @@ import { salesApi } from '../api/client';
 import { useToast } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
+import { getProductCategory } from '../utils/productCategories';
 
 interface POSViewProps {
   products: LocalProduct[];
@@ -37,7 +38,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
 
   // Categories from products
   const categories = ['all', ...Array.from(new Set(
-    products.map(p => p.meta_data?.tipo || p.category || 'General')
+    products.map(p => getProductCategory(p))
   ))];
 
   const filtered = products.filter(p => {
@@ -47,7 +48,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       (p.sku?.toLowerCase().includes(term)) ||
       (p.barcode?.includes(term));
     const matchCat = selectedCategory === 'all' ||
-      (p.meta_data?.tipo || p.category || 'General') === selectedCategory;
+      getProductCategory(p) === selectedCategory;
     return matchSearch && matchCat;
   });
 

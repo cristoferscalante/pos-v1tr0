@@ -2117,6 +2117,21 @@ body {
   flex-shrink: 0;
 }
 
+.inventory-category-create-row {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.inventory-category-create-row .form-input {
+  flex: 1;
+}
+
+.inventory-category-create-btn {
+  justify-content: center;
+  min-width: 110px;
+}
+
 /* ============================
    SETTINGS — Type & Role display
    ============================ */
