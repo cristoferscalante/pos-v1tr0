@@ -282,8 +282,10 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
                       <div className="product-card-body">
                         <span className="product-card-sku">{product.sku || 'Producto destacado'}</span>
                         <h3 className="product-card-title">{product.name}</h3>
-                        <div className="product-card-footer">
+                        <div className="product-card-price-row">
                           <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
+                        </div>
+                        <div className="product-card-footer">
                           <div className="catalog-product-actions">
                             <button className="btn-add-cart" onClick={() => addToCart(product)}>
                               <ShoppingCart size={16} /> Añadir
@@ -327,8 +329,10 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
                     <div className="product-card-body">
                       <span className="product-card-sku">{product.sku || 'Sin SKU'}</span>
                       <h3 className="product-card-title">{product.name}</h3>
-                      <div className="product-card-footer">
+                      <div className="product-card-price-row">
                         <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
+                      </div>
+                      <div className="product-card-footer">
                         <div className="catalog-product-actions">
                           <button className="btn-add-cart" onClick={() => addToCart(product)}>
                             <ShoppingCart size={16} /> Añadir

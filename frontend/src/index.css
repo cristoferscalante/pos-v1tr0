@@ -2613,10 +2613,15 @@ body {
 
 .product-card-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  margin-top: 14px;
+  width: 100%;
+}
+
+.product-card-price-row {
   margin-top: 16px;
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .product-card-price {
@@ -2627,10 +2632,18 @@ body {
 }
 
 .catalog-product-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.catalog-product-actions .btn-add-cart,
+.catalog-product-actions .btn-secondary {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
 }
 
 .btn-add-cart {
@@ -2950,6 +2963,7 @@ body {
   .catalog-product-actions {
     width: 100%;
     justify-content: stretch;
+    flex-wrap: wrap;
   }
 
   .catalog-product-actions .btn-add-cart,
