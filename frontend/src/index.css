@@ -2177,11 +2177,107 @@ body {
     background: white;
     color: black;
   }
+
+  .invoice-print-sheet {
+    width: 100%;
+    max-width: 190mm;
+    padding: 8mm;
+    font-family: Arial, Helvetica, sans-serif !important;
+  }
 }
 
 /* Ticket invisible en pantalla normal */
 #print-ticket-area {
   display: none;
+}
+
+.invoice-print-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #0f172a;
+}
+
+.invoice-print-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 2px solid #cbd5e1;
+  padding-bottom: 12px;
+}
+
+.invoice-print-title {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.invoice-print-subtitle {
+  font-size: 12px;
+  color: #475569;
+  margin-top: 4px;
+}
+
+.invoice-print-badge {
+  border: 1px solid #94a3b8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.invoice-print-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  font-size: 12px;
+}
+
+.invoice-print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.invoice-print-table th,
+.invoice-print-table td {
+  border-bottom: 1px solid #cbd5e1;
+  padding: 8px 6px;
+  text-align: left;
+}
+
+.invoice-print-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.invoice-print-totals {
+  margin-left: auto;
+  width: min(320px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invoice-print-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.invoice-print-total-main {
+  border-top: 2px solid #0f172a;
+  padding-top: 8px;
+  font-size: 14px !important;
+}
+
+.invoice-print-footer {
+  border-top: 1px solid #cbd5e1;
+  padding-top: 12px;
+  font-size: 11px;
+  color: #475569;
 }
 
 /* Ticket Digital / Virtual en Modal */

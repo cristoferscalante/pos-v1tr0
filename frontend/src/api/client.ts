@@ -141,6 +141,9 @@ export const salesApi = {
   list: (token: string): Promise<ApiSale[]> =>
     request('/api/v1/sales/', {}, token),
 
+  get: (token: string, saleId: string): Promise<ApiSale & { details: any[] }> =>
+    request(`/api/v1/sales/${saleId}`, {}, token),
+
   syncOffline: (token: string, sales: LocalSale[]): Promise<{ synced_ids: string[]; errors: any[] }> =>
     request('/api/v1/sales/sync', { method: 'POST', body: JSON.stringify({ sales }) }, token),
 };

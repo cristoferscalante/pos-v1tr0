@@ -34,6 +34,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [isScanning, setIsScanning] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [printMode, setPrintMode] = useState<'receipt' | 'invoice'>('receipt');
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Categories from products
@@ -283,6 +284,51 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     : 0;
   const subtotal = total - tax;
 
+  const handleElectronicInvoiceToggle = (checked: boolean) => {
+    if (!checked) {
+      setRequiresElectronicInvoice(false);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Esta venta sera grabada con IVA y reportada a la DIAN como factura electronica. ¿Deseas continuar?'
+    );
+
+    if (!confirmed) return;
+
+    setRequiresElectronicInvoice(true);
+    warning('La venta se procesara con IVA y sera reportada en el flujo de factura electronica.');
+  };
+
+  const refreshCompletedSaleFromServer = async (saleId: string) => {
+    if (!token || !isOnline) return;
+    try {
+      const serverSale = await salesApi.get(token, saleId);
+      const normalizedSale: LocalSale = {
+        id: serverSale.id,
+        sale_number: serverSale.sale_number,
+        subtotal: Number(serverSale.subtotal),
+        tax: Number(serverSale.tax),
+        total: Number(serverSale.total),
+        payment_method: serverSale.payment_method,
+        created_at: serverSale.created_at,
+        sync_status: 'synced',
+        sync_error: undefined,
+        meta_data: serverSale.meta_data,
+        details: (serverSale as any).details || [],
+      };
+      await db.sales.put(normalizedSale);
+      setCompletedSale(normalizedSale);
+    } catch {
+      // noop
+    }
+  };
+
+  const handlePrint = (mode: 'receipt' | 'invoice') => {
+    setPrintMode(mode);
+    requestAnimationFrame(() => window.print());
+  };
+
   const handleCheckout = async () => {
     if (cart.length === 0) { warning('El carrito está vacío'); return; }
     setIsCheckingOut(true);
@@ -340,6 +386,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               saved.sync_error = undefined;
               await db.sales.put(saved);
             }
+            await refreshCompletedSaleFromServer(saleId);
           } else if ((result.errors || []).length > 0) {
             const saved = await db.sales.get(saleId);
             if (saved) {
@@ -353,6 +400,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
       success(`✅ Venta ${saleNumber} registrada — $${total.toLocaleString('es-CO')}`);
       setCompletedSale(sale); // Mostrar modal de recibo
+      setPrintMode('receipt');
       setRequiresElectronicInvoice(false);
       clearCart();
       onSaleComplete();
@@ -585,10 +633,15 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <input
                 type="checkbox"
                 checked={requiresElectronicInvoice}
-                onChange={e => setRequiresElectronicInvoice(e.target.checked)}
+                onChange={e => handleElectronicInvoiceToggle(e.target.checked)}
               />
               Activar facturación electrónica para esta venta
             </label>
+            {requiresElectronicInvoice && (
+              <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--warning)', lineHeight: 1.5 }}>
+                Esta venta liquidara IVA y sera reportada a la DIAN dentro del flujo de factura electronica.
+              </p>
+            )}
           </div>
 
           {/* Totals */}
@@ -634,39 +687,89 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       {/* Printable Area for Thermal Printer (Rendered at root via Portal to avoid parent display:none) */}
       {completedSale && createPortal(
         <div id="print-ticket-area">
-          <div style={{ textAlign: 'center', textTransform: 'uppercase', marginBottom: '8px' }}>
-            <strong>{businessName}</strong>
-          </div>
-          <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
-            Fecha: {new Date(completedSale.created_at).toLocaleString()}<br />
-            Factura N°: {completedSale.sale_number}
-          </div>
-          <div style={{ borderBottom: '1px dashed black', paddingBottom: '6px', marginBottom: '6px' }}>
-            {completedSale.details.map((item, idx) => (
-              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                <span style={{ flex: 1, textAlign: 'left' }}>{item.quantity}x {item.name}</span>
-                <span>${(item.price * item.quantity).toLocaleString('es-CO')}</span>
+          {printMode === 'receipt' ? (
+            <>
+              <div style={{ textAlign: 'center', textTransform: 'uppercase', marginBottom: '8px' }}>
+                <strong>{businessName}</strong>
               </div>
-            ))}
-          </div>
-          <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Subtotal:</span>
-              <span>${completedSale.subtotal.toLocaleString('es-CO')}</span>
+              <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
+                Fecha: {new Date(completedSale.created_at).toLocaleString()}<br />
+                Factura N°: {completedSale.sale_number}
+              </div>
+              <div style={{ borderBottom: '1px dashed black', paddingBottom: '6px', marginBottom: '6px' }}>
+                {completedSale.details.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
+                    <span style={{ flex: 1, textAlign: 'left' }}>{item.quantity}x {item.name}</span>
+                    <span>${(item.price * item.quantity).toLocaleString('es-CO')}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal:</span>
+                  <span>${completedSale.subtotal.toLocaleString('es-CO')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>IVA:</span>
+                  <span>${completedSale.tax.toLocaleString('es-CO')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '12px', borderTop: '1px dashed black', paddingTop: '4px', marginTop: '4px' }}>
+                  <span>TOTAL COBRADO:</span>
+                  <span>${completedSale.total.toLocaleString('es-CO')}</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '16px', borderTop: '1px dashed black', paddingTop: '8px' }}>
+                Gracias por su compra<br />
+                {businessName}
+              </div>
+            </>
+          ) : (
+            <div className="invoice-print-sheet">
+              <div className="invoice-print-header">
+                <div>
+                  <div className="invoice-print-title">{businessName}</div>
+                  <div className="invoice-print-subtitle">Factura electronica de venta</div>
+                </div>
+                <div className="invoice-print-badge">FE</div>
+              </div>
+              <div className="invoice-print-meta-grid">
+                <div><strong>Numero:</strong> {completedSale.sale_number}</div>
+                <div><strong>Fecha:</strong> {new Date(completedSale.created_at).toLocaleString()}</div>
+                <div><strong>Metodo:</strong> {completedSale.payment_method === 'cash' ? 'Efectivo' : completedSale.payment_method === 'card' ? 'Tarjeta' : 'Transferencia'}</div>
+                <div><strong>Estado DIAN:</strong> {completedSale.meta_data?.dian_status || 'Pendiente'}</div>
+                <div><strong>CUFE:</strong> {completedSale.meta_data?.cufe || 'Pendiente de generar'}</div>
+                <div><strong>QR DIAN:</strong> {completedSale.meta_data?.qr_url || 'Pendiente de generar'}</div>
+              </div>
+              <table className="invoice-print-table">
+                <thead>
+                  <tr>
+                    <th>Producto</th>
+                    <th>Cant.</th>
+                    <th>Unitario</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {completedSale.details.map((item, idx) => (
+                    <tr key={idx}>
+                      <td>{item.name}</td>
+                      <td>{item.quantity}</td>
+                      <td>${item.price.toLocaleString('es-CO')}</td>
+                      <td>${(item.price * item.quantity).toLocaleString('es-CO')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="invoice-print-totals">
+                <div><span>Subtotal</span><strong>${completedSale.subtotal.toLocaleString('es-CO')}</strong></div>
+                <div><span>IVA</span><strong>${completedSale.tax.toLocaleString('es-CO')}</strong></div>
+                <div className="invoice-print-total-main"><span>Total</span><strong>${completedSale.total.toLocaleString('es-CO')}</strong></div>
+              </div>
+              <div className="invoice-print-footer">
+                Documento preparado para el flujo de facturacion electronica y reporte a la DIAN.
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>IVA:</span>
-              <span>${completedSale.tax.toLocaleString('es-CO')}</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '12px', borderTop: '1px dashed black', paddingTop: '4px', marginTop: '4px' }}>
-              <span>TOTAL COBRADO:</span>
-              <span>${completedSale.total.toLocaleString('es-CO')}</span>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '16px', borderTop: '1px dashed black', paddingTop: '8px' }}>
-            Gracias por su compra<br />
-            {businessName}
-          </div>
+          )}
         </div>,
         document.body
       )}
@@ -684,12 +787,18 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <div className="ticket-virtual">
                 <div className="ticket-header">
                   <h4 className="ticket-title">{businessName}</h4>
-                  <p className="ticket-subtitle">Ticket de Venta</p>
+                  <p className="ticket-subtitle">{completedSale.meta_data?.requires_electronic_invoice ? 'Venta con facturacion electronica' : 'Ticket de Venta'}</p>
                 </div>
                 <div className="ticket-meta">
                   <strong>Factura N°:</strong> {completedSale.sale_number}<br />
                   <strong>Fecha:</strong> {new Date(completedSale.created_at).toLocaleString()}<br />
                   <strong>Método:</strong> {completedSale.payment_method === 'cash' ? 'Efectivo' : completedSale.payment_method === 'card' ? 'Tarjeta' : 'Transferencia'}
+                  {completedSale.meta_data?.requires_electronic_invoice && (
+                    <>
+                      <br /><strong>DIAN:</strong> {completedSale.meta_data?.dian_status || 'Pendiente'}
+                      <br /><strong>CUFE:</strong> {completedSale.meta_data?.cufe || 'Pendiente de generar'}
+                    </>
+                  )}
                 </div>
                 <div className="ticket-items">
                   {completedSale.details.map((item, idx) => (
@@ -721,12 +830,21 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             </div>
             <div className="modal-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 20px 20px 20px' }}>
               <button 
-                onClick={() => window.print()} 
+                onClick={() => handlePrint('receipt')} 
                 className="btn-primary w-full"
                 style={{ height: '44px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
               >
                 <Printer size={18} /> Imprimir Recibo (Abrir Caja)
               </button>
+              {completedSale.meta_data?.requires_electronic_invoice && (
+                <button 
+                  onClick={() => handlePrint('invoice')} 
+                  className="btn-secondary w-full"
+                  style={{ height: '44px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                >
+                  <Printer size={18} /> Imprimir Factura Electronica
+                </button>
+              )}
               <button 
                 onClick={() => setCompletedSale(null)} 
                 className="btn-secondary w-full"
