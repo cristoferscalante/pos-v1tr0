@@ -29,6 +29,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [requiresElectronicInvoice, setRequiresElectronicInvoice] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -271,12 +272,14 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
 
   // Totals
   const total = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
-  const tax = Math.round(cart.reduce((s, i) => {
-    const rate = i.product.tax_rate !== undefined ? i.product.tax_rate : 19;
-    const itemTotal = i.product.price * i.quantity;
-    const itemTax = itemTotal - (itemTotal / (1 + rate / 100));
-    return s + itemTax;
-  }, 0));
+  const tax = requiresElectronicInvoice
+    ? Math.round(cart.reduce((s, i) => {
+        const rate = i.product.tax_rate !== undefined ? i.product.tax_rate : 19;
+        const itemTotal = i.product.price * i.quantity;
+        const itemTax = itemTotal - (itemTotal / (1 + rate / 100));
+        return s + itemTax;
+      }, 0))
+    : 0;
   const subtotal = total - tax;
 
   const handleCheckout = async () => {
@@ -307,7 +310,10 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         sync_status: 'pending',
         sync_error: undefined,
         details,
-        meta_data: { dian_status: 'pending_sync' },
+        meta_data: {
+          requires_electronic_invoice: requiresElectronicInvoice,
+          dian_status: requiresElectronicInvoice ? 'pending_sync' : 'not_requested',
+        },
       };
 
       // Save locally first (offline-first)
@@ -346,6 +352,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
       success(`✅ Venta ${saleNumber} registrada — $${total.toLocaleString('es-CO')}`);
       setCompletedSale(sale); // Mostrar modal de recibo
+      setRequiresElectronicInvoice(false);
       clearCart();
       onSaleComplete();
     } catch (e) {
@@ -569,6 +576,18 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="payment-section">
+            <label className="section-label">Factura electrónica</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <input
+                type="checkbox"
+                checked={requiresElectronicInvoice}
+                onChange={e => setRequiresElectronicInvoice(e.target.checked)}
+              />
+              Activar facturación electrónica para esta venta
+            </label>
           </div>
 
           {/* Totals */}

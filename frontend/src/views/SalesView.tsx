@@ -191,6 +191,11 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
                     {PAYMENT_ICONS[sale.payment_method]}
                     {PAYMENT_LABELS[sale.payment_method] || sale.payment_method}
                   </span>
+                  {sale.meta_data?.requires_electronic_invoice && (
+                    <span className="payment-pill card">
+                      FE
+                    </span>
+                  )}
                   <span className={`sync-pill ${sale.sync_status}`}>
                     {sale.sync_status === 'synced'
                       ? <><Wifi size={12} /> Sincronizado</>

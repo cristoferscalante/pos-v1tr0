@@ -106,10 +106,11 @@ def sync_offline_sales(
             session.commit()
             
             # 4. Transmitir e integrar con la DIAN
-            try:
-                DianService.transmit_to_dian(new_sale, session)
-            except Exception as dian_error:
-                print(f"Error en transmisión DIAN para venta {new_sale.id}: {dian_error}")
+            if sale_data.meta_data.get("requires_electronic_invoice"):
+                try:
+                    DianService.transmit_to_dian(new_sale, session)
+                except Exception as dian_error:
+                    print(f"Error en transmisión DIAN para venta {new_sale.id}: {dian_error}")
 
             try:
                 notify_sale_created(session, new_sale)
