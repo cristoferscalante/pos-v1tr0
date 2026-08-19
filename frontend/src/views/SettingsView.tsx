@@ -68,6 +68,13 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const [factusClientSecret, setFactusClientSecret] = useState('');
   const [factusUsername, setFactusUsername] = useState('');
   const [factusPassword, setFactusPassword] = useState('');
+  // Los secretos (client_secret, password) NO se prellenan desde el servidor por
+  // seguridad (hallazgo 6.x del plan). Estos flags recuerdan si YA hay uno
+  // guardado, para (a) mostrar un placeholder claro y (b) no exigir volver a
+  // escribirlo al guardar otros ajustes. El backend conserva el valor guardado
+  // si el campo llega vacío.
+  const [factusSecretConfigured, setFactusSecretConfigured] = useState(false);
+  const [factusPasswordConfigured, setFactusPasswordConfigured] = useState(false);
   const [factusTesting, setFactusTesting] = useState(false);
   const [factusLoadingRanges, setFactusLoadingRanges] = useState(false);
   const [factusConnectionResult, setFactusConnectionResult] = useState<FactusConnectionResult | null>(null);
@@ -91,9 +98,12 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
           setElectronicInvoicingEnabled(Boolean(data.meta_data?.electronic_invoicing_enabled));
           setFactusEnvironment(data.meta_data?.electronic_invoicing_environment === 'production' ? 'production' : 'sandbox');
           setFactusClientId(data.meta_data?.factus_client_id || '');
-          setFactusClientSecret(data.meta_data?.factus_client_secret || '');
+          // No prellenar los secretos: solo recordar si existen.
+          setFactusClientSecret('');
+          setFactusSecretConfigured(Boolean(data.meta_data?.factus_client_secret));
           setFactusUsername(data.meta_data?.factus_username || '');
-          setFactusPassword(data.meta_data?.factus_password || '');
+          setFactusPassword('');
+          setFactusPasswordConfigured(Boolean(data.meta_data?.factus_password));
           setSelectedFactusRangeId(data.meta_data?.factus_numbering_range_id ? String(data.meta_data?.factus_numbering_range_id) : '');
         })
         .catch(() => {
@@ -260,7 +270,12 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
 
   const handleElectronicInvoicingSave = async () => {
     if (!token) return;
-    if (electronicInvoicingEnabled && (!factusClientId.trim() || !factusClientSecret.trim() || !factusUsername.trim() || !factusPassword)) {
+    // Un secreto ya configurado cuenta como completo aunque el campo esté vacío
+    // (vacío = "conservar el guardado"). Solo se exige escribirlo si aún no hay
+    // ninguno guardado.
+    const secretOk = Boolean(factusClientSecret.trim()) || factusSecretConfigured;
+    const passwordOk = Boolean(factusPassword) || factusPasswordConfigured;
+    if (electronicInvoicingEnabled && (!factusClientId.trim() || !secretOk || !factusUsername.trim() || !passwordOk)) {
       warning('Para habilitar facturación electrónica debes completar primero las credenciales de Factus');
       return;
     }
@@ -892,7 +907,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                       screen-sharing a la sesión). Ver hallazgo medio del plan
                       de mejora: "client secret de Factus visible en texto
                       plano en Configuración". */}
-                  <input type="password" autoComplete="off" className="form-input" value={factusClientSecret} onChange={e => setFactusClientSecret(e.target.value)} placeholder="Client Secret de Factus" />
+                  <input type="password" autoComplete="off" className="form-input" value={factusClientSecret} onChange={e => setFactusClientSecret(e.target.value)} placeholder={factusSecretConfigured ? '•••••••• (guardado — deja vacío para conservarlo)' : 'Client Secret de Factus'} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Usuario / Correo</label>
@@ -900,7 +915,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Contraseña</label>
-                  <input type="password" className="form-input" value={factusPassword} onChange={e => setFactusPassword(e.target.value)} placeholder="Contraseña Factus" />
+                  <input type="password" className="form-input" value={factusPassword} onChange={e => setFactusPassword(e.target.value)} placeholder={factusPasswordConfigured ? '•••••••• (guardado — deja vacío para conservarla)' : 'Contraseña Factus'} />
                 </div>
               </div>
 

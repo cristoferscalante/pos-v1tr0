@@ -19,6 +19,19 @@ class ApiError extends Error {
   }
 }
 
+// Auto-logout en 401 (hallazgo 5.5 del plan de mejora, mitigación ligera): el
+// token ahora vive 24h en vez de 7 días; cuando expira, o si el usuario/negocio
+// fue desactivado (deps.py devuelve 401), queremos cerrar la sesión y llevar al
+// login en vez de dejar la app en un estado roto con un token muerto. App.tsx
+// registra aquí su handler de logout. Solo se dispara en peticiones que llevaban
+// token (una petición autenticada que vuelve 401 = token inválido/expirado); el
+// login, que no pasa token por esta ruta, nunca lo dispara ante una contraseña
+// equivocada.
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -31,6 +44,11 @@ async function request<T>(
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+
+  if (res.status === 401 && token && onUnauthorized) {
+    // La sesión expiró o fue revocada: limpiar y volver al login.
+    onUnauthorized();
+  }
 
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;

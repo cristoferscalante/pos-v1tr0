@@ -7,7 +7,13 @@ from app.core.config import settings
 
 JWT_SECRET = settings.JWT_SECRET
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 días para POS (cajas de venta que quedan abiertas)
+# 24 horas. Antes eran 7 días "porque las cajas quedan abiertas", pero un token
+# de 7 días guardado en localStorage es una ventana de exposición muy larga si el
+# dispositivo se pierde/comparte o hay un XSS futuro (ver hallazgo 5.5 del plan de
+# mejora). Con 24h + auto-logout en 401 en el frontend, la caja se reabre con un
+# login diario y la exposición se acota a un día. Si un negocio necesita sesiones
+# más largas, súbelo aquí de forma consciente en vez de dejar 7 días por defecto.
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 horas
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

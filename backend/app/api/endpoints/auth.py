@@ -321,11 +321,15 @@ def update_tenant(
             meta["electronic_invoicing_environment"] = data.electronic_invoicing_environment.strip()
         if data.factus_client_id is not None:
             meta["factus_client_id"] = data.factus_client_id.strip()
-        if data.factus_client_secret is not None:
+        # Los campos SECRETOS (client_secret, password) solo se actualizan cuando
+        # llega un valor no vacío: así el formulario puede dejar de prellenarlos
+        # (ver hallazgo medio 6.x del plan) sin que "guardar" con el campo en
+        # blanco borre el secreto ya configurado. Un valor no vacío sí lo cambia.
+        if data.factus_client_secret is not None and data.factus_client_secret.strip():
             meta["factus_client_secret"] = data.factus_client_secret.strip()
         if data.factus_username is not None:
             meta["factus_username"] = data.factus_username.strip()
-        if data.factus_password is not None:
+        if data.factus_password is not None and data.factus_password.strip():
             meta["factus_password"] = data.factus_password.strip()
         if data.factus_numbering_range_id is not None:
             meta["factus_numbering_range_id"] = data.factus_numbering_range_id

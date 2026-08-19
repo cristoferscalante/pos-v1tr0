@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { QrCode } from 'lucide-react';
 import { db, requestPersistentStorage } from './db/pos-db';
-import { authApi, salesApi } from './api/client';
+import { authApi, salesApi, setUnauthorizedHandler } from './api/client';
 import { ToastProvider, useToast } from './components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { BusinessTypeSelect } from './components/BusinessTypeSelect';
@@ -384,6 +384,21 @@ function AppInner() {
     setProducts([]);
     info('Sesión cerrada');
   };
+
+  // Auto-logout cuando el backend responde 401 en una petición autenticada
+  // (token de 24h expirado, o usuario/negocio desactivado). Ver hallazgo 5.5.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      if (!localStorage.getItem('pos_token')) return; // ya deslogueado, evita loops
+      localStorage.removeItem('pos_token');
+      localStorage.removeItem('pos_user');
+      setToken(null);
+      setUser(null);
+      setProducts([]);
+      showError('Tu sesión expiró. Vuelve a iniciar sesión.');
+    });
+    return () => setUnauthorizedHandler(null);
+  }, [showError]);
 
   const handleToggleTheme = () => {
     setTheme(current => current === 'dark' ? 'light' : 'dark');
