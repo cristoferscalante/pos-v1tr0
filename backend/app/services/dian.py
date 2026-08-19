@@ -36,8 +36,26 @@ class DianService:
         }
 
         # 4. Actualizar metadatos de la venta en la Base de Datos
+        #
+        # IMPORTANTE: esto es una SIMULACIÓN local. No hay ninguna llamada de
+        # red aquí, ni firma digital, ni paso por un proveedor tecnológico
+        # autorizado: el CUFE se genera con un hash local y nunca se transmite
+        # a la DIAN de verdad. Antes se marcaba "dian_status": "aprobado", lo
+        # que hacía parecer que la DIAN había validado el documento cuando en
+        # realidad nunca lo recibió (si el cliente escanea el QR, la DIAN
+        # responde "documento no encontrado"). Ver hallazgo crítico/legal 4.5
+        # del plan de mejora. Se deja el estado explícito como "no
+        # transmitido" para que la interfaz pueda avisarlo con claridad, en
+        # vez de mostrarlo como si fuera una factura electrónica válida.
         dian_metadata = {
-            "dian_status": "aprobado",
+            "dian_status": "no_transmitido_simulado",
+            "dian_is_simulated": True,
+            "dian_warning": (
+                "Documento generado localmente, NO transmitido a la DIAN. "
+                "El QR no corresponderá a una consulta válida. Configura un "
+                "proveedor tecnológico real (Factus) para emitir factura "
+                "electrónica válida."
+            ),
             "cufe": cude_cufe,
             "qr_url": qr_url,
             "transmission_date": datetime.utcnow().isoformat(),

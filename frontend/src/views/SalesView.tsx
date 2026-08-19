@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import {
   BarChart2, Search, ChevronDown, ChevronRight,
   Wifi, WifiOff, Clock, CheckCircle, RefreshCw,
-  Banknote, CreditCard, ArrowLeftRight, Trash2
+  Banknote, CreditCard, ArrowLeftRight, Trash2, ExternalLink
 } from 'lucide-react';
 import { db } from '../db/pos-db';
+import { useConfirm } from '../components/Toast';
 import { CustomSelect } from '../components/CustomSelect';
+import { salesApi } from '../api/client';
 import type { SelectOption } from '../components/CustomSelect';
 import type { LocalSale } from '../types';
 
@@ -36,22 +38,76 @@ const SYNC_FILTER_OPTIONS: SelectOption<string>[] = [
   { value: 'synced',  label: 'Sincronizado',   icon: <CheckCircle size={14} /> }
 ];
 
-export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps) {
+export function SalesView({ token, isOnline }: SalesViewProps) {
+  const { confirm } = useConfirm();
   const [sales, setSales] = useState<LocalSale[]>([]);
   const [search, setSearch] = useState('');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [filterSync, setFilterSync] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Antes esta vista solo leía el IndexedDB local del navegador y nunca
+  // consultaba al servidor (salesApi.list nunca se llamaba). En un negocio con
+  // más de una caja, cada dispositivo mostraba un historial de ventas
+  // incompleto y distinto al de los demás, y si se borraba la caché del
+  // navegador "desaparecían" ventas de la vista aunque siguieran en el
+  // servidor. Ver hallazgo 5.1 del plan de mejora.
+  //
+  // Ahora, con conexión, el servidor es la fuente de verdad (incluye ventas
+  // hechas en cualquier caja del negocio, ya con el sale_number y los montos
+  // definitivos que asigna el backend). Las ventas que siguen pendientes de
+  // sincronizar desde ESTE dispositivo (guardadas solo en IndexedDB mientras
+  // se hicieron offline) se agregan encima para no perderlas de vista mientras
+  // esperan a sincronizarse.
   const loadSales = async () => {
     setLoading(true);
-    const allSales = await db.sales.orderBy('created_at').reverse().toArray();
-    setSales(allSales);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const localSales = await db.sales.orderBy('created_at').reverse().toArray();
+
+      if (isOnline && token) {
+        try {
+          const serverSales = await salesApi.list(token);
+          const serverIds = new Set(serverSales.map(s => s.id));
+          const pendingLocalOnly = localSales.filter(
+            s => s.sync_status === 'pending' && !serverIds.has(s.id)
+          );
+          const merged: LocalSale[] = [
+            ...pendingLocalOnly,
+            ...serverSales.map(s => ({
+              id: s.id,
+              sale_number: s.sale_number,
+              subtotal: s.subtotal,
+              tax: s.tax,
+              total: s.total,
+              payment_method: s.payment_method,
+              created_at: s.created_at,
+              sync_status: 'synced' as const,
+              meta_data: s.meta_data,
+              details: s.details || [],
+            })),
+          ];
+          merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          setSales(merged);
+          return;
+        } catch (err: any) {
+          // Si falla la consulta al servidor (token vencido, error de red
+          // puntual, etc.) se cae de vuelta a lo que haya en IndexedDB en vez
+          // de dejar la pantalla vacía, y se avisa que los datos pueden estar
+          // incompletos.
+          setLoadError('No se pudo obtener el historial completo del servidor. Mostrando solo lo guardado en este dispositivo.');
+        }
+      }
+
+      setSales(localSales);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { loadSales(); }, []);
+  useEffect(() => { loadSales(); }, [isOnline, token]);
 
   const filtered = sales.filter(s => {
     const matchSearch = !search || s.sale_number.toLowerCase().includes(search.toLowerCase());
@@ -75,7 +131,8 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
 
   const handleDeletePendingSale = async (sale: LocalSale) => {
     if (sale.sync_status !== 'pending') return;
-    if (!confirm(`¿Eliminar la venta pendiente ${sale.sale_number}? Esta acción solo borra el registro local.`)) return;
+    const ok = await confirm({ title: 'Eliminar venta pendiente', message: `¿Eliminar ${sale.sale_number}? Esta acción solo borra el registro local.`, confirmText: 'Eliminar', variant: 'warning' });
+    if (!ok) return;
     await db.sales.delete(sale.id);
     await loadSales();
   };
@@ -95,6 +152,17 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
           <RefreshCw size={15} /> Actualizar
         </button>
       </div>
+
+      {!isOnline && (
+        <div className="banner-warning" style={{ marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', fontSize: '13px' }}>
+          Sin conexión: mostrando solo las ventas guardadas en este dispositivo. Puede haber ventas de otras cajas que aún no ves aquí.
+        </div>
+      )}
+      {loadError && (
+        <div className="banner-warning" style={{ marginBottom: '12px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(245,158,11,0.12)', color: 'var(--warning)', fontSize: '13px' }}>
+          {loadError}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="stats-row">
@@ -250,6 +318,28 @@ export function SalesView({ token: _token, isOnline: _isOnline }: SalesViewProps
                   {sale.sync_error && (
                     <div style={{ marginTop: '10px', color: 'var(--warning)', fontSize: '12px' }}>
                       Error de sync: {sale.sync_error}
+                    </div>
+                  )}
+                  {sale.meta_data?.requires_electronic_invoice && (
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
+                      <div><strong>Estado FE:</strong> {sale.meta_data?.factus_status || sale.meta_data?.dian_status || 'Pendiente'}</div>
+                      {sale.meta_data?.dian_is_simulated && (
+                        <div style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(239,68,68,0.12)', color: 'var(--danger, #ef4444)', fontWeight: 600 }}>
+                          ⚠ No transmitido a la DIAN: este documento se generó localmente y NO es una factura electrónica válida. {sale.meta_data?.dian_warning || 'Configura Factus en Configuración para emitir facturación electrónica real.'}
+                        </div>
+                      )}
+                      {sale.meta_data?.factus_bill_number && <div><strong>Número FE:</strong> {sale.meta_data.factus_bill_number}</div>}
+                      {sale.meta_data?.cufe && <div style={{ wordBreak: 'break-all' }}><strong>CUFE:</strong> {sale.meta_data.cufe}</div>}
+                      {sale.meta_data?.qr_url && (
+                        <a href={sale.meta_data.qr_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <ExternalLink size={13} /> Ver QR DIAN
+                        </a>
+                      )}
+                      {sale.meta_data?.factus_public_url && (
+                        <a href={sale.meta_data.factus_public_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <ExternalLink size={13} /> Abrir factura en Factus
+                        </a>
+                      )}
                     </div>
                   )}
                 </div>

@@ -7,6 +7,7 @@ export interface AuthUser {
   id: string;
   email: string;
   role: string;
+  is_superadmin?: boolean;
   tenant_id: string;
   business_name: string;
   business_type: string;
@@ -23,6 +24,28 @@ export interface AuthUser {
     factus_numbering_range_id?: number;
     [key: string]: any;
   };
+}
+
+export interface Tenant {
+  id: string;
+  name: string;
+  slug?: string;
+  business_type: string;
+  plan_name: string;
+  subscription_ends_at?: string | null;
+  has_electronic_billing: boolean;
+  folios_remaining: number;
+  folios_total: number;
+  is_active: boolean;
+  meta_data?: Record<string, any>;
+  // Stats from superadmin endpoint
+  owner_email?: string | null;
+  owner_id?: string | null;
+  product_count?: number;
+  sale_count_total?: number;
+  sale_count_30d?: number;
+  last_sale_at?: string | null;
+  user_count?: number;
 }
 
 export interface AuthResponse {
@@ -46,6 +69,7 @@ export interface LocalProduct {
   sync_status?: 'pending' | 'synced';
   sync_error?: string;
   meta_data?: Record<string, any>;
+  is_archived?: boolean;
 }
 
 export interface LocalSaleDetail {
@@ -93,6 +117,7 @@ export interface ApiProduct {
   tax_rate?: number;
   tenant_id: string;
   meta_data?: Record<string, any>;
+  is_archived?: boolean;
 }
 
 export interface ApiSale {
@@ -106,6 +131,10 @@ export interface ApiSale {
   tenant_id: string;
   user_id: string;
   meta_data?: Record<string, any>;
+  // GET /sales/ y GET /sales/{id} ya devuelven "details" (SaleReadWithDetails
+  // en el backend); antes no estaba declarado aquí. Ver hallazgo 5.1 del plan
+  // de mejora (SalesView solo leía IndexedDB local y nunca el servidor).
+  details: LocalSaleDetail[];
 }
 
 // --- Dashboard ---
@@ -269,7 +298,7 @@ export interface FactusNumberingRangesResult {
 }
 
 // --- UI ---
-export type View = 'pos' | 'inventory' | 'supplies' | 'sales' | 'dashboard' | 'settings';
+export type View = 'pos' | 'inventory' | 'supplies' | 'sales' | 'dashboard' | 'settings' | 'superadmin';
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 export type BusinessType = 'veterinaria' | 'restaurante' | 'tienda' | 'farmacia' | 'otro';
 

@@ -6,8 +6,9 @@ class UserBase(SQLModel):
     email: str = Field(unique=True, index=True)
     is_active: bool = Field(default=True)
     is_admin: bool = Field(default=False)
+    is_superadmin: bool = Field(default=False)
     role: str = Field(default="cashier", description="cashier, manager, admin")
-    tenant_id: uuid.UUID = Field(foreign_key="tenant.id", index=True)
+    tenant_id: Optional[uuid.UUID] = Field(default=None, foreign_key="tenant.id", nullable=True, index=True)
 
 class User(UserBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)

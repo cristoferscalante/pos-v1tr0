@@ -11,6 +11,7 @@ import { SuppliesView } from './views/SuppliesView';
 import { SalesView } from './views/SalesView';
 import { DashboardView } from './views/DashboardView';
 import { SettingsView } from './views/SettingsView';
+import { SuperAdminView } from './views/SuperAdminView';
 import { PublicCatalogView } from './views/PublicCatalogView';
 import type { AuthUser, LocalProduct, View, BusinessType } from './types';
 import { getProductCategory } from './utils/productCategories';
@@ -568,6 +569,9 @@ function AppInner() {
               localStorage.setItem('pos_user', JSON.stringify(updatedUser));
             }} 
           />
+        )}
+        {view === 'superadmin' && user?.is_superadmin && (
+          <SuperAdminView token={token} />
         )}
       </main>
     </div>

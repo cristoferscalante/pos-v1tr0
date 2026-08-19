@@ -25,9 +25,28 @@ def _get_open_session(session: Session, tenant_id: uuid.UUID) -> CashSession | N
 
 
 def _get_session_metrics(session: Session, cash_session_id: uuid.UUID) -> tuple[int, Decimal]:
+    """Cantidad de ventas y total EN EFECTIVO de la sesión de caja.
+
+    Antes sumaba sale.total de TODAS las ventas de la sesión sin filtrar por
+    payment_method, así que una venta pagada con tarjeta o transferencia se
+    contaba como si fuera efectivo físico. Eso hacía que el "monto esperado" al
+    cerrar caja incluyera dinero que nunca estuvo en el cajón, y el arqueo
+    siempre mostraba una diferencia falsa en cualquier negocio que aceptara más
+    de un medio de pago. Ver hallazgo 4.2 del plan de mejora.
+    """
     sales = session.exec(select(Sale).where(Sale.cash_session_id == cash_session_id)).all()
-    total = sum((sale.total for sale in sales), Decimal("0"))
-    return len(sales), total
+    cash_sales = [sale for sale in sales if sale.payment_method == "cash"]
+    total = sum((sale.total for sale in cash_sales), Decimal("0"))
+    return len(cash_sales), total
+
+
+def _get_session_totals_by_method(session: Session, cash_session_id: uuid.UUID) -> dict[str, Decimal]:
+    """Totales por método de pago, para mostrarlos aparte del arqueo de efectivo."""
+    sales = session.exec(select(Sale).where(Sale.cash_session_id == cash_session_id)).all()
+    totals: dict[str, Decimal] = {}
+    for sale in sales:
+        totals[sale.payment_method] = totals.get(sale.payment_method, Decimal("0")) + sale.total
+    return totals
 
 
 @router.get("/current")
@@ -44,6 +63,7 @@ def get_current_cash_session(
         "session": cash_session,
         "sales_count": sales_count,
         "sales_total": sales_total,
+        "sales_total_by_method": _get_session_totals_by_method(session, cash_session.id),
         "expected_amount": cash_session.opening_amount + sales_total,
     }
 
@@ -67,6 +87,7 @@ def list_cash_sessions(
                 "session": cash_session,
                 "sales_count": sales_count,
                 "sales_total": sales_total,
+                "sales_total_by_method": _get_session_totals_by_method(session, cash_session.id),
                 "expected_amount": cash_session.expected_closing_amount or (cash_session.opening_amount + sales_total),
             }
         )
@@ -124,6 +145,7 @@ def close_cash_session(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La caja ya fue cerrada")
 
     sales_count, sales_total = _get_session_metrics(session, cash_session.id)
+    sales_total_by_method = _get_session_totals_by_method(session, cash_session.id)
     expected_amount = cash_session.opening_amount + sales_total
 
     cash_session.status = "closed"
@@ -155,6 +177,7 @@ def close_cash_session(
         "session": cash_session,
         "sales_count": sales_count,
         "sales_total": sales_total,
+        "sales_total_by_method": sales_total_by_method,
         "expected_amount": expected_amount,
         "difference_amount": (data.actual_closing_amount or Decimal("0")) - expected_amount,
     }

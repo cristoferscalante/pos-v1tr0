@@ -5,10 +5,11 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 
 from app.core.config import settings
+from app.models.notification import NotificationLog
 from app.models.password_reset import PasswordResetToken
 from app.models.user import User
 from app.services.mail import send_email
-from app.services.notifications import _email_shell, _info_row
+from app.services.notifications import _email_shell, _info_row, _json_safe
 
 
 def _hash_token(token: str) -> str:
@@ -66,7 +67,35 @@ def send_password_reset_email(session: Session, user: User) -> tuple[bool, str]:
         body,
         "Si no solicitaste este cambio, puedes ignorar este mensaje sin realizar ninguna acción.",
     )
-    return send_email([user.email], subject, html, text)
+    success, message = send_email([user.email], subject, html, text)
+
+    # Antes este resultado se descartaba en silencio (ver hallazgo 5.8 del plan de
+    # mejora): si el correo fallaba (o EMAIL_ENABLED=false), el token de recuperación
+    # se generaba igual pero nadie se enteraba de por qué el usuario nunca lo recibió.
+    # Se deja constancia en NotificationLog (igual que el resto de eventos del
+    # sistema) para que soporte pueda diagnosticarlo, y en el log del contenedor.
+    if user.tenant_id:
+        try:
+            session.add(
+                NotificationLog(
+                    tenant_id=user.tenant_id,
+                    event_type="password_reset_requested",
+                    recipient=user.email,
+                    subject=subject,
+                    status="sent" if success else "failed",
+                    error_message=None if success else message,
+                    payload=_json_safe({"reset_url": reset_url}),
+                )
+            )
+            session.commit()
+        except Exception as log_error:  # nunca debe romper el flujo de reset
+            session.rollback()
+            print(f"[password_reset] No se pudo registrar NotificationLog: {log_error}")
+
+    if not success:
+        print(f"[password_reset] No se pudo enviar correo de recuperación a {user.email}: {message}")
+
+    return success, message
 
 
 def validate_password_reset_token(session: Session, token: str) -> PasswordResetToken | None:

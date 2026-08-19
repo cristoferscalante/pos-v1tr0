@@ -51,9 +51,34 @@ class Settings(BaseSettings):
         return [email.strip() for email in self.DEFAULT_NOTIFICATION_RECIPIENTS.split(",") if email.strip()]
 
 
+_INSECURE_JWT_SECRETS = {"", "change-me-in-production"}
+
+
+def _validate_production_settings(settings: "Settings") -> None:
+    """Falla rápido y ruidoso en vez de arrancar en un estado inseguro.
+
+    Antes, si JWT_SECRET quedaba vacío o en su valor por defecto en producción
+    (por ejemplo porque la variable de entorno no se propagó bien al contenedor),
+    el backend arrancaba igual y firmaba tokens con un secreto conocido/vacío,
+    permitiendo falsificar el token de cualquier usuario, incluido superadmin.
+    Ver hallazgo 5.10 del plan de mejora.
+    """
+    if not settings.is_production:
+        return
+    if settings.JWT_SECRET in _INSECURE_JWT_SECRETS or len(settings.JWT_SECRET) < 32:
+        raise RuntimeError(
+            "JWT_SECRET no está configurado de forma segura para producción "
+            "(vacío, en su valor por defecto, o demasiado corto). "
+            "Define una variable de entorno JWT_SECRET con al menos 32 "
+            "caracteres aleatorios antes de arrancar en ENV=production."
+        )
+
+
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    resolved = Settings()
+    _validate_production_settings(resolved)
+    return resolved
 
 
 settings = get_settings()

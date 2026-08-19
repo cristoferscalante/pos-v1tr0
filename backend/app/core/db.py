@@ -39,6 +39,17 @@ def init_db():
             try:
                 session.execute(text("ALTER TABLE tenant ADD COLUMN IF NOT EXISTS slug VARCHAR(255) UNIQUE;"))
                 session.execute(text("ALTER TABLE sale ADD COLUMN IF NOT EXISTS cash_session_id UUID;"))
+                session.execute(text("ALTER TABLE product ADD COLUMN IF NOT EXISTS is_archived BOOLEAN DEFAULT FALSE;"))
+                # Consecutivo para asignar sale_number en el servidor (ver hallazgo 5.2
+                # del plan de mejora / migración 0007_tenant_sale_seq). Se agrega también
+                # aquí porque RUN_MIGRATIONS_ON_STARTUP=false es la configuración
+                # recomendada en producción (DEPLOYMENT.md), así que este es el camino
+                # que realmente corre en cada arranque salvo que se ejecute Alembic a mano.
+                session.execute(text("ALTER TABLE tenant ADD COLUMN IF NOT EXISTS last_sale_seq INTEGER NOT NULL DEFAULT 0;"))
+                session.execute(text(
+                    "UPDATE tenant SET last_sale_seq = COALESCE((SELECT COUNT(*) FROM sale WHERE sale.tenant_id = tenant.id), 0) "
+                    "WHERE last_sale_seq = 0;"
+                ))
                 session.commit()
             except Exception as e:
                 print(f"Error migrando base de datos PostgreSQL: {e}")
@@ -55,6 +66,12 @@ def init_db():
                 session.commit()
             except Exception as e:
                 print(f"Intento de agregar columna cash_session_id en SQLite: {e}")
+                session.rollback()
+            try:
+                session.execute(text("ALTER TABLE product ADD COLUMN is_archived BOOLEAN DEFAULT 0;"))
+                session.commit()
+            except Exception as e:
+                print(f"Intento de agregar columna is_archived en SQLite: {e}")
                 session.rollback()
 
         # Rellenar slugs vacíos para inquilinos existentes

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Building2, History, Pencil, Plus, RefreshCw, RotateCcw, ShoppingBag, Trash2, Truck, Wallet } from 'lucide-react';
 
 import { productsApi, purchasesApi, suppliersApi } from '../api/client';
-import { useToast } from '../components/Toast';
+import { useToast, useConfirm } from '../components/Toast';
 import type { ApiProduct, InventoryMovement, Purchase, Supplier } from '../types';
 
 
@@ -25,6 +25,7 @@ const EMPTY_LINE: PurchaseLineForm = { product_id: '', quantity: '1', unit_cost:
 
 export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesViewProps) {
   const { success, error, warning } = useToast();
+  const { confirm } = useConfirm();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -167,7 +168,8 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
   const handleDeleteSupplier = async (supplier: Supplier) => {
     if (!token) return;
-    if (!confirm(`¿Eliminar el proveedor ${supplier.name}?`)) return;
+    const ok = await confirm({ title: 'Eliminar proveedor', message: `¿Eliminar a "${supplier.name}"? Esta acción no se puede deshacer.`, confirmText: 'Eliminar', variant: 'danger' });
+    if (!ok) return;
     try {
       await suppliersApi.delete(token, supplier.id);
       success('Proveedor eliminado correctamente');
@@ -236,7 +238,8 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
   const handleCancelPurchase = async (purchase: Purchase) => {
     if (!token) return;
-    if (!confirm(`¿Anular la compra ${purchase.invoice_number || purchase.id}?`)) return;
+    const ok2 = await confirm({ title: 'Anular compra', message: `¿Anular la compra ${purchase.invoice_number || purchase.id}? Se revertirá el stock ingresado.`, confirmText: 'Anular', variant: 'warning' });
+    if (!ok2) return;
     try {
       await purchasesApi.cancel(token, purchase.id);
       success('Compra anulada correctamente');

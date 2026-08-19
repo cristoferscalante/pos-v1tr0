@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { db } from '../db/pos-db';
 import { authApi, productsApi } from '../api/client';
-import { useToast } from '../components/Toast';
+import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon } from '../components/BusinessTypeSelect';
 import { CustomSelect } from '../components/CustomSelect';
 import { fileToDataUrl } from '../utils/imageUpload';
@@ -36,6 +36,7 @@ const TAX_RATE_OPTIONS: SelectOption<number>[] = [
 
 export function InventoryView({ products, token, isOnline, onProductsChange, user }: InventoryViewProps) {
   const { success, error, warning } = useToast();
+  const { confirm } = useConfirm();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -49,9 +50,37 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const [tenantCategories, setTenantCategories] = useState<string[]>(() => getTenantProductCategories(user));
   const [newCategoryName, setNewCategoryName] = useState('');
 
+  const [archivedSuggestion, setArchivedSuggestion] = useState<LocalProduct | null>(null);
+
   useEffect(() => {
     setTenantCategories(getTenantProductCategories(user));
   }, [user]);
+
+  // Chequear si el código de barras corresponde a un producto archivado
+  useEffect(() => {
+    const code = form.barcode?.trim();
+    if (!code || code.length < 3 || editingProduct || !token || !isOnline) {
+      setArchivedSuggestion(null);
+      return;
+    }
+
+    const handler = setTimeout(async () => {
+      try {
+        const results = await productsApi.list(token, { barcode: code, include_archived: true });
+        const found = results.find(p => p.barcode === code && p.is_archived);
+        if (found) {
+          setArchivedSuggestion(found as LocalProduct);
+        } else {
+          setArchivedSuggestion(null);
+        }
+      } catch {
+        setArchivedSuggestion(null);
+      }
+    }, 450);
+
+    return () => clearTimeout(handler);
+  }, [form.barcode, editingProduct, token, isOnline]);
+
 
   // Global keydown listener when modal is open to capture barcode scanner gun
   useEffect(() => {
@@ -238,7 +267,13 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         barcode: form.barcode || undefined,
         price: Number(form.price),
         cost: Number(form.cost) || 0,
-        stock: Number(form.stock) || 0,
+        // Al editar un producto existente, el stock NO se toma del formulario:
+        // el backend ya ignora el campo "stock" en PUT /products/{id} (para no
+        // pisar una venta o compra concurrente, ver hallazgo 5.4 del plan de
+        // mejora), así que aquí se conserva el valor que ya tenía el producto en
+        // vez del que estaba en pantalla cuando se abrió el formulario. Para
+        // productos nuevos sí se usa el stock inicial capturado en el formulario.
+        stock: editingProduct ? editingProduct.stock : (Number(form.stock) || 0),
         category: selectedCategory,
         image: productImage || undefined,
         tax_rate: form.tax_rate !== undefined ? Number(form.tax_rate) : 19,
@@ -289,7 +324,8 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   };
 
   const handleDelete = async (product: LocalProduct) => {
-    if (!confirm(`¿Eliminar "${product.name}"? Esta acción no se puede deshacer.`)) return;
+    const ok = await confirm({ title: 'Eliminar producto', message: `¿Eliminar "${product.name}"? Esta acción no se puede deshacer.`, confirmText: 'Eliminar', variant: 'danger' });
+    if (!ok) return;
     setDeletingId(product.id);
     try {
       await db.products.delete(product.id);
@@ -587,8 +623,17 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Stock inicial</label>
-                <input type="number" className="form-input" value={form.stock || ''} onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))} placeholder="0" />
+                <label className="form-label">{editingProduct ? 'Stock actual' : 'Stock inicial'}</label>
+                {editingProduct ? (
+                  <>
+                    <input type="number" className="form-input" value={form.stock ?? 0} disabled readOnly title="El stock de un producto existente no se edita aquí, para evitar pisar ventas o compras registradas mientras el formulario estaba abierto." />
+                    <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      Para ajustar el stock de un producto existente usa Suministros → Movimientos manuales (entrada, salida o merma). Así queda un registro de por qué cambió.
+                    </p>
+                  </>
+                ) : (
+                  <input type="number" className="form-input" value={form.stock || ''} onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))} placeholder="0" />
+                )}
               </div>
               <div className="form-group">
                 <label className="form-label">Categoría *</label>
@@ -669,6 +714,63 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                     <Barcode size={16} />
                   </div>
                 </div>
+                {archivedSuggestion && (
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '10px 12px',
+                    background: 'rgba(99, 102, 241, 0.1)',
+                    border: '1px solid rgba(99, 102, 241, 0.25)',
+                    borderRadius: '8px',
+                    fontSize: '0.78rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                  }}>
+                    <div style={{ color: 'var(--text-muted)' }}>
+                      💡 Se detectó un producto archivado con este código: <strong style={{ color: 'var(--text)' }}>"{archivedSuggestion.name}"</strong>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(f => ({
+                          ...f,
+                          name: archivedSuggestion.name,
+                          sku: archivedSuggestion.sku || '',
+                          price: archivedSuggestion.price,
+                          cost: archivedSuggestion.cost,
+                          category: archivedSuggestion.category || '',
+                          tax_rate: archivedSuggestion.tax_rate || 19,
+                          meta_data: archivedSuggestion.meta_data || {},
+                        }));
+                        if (archivedSuggestion.image) {
+                          setProductImage(archivedSuggestion.image);
+                        }
+                        if (archivedSuggestion.meta_data) {
+                          const entries = Object.entries(archivedSuggestion.meta_data)
+                            .filter(([k]) => k !== 'category_path')
+                            .map(([k, v]) => `${k}: ${v}`);
+                          setMetaExtra(entries.join(', '));
+                        }
+                        setArchivedSuggestion(null);
+                        success('Sugerencia cargada en el formulario');
+                      }}
+                      style={{
+                        background: '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                        fontSize: '0.74rem'
+                      }}
+                    >
+                      Sugerir datos
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="form-group form-group-full">
                 <label className="form-label">Detalle adicional</label>

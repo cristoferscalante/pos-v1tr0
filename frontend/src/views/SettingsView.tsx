@@ -5,7 +5,7 @@ import {
   Crown, User, Printer, Trash2, Users, Globe, MessageSquare, Plus, ExternalLink, Mail, Send, ReceiptText, RefreshCw
 } from 'lucide-react';
 import { API_URL, authApi, einvoiceApi } from '../api/client';
-import { useToast } from '../components/Toast';
+import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import type { AuthUser, FactusConnectionResult, FactusNumberingRangesResult, NotificationLog, NotificationRule } from '../types';
 import { fileToDataUrl } from '../utils/imageUpload';
@@ -19,6 +19,7 @@ interface SettingsViewProps {
 
 export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const { success, error, warning } = useToast();
+  const { confirm } = useConfirm();
 
   const getElectronicInvoicingErrorMessage = (err: any, fallback: string) => {
     if (err?.status === 401) {
@@ -370,7 +371,8 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
 
   const handleDeleteCollaborator = async (userId: string, email: string) => {
     if (!token) return;
-    if (!confirm(`¿Estás seguro de que deseas eliminar al colaborador ${email}?`)) return;
+    const ok = await confirm({ title: 'Eliminar colaborador', message: `¿Eliminar a ${email} del equipo? Perderá acceso inmediatamente.`, confirmText: 'Eliminar', variant: 'danger' });
+    if (!ok) return;
     try {
       await authApi.deleteCollaborator(token, userId);
       success('Colaborador eliminado correctamente');
@@ -885,7 +887,12 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Client Secret</label>
-                  <input className="form-input" value={factusClientSecret} onChange={e => setFactusClientSecret(e.target.value)} placeholder="Client Secret de Factus" />
+                  {/* Antes este campo era de texto plano (visible en pantalla y
+                      en el DOM para cualquiera con acceso físico o de
+                      screen-sharing a la sesión). Ver hallazgo medio del plan
+                      de mejora: "client secret de Factus visible en texto
+                      plano en Configuración". */}
+                  <input type="password" autoComplete="off" className="form-input" value={factusClientSecret} onChange={e => setFactusClientSecret(e.target.value)} placeholder="Client Secret de Factus" />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Usuario / Correo</label>

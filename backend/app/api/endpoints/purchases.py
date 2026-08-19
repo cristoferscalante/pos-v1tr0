@@ -98,6 +98,21 @@ def _create_inventory_movement(
 def _apply_purchase_lines(session: Session, purchase: Purchase, details, current_user: User, notes: str | None):
     subtotal = Decimal("0")
     for detail_data in details:
+        # A diferencia de los movimientos manuales de inventario (que sí validan
+        # quantity > 0), esta función no validaba cantidades/costos negativos: una
+        # compra con cantidad negativa restaba stock y reducía el subtotal sin que
+        # el sistema lo impidiera. Ver hallazgo 5.7 del plan de mejora.
+        if detail_data.quantity is None or detail_data.quantity <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="La cantidad de cada línea de compra debe ser mayor a 0",
+            )
+        if detail_data.unit_cost is None or detail_data.unit_cost < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="El costo unitario de cada línea de compra no puede ser negativo",
+            )
+
         product = session.get(Product, detail_data.product_id)
         if not product or product.tenant_id != current_user.tenant_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado en el negocio")

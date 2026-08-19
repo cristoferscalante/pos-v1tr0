@@ -71,41 +71,119 @@ def sync_offline_sales(
                 )
             ).first()
 
+            # Bloquear la fila del tenant (SELECT ... FOR UPDATE) para asignar un
+            # consecutivo de venta atómico. Antes sale_number lo generaba cada caja
+            # contando su propio IndexedDB local, así que dos cajas del mismo
+            # negocio podían producir el mismo número. Ver hallazgo 5.2 del plan de
+            # mejora. El número que mandó el cliente se conserva en meta_data como
+            # referencia offline, pero el número oficial ahora lo asigna el servidor.
+            tenant = session.exec(
+                select(Tenant).where(Tenant.id == tenant_id).with_for_update()
+            ).first()
+            if not tenant:
+                raise ValueError("El negocio no existe")
+            tenant.last_sale_seq += 1
+            server_sale_number = f"POS-{tenant.last_sale_seq + 1000:05d}"
+            session.add(tenant)
+
+            low_stock_products = []
+            oversold_products = []
+            pricing_adjusted = False
+            computed_subtotal = Decimal("0")
+            computed_tax = Decimal("0")
+            detail_rows = []
+
+            # 3. Registrar los detalles, recalcular precios y actualizar stock
+            for detail_data in sale_data.details:
+                # Bloquear la fila del producto (SELECT ... FOR UPDATE) para leer y
+                # descontar el stock de forma atómica. Antes se hacía un
+                # session.get() sin bloqueo y sin validar stock disponible: dos
+                # ventas casi simultáneas del mismo producto podían pisarse la
+                # actualización (lost update) y el stock terminaba mal calculado o
+                # negativo sin que el sistema lo detectara. Ver hallazgo 4.1 del
+                # plan de mejora.
+                product = session.exec(
+                    select(Product)
+                    .where(Product.id == detail_data.product_id, Product.tenant_id == tenant_id)
+                    .with_for_update()
+                ).first()
+                if not product:
+                    raise ValueError(f"El producto {detail_data.product_id} no existe en este negocio")
+
+                # Recalcular el precio/total contra Product.price (fuente de
+                # verdad) en vez de confiar en lo que mandó el cliente offline.
+                # POSView.tsx nunca permite editar el precio manualmente, así que
+                # price siempre debería coincidir con product.price; si no
+                # coincide, se usa el precio real del producto y se marca la venta
+                # para revisión en vez de aceptar el monto reportado por el
+                # cliente. Ver hallazgo 5.3 del plan de mejora (vector de fraude
+                # interno: registrar una venta con precio bajo mientras se cobra
+                # el valor real en efectivo).
+                trusted_unit_price = product.price
+                if abs(detail_data.price - trusted_unit_price) > Decimal("0.01"):
+                    pricing_adjusted = True
+                line_total = (trusted_unit_price * Decimal(str(detail_data.quantity))).quantize(Decimal("0.01"))
+
+                tax_rate = detail_data.tax_rate if detail_data.tax_rate is not None else (product.tax_rate or Decimal("0"))
+                if tax_rate and tax_rate > 0:
+                    net_line_total = line_total / (1 + tax_rate / Decimal("100"))
+                    line_tax = (line_total - net_line_total).quantize(Decimal("0.01"))
+                else:
+                    line_tax = Decimal("0")
+                computed_tax += line_tax
+                computed_subtotal += (line_total - line_tax)
+
+                detail_rows.append(
+                    SaleDetail(
+                        sale_id=sale_data.id,
+                        product_id=detail_data.product_id,
+                        quantity=detail_data.quantity,
+                        price=trusted_unit_price,
+                        total=line_total,
+                    )
+                )
+
+                # Descontar stock del inventario. Se permite que quede negativo
+                # (rechazar la sincronización dejaría una venta que ya ocurrió
+                # físicamente sin registrar) pero ahora queda marcado en
+                # oversold_products para que el negocio lo vea, en vez de pasar
+                # desapercibido.
+                product.stock -= detail_data.quantity
+                session.add(product)
+                if product.stock < 0:
+                    oversold_products.append({
+                        "name": product.name,
+                        "stock": product.stock,
+                        "requested": detail_data.quantity,
+                    })
+                if product.stock <= settings.LOW_STOCK_THRESHOLD:
+                    low_stock_products.append({"name": product.name, "stock": product.stock})
+
+            computed_total = computed_subtotal + computed_tax
+
+            sale_meta = dict(sale_data.meta_data or {})
+            sale_meta["client_sale_number"] = sale_data.sale_number
+            if pricing_adjusted:
+                sale_meta["pricing_adjusted"] = True
+            if oversold_products:
+                sale_meta["oversold_products"] = oversold_products
+
             new_sale = Sale(
                 id=sale_data.id,
-                sale_number=sale_data.sale_number,
-                subtotal=sale_data.subtotal,
-                tax=sale_data.tax,
-                total=sale_data.total,
+                sale_number=server_sale_number,
+                subtotal=computed_subtotal,
+                tax=computed_tax,
+                total=computed_total,
                 payment_method=sale_data.payment_method,
                 tenant_id=tenant_id,
                 user_id=current_user.id,
                 cash_session_id=open_cash_session.id if open_cash_session else None,
                 created_at=sale_data.created_at,
-                meta_data=sale_data.meta_data
+                meta_data=sale_meta,
             )
             session.add(new_sale)
-
-            low_stock_products = []
-
-            # 3. Registrar los detalles y actualizar stock
-            for detail_data in sale_data.details:
-                detail = SaleDetail(
-                    sale_id=new_sale.id,
-                    product_id=detail_data.product_id,
-                    quantity=detail_data.quantity,
-                    price=detail_data.price,
-                    total=detail_data.total
-                )
+            for detail in detail_rows:
                 session.add(detail)
-
-                # Descontar stock del inventario
-                product = session.get(Product, detail_data.product_id)
-                if product and product.tenant_id == tenant_id:
-                    product.stock -= detail_data.quantity
-                    session.add(product)
-                    if product.stock <= settings.LOW_STOCK_THRESHOLD:
-                        low_stock_products.append({"name": product.name, "stock": product.stock})
 
             session.commit()
             
@@ -113,31 +191,50 @@ def sync_offline_sales(
             if sale_data.meta_data.get("requires_electronic_invoice"):
                 try:
                     tenant = session.get(Tenant, tenant_id)
-                    tenant_meta = dict(tenant.meta_data or {}) if tenant else {}
-                    if tenant_meta.get("electronic_invoicing_enabled") and tenant_meta.get("electronic_invoicing_provider") == "factus":
-                        factus_result = _emit_with_factus(
-                            sale=new_sale,
-                            details=sale_data.details,
-                            tenant_meta=tenant_meta,
-                            session=session,
-                        )
-                        current_metadata = dict(new_sale.meta_data or {})
-                        current_metadata.update({
-                            "dian_status": "validated" if factus_result.get("data", {}).get("is_validated") else "submitted",
-                            "cufe": factus_result.get("data", {}).get("cufe"),
-                            "qr_url": factus_result.get("data", {}).get("links", {}).get("qr"),
-                            "factus_status": factus_result.get("status"),
-                            "factus_message": factus_result.get("message"),
-                            "factus_bill_number": factus_result.get("data", {}).get("number"),
-                            "factus_public_url": factus_result.get("data", {}).get("links", {}).get("public_url"),
-                            "factus_payload_preview": factus_result,
-                        })
-                        new_sale.meta_data = current_metadata
-                        session.add(new_sale)
-                        session.commit()
-                        session.refresh(new_sale)
-                    else:
-                        DianService.transmit_to_dian(new_sale, session)
+                    if tenant:
+                        # Validar si tiene habilitada la facturación electrónica y le quedan folios
+                        if not tenant.has_electronic_billing or tenant.folios_remaining <= 0:
+                            current_metadata = dict(new_sale.meta_data or {})
+                            current_metadata.update({
+                                "dian_status": "error",
+                                "dian_error": f"Sin folios disponibles o facturación electrónica no activa (Folios restantes: {tenant.folios_remaining})."
+                            })
+                            new_sale.meta_data = current_metadata
+                            session.add(new_sale)
+                            session.commit()
+                            session.refresh(new_sale)
+                        else:
+                            tenant_meta = dict(tenant.meta_data or {})
+                            if tenant_meta.get("electronic_invoicing_enabled") and tenant_meta.get("electronic_invoicing_provider") == "factus":
+                                factus_result = _emit_with_factus(
+                                    sale=new_sale,
+                                    details=sale_data.details,
+                                    tenant_meta=tenant_meta,
+                                    session=session,
+                                )
+                                current_metadata = dict(new_sale.meta_data or {})
+                                current_metadata.update({
+                                    "dian_status": "validated" if factus_result.get("data", {}).get("is_validated") else "submitted",
+                                    "cufe": factus_result.get("data", {}).get("cufe"),
+                                    "qr_url": factus_result.get("data", {}).get("links", {}).get("qr"),
+                                    "factus_status": factus_result.get("status"),
+                                    "factus_message": factus_result.get("message"),
+                                    "factus_bill_number": factus_result.get("data", {}).get("number"),
+                                    "factus_public_url": factus_result.get("data", {}).get("links", {}).get("public_url"),
+                                    "factus_payload_preview": factus_result,
+                                })
+                                new_sale.meta_data = current_metadata
+                                session.add(new_sale)
+                                session.commit()
+                                session.refresh(new_sale)
+                            else:
+                                DianService.transmit_to_dian(new_sale, session)
+                            
+                            # Descontar 1 folio del tenant
+                            tenant.folios_remaining -= 1
+                            session.add(tenant)
+                            session.commit()
+                            session.refresh(tenant)
                 except Exception as dian_error:
                     print(f"Error en transmisión DIAN para venta {new_sale.id}: {dian_error}")
 
@@ -156,9 +253,17 @@ def sync_offline_sales(
 
         except Exception as e:
             session.rollback()
+            # Antes se devolvía str(e) crudo al cliente, lo que puede filtrar
+            # detalles internos (nombres de tabla, restricciones de base de
+            # datos) a quien controle el dispositivo POS. Ver hallazgo medio
+            # "excepciones crudas" del plan de mejora: el detalle completo se
+            # deja en el log del servidor y al cliente solo se le da un mensaje
+            # genérico más una categoría simple para que la UI pueda reaccionar.
+            print(f"Error sincronizando venta {sale_data.id}: {e}")
             errors.append({
                 "sale_id": sale_data.id,
-                "error": str(e)
+                "error": "No se pudo registrar la venta. Intenta sincronizar de nuevo.",
+                "error_type": type(e).__name__,
             })
 
     return {

@@ -13,7 +13,7 @@ from app.api.deps import get_current_user
 from app.models.notification import NotificationRuleRead, NotificationRuleUpdate, NotificationTestRequest
 from app.services.notifications import ensure_default_notification_rules, get_notification_rules, send_test_notification
 from app.services.password_reset import send_password_reset_email, validate_password_reset_token
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter()
 
@@ -51,7 +51,18 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
         slug = f"{base_slug}-{counter}"
         counter += 1
 
-    tenant = Tenant(name=data.business_name, business_type=data.business_type, slug=slug)
+    subscription_ends = datetime.utcnow() + timedelta(days=7)
+    tenant = Tenant(
+        name=data.business_name,
+        business_type=data.business_type,
+        slug=slug,
+        plan_name="free",
+        subscription_ends_at=subscription_ends,
+        has_electronic_billing=False,
+        folios_remaining=0,
+        folios_total=0,
+        is_active=True
+    )
     session.add(tenant)
     session.commit()
     session.refresh(tenant)
@@ -62,6 +73,7 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
         email=data.email,
         hashed_password=hashed_pwd,
         is_admin=True,
+        is_superadmin=False,
         role="admin",
         tenant_id=tenant.id
     )
@@ -72,7 +84,7 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
     ensure_default_notification_rules(session, tenant.id, [user.email])
     
     # 4. Generar Token de Acceso inmediato
-    token = create_access_token(subject=user.id, tenant_id=tenant.id, role=user.role)
+    token = create_access_token(subject=user.id, tenant_id=tenant.id, role=user.role, is_superadmin=user.is_superadmin)
     
     return {
         "access_token": token,
@@ -81,6 +93,7 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
             "id": user.id,
             "email": user.email,
             "role": user.role,
+            "is_superadmin": user.is_superadmin,
             "tenant_id": tenant.id,
             "business_name": tenant.name,
             "business_type": tenant.business_type,
@@ -105,10 +118,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
         )
         
     # Obtener el negocio asociado
-    tenant = session.get(Tenant, user.tenant_id)
+    tenant = session.get(Tenant, user.tenant_id) if user.tenant_id else None
     
+    if tenant and not tenant.is_active and not user.is_superadmin:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El negocio se encuentra suspendido o inactivo."
+        )
+        
     # Crear token
-    token = create_access_token(subject=user.id, tenant_id=user.tenant_id, role=user.role)
+    token = create_access_token(subject=user.id, tenant_id=user.tenant_id, role=user.role, is_superadmin=user.is_superadmin)
     
     return {
         "access_token": token,
@@ -117,8 +136,9 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
             "id": user.id,
             "email": user.email,
             "role": user.role,
+            "is_superadmin": user.is_superadmin,
             "tenant_id": user.tenant_id,
-            "business_name": tenant.name if tenant else "N/A",
+            "business_name": tenant.name if tenant else "Sistema",
             "business_type": tenant.business_type if tenant else "retail",
             "slug": tenant.slug if tenant else None
         }
@@ -202,6 +222,15 @@ def get_tenant(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
+    # Restringido a admin: este endpoint devuelve tenant.meta_data completo, que
+    # incluye las credenciales de Factus (factus_client_secret, factus_password)
+    # en texto plano. Antes cualquier usuario autenticado (incluido un cajero)
+    # podía leerlas. Ver hallazgo 3.2 / 4 del plan de mejora.
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Operación permitida únicamente para administradores"
+        )
     tenant = session.get(Tenant, current_user.tenant_id)
     if not tenant:
         raise HTTPException(

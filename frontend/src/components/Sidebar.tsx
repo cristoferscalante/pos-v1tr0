@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   ShoppingCart, Package, BarChart2, Settings, LayoutDashboard, Truck,
-  QrCode, Wifi, WifiOff, RefreshCw, LogOut, ChevronRight, Sun, Moon
+  QrCode, Wifi, WifiOff, RefreshCw, LogOut, ChevronRight, Sun, Moon, Shield
 } from 'lucide-react';
 import { getBusinessTypeLabel } from './BusinessTypeSelect';
 import type { View, AuthUser } from '../types';
@@ -42,6 +42,10 @@ export function Sidebar({
     ? navItems.filter(item => item.view === 'pos' || item.view === 'sales')
     : navItems;
 
+  const superAdminItems: NavItem[] = user?.is_superadmin
+    ? [{ view: 'superadmin', icon: <Shield size={20} />, label: 'Administración POS' }]
+    : [];
+
   return (
     <aside className="sidebar">
       {/* Logo */}
@@ -78,6 +82,23 @@ export function Sidebar({
             {currentView === item.view && <ChevronRight size={14} className="nav-arrow" />}
           </button>
         ))}
+        {superAdminItems.length > 0 && (
+          <>
+            <div style={{ height: '1px', background: 'var(--border)', margin: '8px 12px', opacity: 0.5 }} />
+            {superAdminItems.map(item => (
+              <button
+                key={item.view}
+                onClick={() => onNavigate(item.view)}
+                className={`sidebar-nav-item ${currentView === item.view ? 'active' : ''}`}
+                style={{ color: currentView === item.view ? undefined : '#a78bfa' }}
+              >
+                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-label">{item.label}</span>
+                {currentView === item.view && <ChevronRight size={14} className="nav-arrow" />}
+              </button>
+            ))}
+          </>
+        )}
       </nav>
 
       {/* Bottom Status */}
@@ -116,7 +137,7 @@ export function Sidebar({
             </span>
             <div>
               <p className="sidebar-user-email">{user?.email}</p>
-              <p className="sidebar-user-role">{user?.role === 'admin' ? 'Administrador' : 'Cajero'}</p>
+              <p className="sidebar-user-role">{user?.is_superadmin ? 'Super Admin' : user?.role === 'admin' ? 'Administrador' : 'Cajero'}</p>
             </div>
           </div>
           <button onClick={onLogout} className="sidebar-logout" title="Cerrar sesión">

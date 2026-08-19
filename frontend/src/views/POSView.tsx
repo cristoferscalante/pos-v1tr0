@@ -7,7 +7,7 @@ import {
 import confetti from 'canvas-confetti';
 import { db } from '../db/pos-db';
 import { salesApi } from '../api/client';
-import { useToast } from '../components/Toast';
+import { useToast, useConfirm } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
@@ -27,6 +27,7 @@ const PAYMENT_OPTIONS: { id: PaymentMethod; label: string; icon: React.ReactNode
 
 export function POSView({ products, token, isOnline, onSaleComplete }: POSViewProps) {
   const { success, error, warning } = useToast();
+  const { confirm } = useConfirm();
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
@@ -291,7 +292,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     : 0;
   const subtotal = total - tax;
 
-  const handleElectronicInvoiceToggle = (checked: boolean) => {
+  const handleElectronicInvoiceToggle = async (checked: boolean) => {
     if (!checked) {
       setRequiresElectronicInvoice(false);
       return;
@@ -302,14 +303,18 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       return;
     }
 
-    const confirmed = window.confirm(
-      'Esta venta sera grabada con IVA y reportada a la DIAN como factura electronica. ¿Deseas continuar?'
-    );
+    const confirmed = await confirm({
+      title: 'Factura Electrónica DIAN',
+      message: 'Esta venta será grabada con IVA y reportada a la DIAN como factura electrónica. ¿Deseas continuar?',
+      confirmText: 'Sí, emitir factura',
+      cancelText: 'Cancelar',
+      variant: 'info',
+    });
 
     if (!confirmed) return;
 
     setRequiresElectronicInvoice(true);
-    warning('La venta se procesara con IVA y sera reportada en el flujo de factura electronica.');
+    warning('La venta se procesará con IVA y será reportada en el flujo de factura electrónica.');
   };
 
   const refreshCompletedSaleFromServer = async (saleId: string) => {
@@ -863,6 +868,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                   {completedSale.meta_data?.requires_electronic_invoice && (
                     <>
                       <br /><strong>DIAN:</strong> {completedSale.meta_data?.dian_status || 'Pendiente'}
+                      <br /><strong>Factus:</strong> {completedSale.meta_data?.factus_status || 'Pendiente'}
+                      <br /><strong>Número FE:</strong> {completedSale.meta_data?.factus_bill_number || 'Pendiente de generar'}
                       <br /><strong>CUFE:</strong> {completedSale.meta_data?.cufe || 'Pendiente de generar'}
                     </>
                   )}
@@ -903,6 +910,19 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               >
                 <Printer size={18} /> Imprimir Recibo (Abrir Caja)
               </button>
+              {completedSale.meta_data?.requires_electronic_invoice && (
+                completedSale.meta_data?.factus_public_url && (
+                  <a
+                    href={completedSale.meta_data.factus_public_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="btn-secondary w-full"
+                    style={{ height: '44px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', textDecoration: 'none' }}
+                  >
+                    <Printer size={18} /> Ver factura en Factus
+                  </a>
+                )
+              )}
               {completedSale.meta_data?.requires_electronic_invoice && (
                 <button 
                   onClick={() => handlePrint('invoice')} 

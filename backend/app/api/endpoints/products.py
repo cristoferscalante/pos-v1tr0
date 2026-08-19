@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 import uuid
@@ -12,11 +12,18 @@ router = APIRouter()
 
 @router.get("/", response_model=List[ProductRead])
 def get_products(
+    barcode: Optional[str] = None,
+    include_archived: bool = False,
     session: Session = Depends(get_session),
     tenant_id: uuid.UUID = Depends(get_current_tenant_id)
 ):
-    # Retornar únicamente los productos que pertenecen al tenant actual
-    products = session.exec(select(Product).where(Product.tenant_id == tenant_id)).all()
+    query = select(Product).where(Product.tenant_id == tenant_id)
+    if not include_archived:
+        query = query.where(Product.is_archived == False)
+    if barcode:
+        query = query.where(Product.barcode == barcode)
+    
+    products = session.exec(query).all()
     return products
 
 @router.post("/", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
@@ -85,10 +92,17 @@ def update_product(
             detail="El producto no existe o no tiene permisos para modificarlo"
         )
     
-    # Actualizar valores
+    # Actualizar valores.
+    # "stock" se excluye deliberadamente: el stock de un producto ya existente
+    # solo debe cambiar a través de una venta, una compra o un movimiento manual
+    # de inventario (endpoints de purchases.py), que además dejan un registro en
+    # InventoryMovement. Permitir que el formulario de edición de producto
+    # sobrescriba el stock aquí puede revertir en silencio el efecto de una venta
+    # concurrente (ver hallazgo 5.4 del plan de mejora).
+    FIELDS_NOT_EDITABLE_HERE = {"tenant_id", "stock"}
     product_data = data.model_dump(exclude_unset=True)
     for key, value in product_data.items():
-        if key != "tenant_id": # Impedir cambiar el tenant_id
+        if key not in FIELDS_NOT_EDITABLE_HERE:
             setattr(db_product, key, value)
             
     session.add(db_product)
@@ -114,9 +128,40 @@ def delete_product(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El producto no existe o no tiene permisos para eliminarlo"
         )
-    session.delete(db_product)
-    session.commit()
+    # Verificar si tiene historial en ventas (FK saledetail → product)
+    from sqlalchemy import text as sa_text
+    has_sales = session.connection().execute(
+        sa_text("SELECT 1 FROM saledetail WHERE product_id = :pid LIMIT 1"),
+        {"pid": str(product_id)}
+    ).first()
+
+    if has_sales:
+        # Soft delete: archiva el producto para preservar el historial de ventas
+        db_product.is_archived = True
+        session.add(db_product)
+        session.commit()
+    else:
+        # Sin ventas: borra físicamente
+        session.delete(db_product)
+        session.commit()
     return
+
+
+# Campos de tenant.meta_data que son seguros para exponer sin autenticación en el
+# catálogo público (los usa PublicCatalogView.tsx para pintar la tienda). Cualquier
+# otro campo (en particular electronic_invoicing_* / factus_* con las credenciales
+# del proveedor de facturación electrónica) NUNCA debe salir por este endpoint.
+# Ver hallazgo crítico 3.2 del plan de mejora: este endpoint filtraba tenant.meta_data
+# completo, incluidas las credenciales de Factus en texto plano, sin ningún login.
+_PUBLIC_TENANT_META_FIELDS = {
+    "display_name",
+    "whatsapp_number",
+    "brand_color",
+    "banner_url",
+    "logo_url",
+    "product_categories",
+}
+
 
 @router.get("/public/{slug}")
 def get_public_catalog(
@@ -130,15 +175,34 @@ def get_public_catalog(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El negocio no existe o el catálogo no está activo"
         )
-    
-    products = session.exec(select(Product).where(Product.tenant_id == tenant.id)).all()
-    
+
+    products = session.exec(select(Product).where(Product.tenant_id == tenant.id, Product.is_archived == False)).all()
+
+    safe_meta = {
+        key: value
+        for key, value in (tenant.meta_data or {}).items()
+        if key in _PUBLIC_TENANT_META_FIELDS
+    }
+
     return {
         "tenant": {
             "name": tenant.name,
             "business_type": tenant.business_type,
             "slug": tenant.slug,
-            "meta_data": tenant.meta_data
+            "meta_data": safe_meta,
         },
-        "products": products
+        "products": [
+            {
+                "id": product.id,
+                "name": product.name,
+                "sku": product.sku,
+                "barcode": product.barcode,
+                "price": product.price,
+                "image": product.image,
+                "meta_data": product.meta_data,
+                # Deliberadamente NO se incluye "cost" (costo de compra, dato
+                # sensible del margen del negocio) ni ningún otro campo interno.
+            }
+            for product in products
+        ],
     }

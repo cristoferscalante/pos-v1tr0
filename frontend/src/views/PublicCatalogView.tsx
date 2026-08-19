@@ -4,6 +4,7 @@ import { publicCatalogApi, API_URL } from '../api/client';
 import type { ApiProduct } from '../types';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import { getProductCategory } from '../utils/productCategories';
+import { useToast } from '../components/Toast';
 
 interface PublicCatalogViewProps {
   slug: string;
@@ -15,6 +16,7 @@ interface CartItem {
 }
 
 export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
+  const { warning } = useToast();
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tenant, setTenant] = useState<any>(null);
@@ -34,7 +36,7 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
   const openWhatsApp = (message: string) => {
     const whatsappNumber = tenant?.meta_data?.whatsapp_number;
     if (!whatsappNumber) {
-      alert('Este negocio no tiene configurado un número de WhatsApp para recibir pedidos.');
+      warning('Este negocio no tiene configurado un número de WhatsApp para recibir pedidos.');
       return;
     }
 

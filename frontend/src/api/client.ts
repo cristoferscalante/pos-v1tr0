@@ -123,8 +123,17 @@ export const authApi = {
 
 // --- Products ---
 export const productsApi = {
-  list: (token: string): Promise<ApiProduct[]> =>
-    request('/api/v1/products/', {}, token),
+  list: (token: string, params?: { barcode?: string; include_archived?: boolean }): Promise<ApiProduct[]> => {
+    let url = '/api/v1/products/';
+    if (params) {
+      const q = new URLSearchParams();
+      if (params.barcode) q.append('barcode', params.barcode);
+      if (params.include_archived !== undefined) q.append('include_archived', String(params.include_archived));
+      const qs = q.toString();
+      if (qs) url += '?' + qs;
+    }
+    return request(url, {}, token);
+  },
 
   create: (token: string, data: Omit<ApiProduct, 'tenant_id'>): Promise<ApiProduct> =>
     request('/api/v1/products/', { method: 'POST', body: JSON.stringify(data) }, token),
@@ -240,6 +249,28 @@ export const einvoiceApi = {
 export const publicCatalogApi = {
   fetch: (slug: string): Promise<{ tenant: any; products: ApiProduct[] }> =>
     request(`/api/v1/products/public/${slug}`),
+};
+
+// --- Super Admin ---
+export const superadminApi = {
+  listTenants: (token: string): Promise<any[]> =>
+    request('/api/v1/superadmin/tenants', {}, token),
+
+  updatePlan: (token: string, tenantId: string, data: {
+    plan_name: string;
+    subscription_ends_at: string | null;
+    has_electronic_billing: boolean;
+    folios_remaining: number;
+    folios_total: number;
+    is_active: boolean;
+  }): Promise<any> =>
+    request(`/api/v1/superadmin/tenants/${tenantId}/plan`, { method: 'PUT', body: JSON.stringify(data) }, token),
+
+  recharge: (token: string, tenantId: string, folios: number = 100): Promise<any> =>
+    request(`/api/v1/superadmin/tenants/${tenantId}/recharge`, { method: 'POST', body: JSON.stringify({ folios }) }, token),
+
+  deleteTenant: (token: string, tenantId: string): Promise<void> =>
+    request(`/api/v1/superadmin/tenants/${tenantId}`, { method: 'DELETE' }, token),
 };
 
 export { ApiError };
