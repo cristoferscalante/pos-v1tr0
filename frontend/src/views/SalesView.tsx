@@ -79,14 +79,23 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
             ...serverSales.map(s => ({
               id: s.id,
               sale_number: s.sale_number,
-              subtotal: s.subtotal,
-              tax: s.tax,
-              total: s.total,
+              // El backend serializa los Decimal como string en JSON. Si se
+              // dejan como string, la suma de totales los CONCATENA en vez de
+              // sumarlos ("$010000.0010000.00...") y el formato por fila no
+              // aplica separadores de miles. Se coercionan a número aquí.
+              subtotal: Number(s.subtotal),
+              tax: Number(s.tax),
+              total: Number(s.total),
               payment_method: s.payment_method,
               created_at: s.created_at,
               sync_status: 'synced' as const,
               meta_data: s.meta_data,
-              details: s.details || [],
+              details: (s.details || []).map(d => ({
+                ...d,
+                price: Number((d as any).price),
+                total: Number((d as any).total),
+                quantity: Number((d as any).quantity),
+              })),
             })),
           ];
           merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -117,8 +126,10 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
   });
 
   // Summary of filtered
-  const totalRevenue = filtered.reduce((s, sale) => s + sale.total, 0);
-  const totalTax = filtered.reduce((s, sale) => s + sale.tax, 0);
+  // Number(...) defensivo: garantiza suma numérica aunque alguna venta venga de
+  // IndexedDB con los montos guardados como string.
+  const totalRevenue = filtered.reduce((s, sale) => s + Number(sale.total), 0);
+  const totalTax = filtered.reduce((s, sale) => s + Number(sale.tax), 0);
   const pendingCount = filtered.filter(s => s.sync_status === 'pending').length;
 
   const formatDate = (iso: string) => {
