@@ -453,7 +453,7 @@ function AppInner() {
               <div className="form-group">
                 <label className="form-label">Nueva contraseña</label>
                 <input
-                  type="password" required value={resetPasswordValue}
+                  type="password" autoComplete="new-password" required value={resetPasswordValue}
                   onChange={e => setResetPasswordValue(e.target.value)}
                   className="form-input" placeholder="Mínimo 8 caracteres"
                   minLength={8}
@@ -484,7 +484,7 @@ function AppInner() {
             <div className="form-group">
               <label className="form-label">Correo Electrónico</label>
               <input
-                type="email" required value={loginEmail}
+                type="email" autoComplete="email" required value={loginEmail}
                 onChange={e => setLoginEmail(e.target.value)}
                 className="form-input" placeholder="correo@negocio.com"
               />
@@ -493,7 +493,7 @@ function AppInner() {
             <div className="form-group">
               <label className="form-label">Contraseña</label>
               <input
-                type="password" required value={loginPassword}
+                type="password" autoComplete={isRegisterMode ? 'new-password' : 'current-password'} required value={loginPassword}
                 onChange={e => setLoginPassword(e.target.value)}
                 className="form-input" placeholder="••••••••"
                 minLength={isRegisterMode ? 8 : undefined}

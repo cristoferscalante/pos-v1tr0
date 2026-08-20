@@ -663,6 +663,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                     <label className="form-label">Contraseña</label>
                     <input
                       type="password"
+                      autoComplete="new-password"
                       required
                       value={collabPassword}
                       onChange={e => setCollabPassword(e.target.value)}
@@ -740,6 +741,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
               <label className="form-label">Contraseña actual</label>
               <input
                 type="password"
+                autoComplete="current-password"
                 value={currentPwd}
                 onChange={e => setCurrentPwd(e.target.value)}
                 className="form-input"
@@ -750,6 +752,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
               <label className="form-label">Nueva contraseña</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={newPwd}
                 onChange={e => setNewPwd(e.target.value)}
                 className="form-input"
@@ -760,6 +763,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
               <label className="form-label">Confirmar nueva contraseña</label>
               <input
                 type="password"
+                autoComplete="new-password"
                 value={confirmPwd}
                 onChange={e => setConfirmPwd(e.target.value)}
                 className="form-input"
@@ -915,7 +919,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Contraseña</label>
-                  <input type="password" className="form-input" value={factusPassword} onChange={e => setFactusPassword(e.target.value)} placeholder={factusPasswordConfigured ? '•••••••• (guardado — deja vacío para conservarla)' : 'Contraseña Factus'} />
+                  <input type="password" autoComplete="off" className="form-input" value={factusPassword} onChange={e => setFactusPassword(e.target.value)} placeholder={factusPasswordConfigured ? '•••••••• (guardado — deja vacío para conservarla)' : 'Contraseña Factus'} />
                 </div>
               </div>
 
