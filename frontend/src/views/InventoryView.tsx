@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import {
   Package, Plus, Pencil, Trash2, Search, X, Save,
-  TrendingUp, AlertTriangle, ChevronUp, ChevronDown, Barcode
+  TrendingUp, AlertTriangle, ChevronUp, ChevronDown, Barcode,
+  ArrowLeft, ArrowRight, Check, Minus
 } from 'lucide-react';
 import { db } from '../db/pos-db';
 import { authApi, productsApi } from '../api/client';
 import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon } from '../components/BusinessTypeSelect';
-import { CustomSelect } from '../components/CustomSelect';
+import { CategoryPicker } from '../components/CategoryPicker';
 import { fileToDataUrl } from '../utils/imageUpload';
-import type { SelectOption } from '../components/CustomSelect';
 import type { LocalProduct, AuthUser } from '../types';
 import { buildCategoryOptions, getProductCategory, getTenantProductCategories, normalizeCategoryName } from '../utils/productCategories';
 
@@ -28,11 +28,13 @@ const EMPTY_FORM: Partial<LocalProduct> = {
   name: '', sku: '', barcode: '', price: 0, cost: 0, stock: 0, category: '', tax_rate: 19, meta_data: {}
 };
 
-const TAX_RATE_OPTIONS: SelectOption<number>[] = [
-  { value: 19, label: '19% (General)' },
-  { value: 5,  label: '5% (Reducido)' },
-  { value: 0,  label: '0% (Exento)' }
+const TAX_RATE_OPTIONS: { value: number; label: string }[] = [
+  { value: 19, label: '19% General' },
+  { value: 5,  label: '5% Reducido' },
+  { value: 0,  label: '0% Exento' }
 ];
+
+const STEP_TITLES = ['Lo esencial', 'Precio y ganancia', 'Stock y categoría', 'Últimos detalles'];
 
 export function InventoryView({ products, token, isOnline, onProductsChange, user }: InventoryViewProps) {
   const { success, error, warning } = useToast();
@@ -48,7 +50,8 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [tenantCategories, setTenantCategories] = useState<string[]>(() => getTenantProductCategories(user));
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [step, setStep] = useState(1);
+  const [visitedMax, setVisitedMax] = useState(1);
 
   const [archivedSuggestion, setArchivedSuggestion] = useState<LocalProduct | null>(null);
 
@@ -202,7 +205,8 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     setForm({ ...EMPTY_FORM, category: defaultCategory });
     setMetaExtra('');
     setProductImage('');
-    setNewCategoryName('');
+    setStep(1);
+    setVisitedMax(1);
     setShowForm(true);
   };
 
@@ -211,9 +215,35 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     setForm({ ...p, category: getProductCategory(p) });
     setProductImage(p.image || '');
     setMetaExtra(p.meta_data?.detalle_especifico || '');
-    setNewCategoryName('');
+    // Al editar, los 4 pasos ya están disponibles: los datos vienen precargados.
+    setStep(1);
+    setVisitedMax(4);
     setShowForm(true);
   };
+
+  const goNext = () => {
+    if (step === 1) {
+      if (!form.name?.trim()) { warning('Escribe el nombre del producto'); return; }
+      if (!form.price || Number(form.price) <= 0) { warning('El precio de venta debe ser mayor a 0'); return; }
+    }
+    if (step === 3 && !normalizeCategoryName(String(form.category || ''))) {
+      warning('Elige una categoría para el producto');
+      return;
+    }
+    const next = Math.min(4, step + 1);
+    setStep(next);
+    setVisitedMax(m => Math.max(m, next));
+  };
+
+  const goBack = () => setStep(s => Math.max(1, s - 1));
+
+  // Ganancia y margen en vivo (paso 2 y tarjeta de resumen)
+  const priceNum = Number(form.price) || 0;
+  const costNum = Number(form.cost) || 0;
+  const unitProfit = priceNum - costNum;
+  const marginPct = priceNum > 0 ? (unitProfit / priceNum) * 100 : 0;
+  const marginTier: 'good' | 'ok' | 'low' = marginPct >= 30 ? 'good' : marginPct >= 10 ? 'ok' : 'low';
+  const marginColor = marginTier === 'good' ? 'var(--success)' : marginTier === 'ok' ? 'var(--warning)' : 'var(--danger)';
 
   const syncTenantCategories = async (categories: string[]) => {
     const normalized = buildCategoryOptions(categories);
@@ -226,30 +256,131 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     return refreshedCategories;
   };
 
-  const handleCreateCategory = async () => {
-    const category = normalizeCategoryName(newCategoryName);
+  const persistUserCategories = (categories: string[]) => {
+    if (user) {
+      user.meta_data = { ...(user.meta_data || {}), product_categories: categories };
+    }
+  };
+
+  const handleCreateCategory = async (rawName: string) => {
+    const category = normalizeCategoryName(rawName);
     if (!category) {
       warning('Escribe un nombre para la categoría');
       return;
     }
 
-    if (tenantCategories.some(item => item.toLowerCase() === category.toLowerCase())) {
-      warning('Esa categoría ya existe');
-      setForm(prev => ({ ...prev, category }));
-      setNewCategoryName('');
+    const existing = tenantCategories.find(item => item.toLowerCase() === category.toLowerCase());
+    if (existing) {
+      setForm(prev => ({ ...prev, category: existing }));
+      warning('Esa categoría ya existe, la dejamos seleccionada');
       return;
     }
 
     try {
       const syncedCategories = await syncTenantCategories([...tenantCategories, category]);
       setForm(prev => ({ ...prev, category }));
-      setNewCategoryName('');
-      success('Categoría creada correctamente');
-      if (user) {
-        user.meta_data = { ...(user.meta_data || {}), product_categories: syncedCategories };
+      persistUserCategories(syncedCategories);
+      success(`Categoría "${category}" creada y lista para reutilizar`);
+    } catch (err) {
+      error(err instanceof Error ? err.message : 'No se pudo crear la categoría');
+    }
+  };
+
+  // Reescribe la categoría en los productos que la usaban (IndexedDB + servidor)
+  // para que renombrar una categoría no deje productos "huérfanos" con la etiqueta
+  // vieja. Devuelve cuántos productos se tocaron.
+  const rewriteProductsCategory = async (from: string, to: string) => {
+    const affected = products.filter(
+      p => getProductCategory(p).toLowerCase() === from.toLowerCase()
+    );
+    for (const product of affected) {
+      const updated: LocalProduct = {
+        ...product,
+        category: to,
+        meta_data: { ...(product.meta_data || {}), tipo: to },
+        sync_status: isOnline && token ? 'synced' : 'pending',
+        sync_error: undefined,
+      };
+      await db.products.put(updated);
+      if (isOnline && token) {
+        try {
+          const res = await productsApi.update(token, product.id, updated);
+          await db.products.put({ ...(res as LocalProduct), sync_status: 'synced', sync_error: undefined });
+        } catch {
+          await db.products.put({ ...updated, sync_status: 'pending', sync_error: 'Pendiente de sincronización' });
+        }
       }
-    } catch (err: any) {
-      error(err.message || 'No se pudo crear la categoría');
+    }
+    return affected.length;
+  };
+
+  const handleRenameCategory = async (from: string, rawTo: string) => {
+    const target = normalizeCategoryName(rawTo);
+    if (!target) {
+      warning('El nombre de la categoría no puede quedar vacío');
+      return;
+    }
+    if (
+      target.toLowerCase() !== from.toLowerCase() &&
+      tenantCategories.some(item => item.toLowerCase() === target.toLowerCase())
+    ) {
+      warning('Ya existe otra categoría con ese nombre');
+      return;
+    }
+
+    try {
+      const nextList = tenantCategories.map(item =>
+        item.toLowerCase() === from.toLowerCase() ? target : item
+      );
+      const syncedCategories = await syncTenantCategories(nextList);
+      persistUserCategories(syncedCategories);
+
+      const touched = await rewriteProductsCategory(from, target);
+
+      setForm(prev =>
+        normalizeCategoryName(String(prev.category || '')).toLowerCase() === from.toLowerCase()
+          ? { ...prev, category: target }
+          : prev
+      );
+      onProductsChange();
+      success(
+        touched > 0
+          ? `Categoría renombrada a "${target}" en ${touched} producto${touched === 1 ? '' : 's'}`
+          : `Categoría renombrada a "${target}"`
+      );
+    } catch (err) {
+      error(err instanceof Error ? err.message : 'No se pudo renombrar la categoría');
+    }
+  };
+
+  const handleDeleteCategory = async (name: string) => {
+    const inUse = products.filter(
+      p => getProductCategory(p).toLowerCase() === name.toLowerCase()
+    ).length;
+
+    const ok = await confirm({
+      title: 'Eliminar categoría',
+      message: inUse > 0
+        ? `${inUse} producto${inUse === 1 ? '' : 's'} usa${inUse === 1 ? '' : 'n'} "${name}". Se quitará de la lista; esos productos conservarán la etiqueta hasta que los edites.`
+        : `¿Eliminar la categoría "${name}"?`,
+      confirmText: 'Eliminar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    try {
+      const nextList = tenantCategories.filter(item => item.toLowerCase() !== name.toLowerCase());
+      const syncedCategories = await syncTenantCategories(nextList);
+      persistUserCategories(syncedCategories);
+
+      setForm(prev =>
+        normalizeCategoryName(String(prev.category || '')).toLowerCase() === name.toLowerCase()
+          ? { ...prev, category: syncedCategories[0] || 'General' }
+          : prev
+      );
+      success('Categoría eliminada de la lista');
+    } catch (err) {
+      error(err instanceof Error ? err.message : 'No se pudo eliminar la categoría');
     }
   };
 
@@ -542,193 +673,339 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         )}
       </div>
 
-      {/* Product Form Modal */}
+      {/* Alta de producto — asistente por pasos */}
       {showForm && (
         <div className="modal-backdrop" onClick={() => setShowForm(false)}>
           <div className="modal-box glass" onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">
-                {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
-              </h2>
+
+            <div className="modal-header" style={{ marginBottom: '14px', alignItems: 'flex-start' }}>
+              <div>
+                <h2 className="modal-title">{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                  Paso {step} de 4 &middot; {STEP_TITLES[step - 1]}
+                </p>
+              </div>
               <button onClick={() => setShowForm(false)} className="modal-close">
                 <X size={20} />
               </button>
-                    <div className="form-grid-2">
-              {/* Image Uploader */}
-              <div className="image-upload-wrapper">
-                <label className="form-label">Imagen del Producto</label>
-                <div className="image-upload-box glass">
-                  {productImage ? (
-                    <div className="image-preview-container">
-                      {productImage.startsWith('preset-') ? (
-                        <div className={`product-preset-img ${productImage}`} style={{ fontSize: '32px' }}>
-                          {productImage === 'preset-food' && '🥩'}
-                          {productImage === 'preset-med' && '💊'}
-                          {productImage === 'preset-service' && '🩺'}
-                          {productImage === 'preset-package' && '📦'}
-                        </div>
-                      ) : (
-                        <img src={productImage} alt="Preview" className="image-preview" />
-                      )}
-                      <button type="button" onClick={() => setProductImage('')} className="btn-remove-image">
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="image-upload-trigger">
-                      <Plus size={16} />
-                      <span>Subir archivo o seleccionar preset</span>
-                      <input type="file" accept="image/*" onChange={async e => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        try {
-                          setProductImage(await fileToDataUrl(file));
-                        } catch (err: any) {
-                          error(err.message || 'No se pudo cargar la imagen');
-                        }
-                      }} style={{ display: 'none' }} />
-                    </label>
-                  )}
-                </div>
-                <div className="preset-options">
-                  <button type="button" onClick={() => setProductImage('preset-package')} className={`preset-btn ${productImage === 'preset-package' ? 'active' : ''}`}>📦 Caja</button>
-                  <button type="button" onClick={() => setProductImage('preset-food')} className={`preset-btn ${productImage === 'preset-food' ? 'active' : ''}`}>🥩 Comida</button>
-                  <button type="button" onClick={() => setProductImage('preset-med')} className={`preset-btn ${productImage === 'preset-med' ? 'active' : ''}`}>💊 Medicina</button>
-                  <button type="button" onClick={() => setProductImage('preset-service')} className={`preset-btn ${productImage === 'preset-service' ? 'active' : ''}`}>🩺 Servicio</button>
-                </div>
-              </div>
+            </div>
 
-              <div className="form-group">
-                <label className="form-label">Nombre *</label>
-                <input className="form-input" value={form.name || ''} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej. Alimento para perros 10kg" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">SKU / Código interno</label>
-                <input className="form-input" value={form.sku || ''} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="Ej. SKU-001" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Precio de venta ($ COP) *</label>
-                <input type="number" className="form-input" value={form.price || ''} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} placeholder="0" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Costo de compra ($ COP)</label>
-                <input type="number" className="form-input" value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Tasa de IVA (%)</label>
-                <CustomSelect
-                  options={TAX_RATE_OPTIONS}
-                  value={form.tax_rate !== undefined ? form.tax_rate : 19}
-                  onChange={val => setForm(f => ({ ...f, tax_rate: val }))}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">{editingProduct ? 'Stock actual' : 'Stock inicial'}</label>
-                {editingProduct ? (
-                  <>
-                    <input type="number" className="form-input" value={form.stock ?? 0} disabled readOnly title="El stock de un producto existente no se edita aquí, para evitar pisar ventas o compras registradas mientras el formulario estaba abierto." />
-                    <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                      Para ajustar el stock de un producto existente usa Suministros → Movimientos manuales (entrada, salida o merma). Así queda un registro de por qué cambió.
-                    </p>
-                  </>
-                ) : (
-                  <input type="number" className="form-input" value={form.stock || ''} onChange={e => setForm(f => ({ ...f, stock: Number(e.target.value) }))} placeholder="0" />
-                )}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Categoría *</label>
-                <CustomSelect
-                  options={tenantCategories.map(category => ({
-                    value: category,
-                    label: category,
-                    icon: getBusinessTypeIcon(user?.business_type || 'otro', 14),
-                  }))}
-                  value={String(form.category || tenantCategories[0] || 'General')}
-                  onChange={value => setForm(f => ({ ...f, category: value }))}
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Crear nueva categoría</label>
-                <div className="inventory-category-create-row">
+            {/* Barra de progreso — los tramos ya visitados son clicables */}
+            <div style={{ display: 'flex', gap: '6px', marginBottom: '18px' }}>
+              {[1, 2, 3, 4].map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-label={`Ir al paso ${n}: ${STEP_TITLES[n - 1]}`}
+                  onClick={() => { if (n <= visitedMax) setStep(n); }}
+                  style={{
+                    flex: 1, display: 'flex', alignItems: 'center', border: 'none',
+                    padding: '9px 0', background: 'transparent',
+                    cursor: n <= visitedMax ? 'pointer' : 'default',
+                  }}
+                >
+                  <span style={{
+                    display: 'block', width: '100%', height: '4px', borderRadius: '2px',
+                    background: n <= step ? 'var(--primary)' : 'rgba(255,255,255,0.09)',
+                    transition: 'background var(--t-fast)',
+                  }} />
+                </button>
+              ))}
+            </div>
+
+            {/* PASO 1 — Lo esencial */}
+            {step === 1 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px' }}>¿Qué vas a vender?</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+                    Empieza por lo básico. El resto lo completas en 3 pasos cortos.
+                  </p>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Nombre del producto *</label>
                   <input
                     className="form-input"
-                    value={newCategoryName}
-                    onChange={e => setNewCategoryName(e.target.value)}
-                    placeholder="Ej. Snacks, Combos, Accesorios"
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void handleCreateCategory();
-                      }
-                    }}
+                    style={{ fontSize: '15px' }}
+                    value={form.name || ''}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Ej. Alimento para perros 10 kg"
+                    autoFocus
                   />
-                  <button type="button" onClick={() => void handleCreateCategory()} className="btn-secondary inventory-category-create-btn">
-                    <Plus size={14} />
-                    Crear
-                  </button>
+                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Así aparecerá en el punto de venta y en tus reportes.
+                  </p>
                 </div>
-              </div>
-              <div className="form-group">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label className="form-label">Código de barras</label>
-                  <span className="barcode-status-indicator" style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    fontSize: '10px',
-                    color: '#10b881',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.5px'
-                  }}>
-                    <span style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: '#10b881',
-                      display: 'inline-block',
-                      boxShadow: '0 0 8px #10b881',
-                      animation: 'pulse 1.5s infinite'
-                    }} />
-                    Pistola Lista
-                  </span>
-                </div>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    className="form-input"
-                    value={form.barcode || ''}
-                    onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                    placeholder="Escanear o escribir"
-                    style={{ paddingRight: '36px' }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: '#10b881',
-                    display: 'flex',
-                    alignItems: 'center',
-                    pointerEvents: 'none'
-                  }} title="Pistola de código de barras conectada y lista para emular entrada de teclado">
-                    <Barcode size={16} />
+
+                <div className="form-group">
+                  <label className="form-label">Precio de venta ($ COP) *</label>
+                  <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', padding: '0 14px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600, borderRight: '1px solid var(--border)' }}>$</span>
+                    <input
+                      type="number"
+                      className="form-input"
+                      style={{ border: 'none', borderRadius: 0, background: 'transparent', fontSize: '17px', fontWeight: 700 }}
+                      value={form.price || ''}
+                      onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))}
+                      placeholder="0"
+                    />
                   </div>
                 </div>
+
+                <div className="form-group">
+                  <label className="form-label">Imagen del producto — opcional</label>
+                  <div className="image-upload-box glass">
+                    {productImage ? (
+                      <div className="image-preview-container">
+                        {productImage.startsWith('preset-') ? (
+                          <div className={`product-preset-img ${productImage}`} style={{ fontSize: '32px' }}>
+                            {productImage === 'preset-food' && '🥩'}
+                            {productImage === 'preset-med' && '💊'}
+                            {productImage === 'preset-service' && '🩺'}
+                            {productImage === 'preset-package' && '📦'}
+                          </div>
+                        ) : (
+                          <img src={productImage} alt="Vista previa" className="image-preview" />
+                        )}
+                        <button type="button" onClick={() => setProductImage('')} className="btn-remove-image">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="image-upload-trigger">
+                        <Plus size={16} />
+                        <span>Subir archivo o elegir un ícono</span>
+                        <input type="file" accept="image/*" onChange={async e => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          try {
+                            setProductImage(await fileToDataUrl(file));
+                          } catch (err) {
+                            error(err instanceof Error ? err.message : 'No se pudo cargar la imagen');
+                          }
+                        }} style={{ display: 'none' }} />
+                      </label>
+                    )}
+                  </div>
+                  <div className="preset-options">
+                    <button type="button" onClick={() => setProductImage('preset-package')} className={`preset-btn ${productImage === 'preset-package' ? 'active' : ''}`}>📦 Caja</button>
+                    <button type="button" onClick={() => setProductImage('preset-food')} className={`preset-btn ${productImage === 'preset-food' ? 'active' : ''}`}>🥩 Comida</button>
+                    <button type="button" onClick={() => setProductImage('preset-med')} className={`preset-btn ${productImage === 'preset-med' ? 'active' : ''}`}>💊 Medicina</button>
+                    <button type="button" onClick={() => setProductImage('preset-service')} className={`preset-btn ${productImage === 'preset-service' ? 'active' : ''}`}>🩺 Servicio</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PASO 2 — Precio y ganancia */}
+            {step === 2 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px' }}>¿Cuánto te cuesta y cuánto ganas?</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+                    Con el costo calculamos tu ganancia al instante. Si no lo sabes aún, déjalo en cero y ajústalo luego.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
+                    <label className="form-label">Precio de venta ($ COP) *</label>
+                    <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600, borderRight: '1px solid var(--border)' }}>$</span>
+                      <input type="number" className="form-input" style={{ border: 'none', borderRadius: 0, background: 'transparent', fontSize: '15px', fontWeight: 700 }} value={form.price || ''} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} placeholder="0" />
+                    </div>
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
+                    <label className="form-label">Costo de compra ($ COP)</label>
+                    <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600, borderRight: '1px solid var(--border)' }}>$</span>
+                      <input type="number" className="form-input" style={{ border: 'none', borderRadius: 0, background: 'transparent', fontSize: '15px', fontWeight: 700 }} value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" />
+                    </div>
+                  </div>
+                </div>
+
+                {priceNum > 0 && costNum > 0 ? (
+                  <div style={{ padding: '16px 17px', borderRadius: 'var(--r-lg)', background: marginTier === 'good' ? 'var(--success-bg)' : marginTier === 'ok' ? 'var(--warning-bg)' : 'var(--danger-bg)', border: `1px solid ${marginColor}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: marginColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <TrendingUp size={18} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '14.5px', fontWeight: 700, color: marginColor }}>
+                          {unitProfit >= 0 ? 'Ganas' : 'Pierdes'} ${Math.abs(unitProfit).toLocaleString('es-CO')} por unidad
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          Margen del {marginPct.toFixed(1)}% sobre el precio de venta
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '12px', height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.max(0, Math.min(100, marginPct))}%`, height: '100%', background: marginColor }} />
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '14px 16px', borderRadius: 'var(--r-lg)', background: 'var(--bg-elevated)', border: '1px solid var(--border)', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                    Agrega el costo de compra para ver tu ganancia y margen al instante.
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">IVA aplicado</label>
+                  <div style={{ display: 'inline-flex', padding: '4px', background: 'var(--surface-input)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', gap: '4px', flexWrap: 'wrap' }}>
+                    {TAX_RATE_OPTIONS.map(opt => {
+                      const active = (form.tax_rate ?? 19) === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setForm(f => ({ ...f, tax_rate: opt.value }))}
+                          style={{
+                            padding: '8px 14px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+                            fontFamily: 'inherit', fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap',
+                            background: active ? 'var(--primary)' : 'transparent',
+                            color: active ? '#fff' : 'var(--text-secondary)',
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    El precio que escribiste ya incluye IVA. Se usa para la factura electrónica.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* PASO 3 — Stock y categoría */}
+            {step === 3 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px' }}>Inventario y organización</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+                    Reutiliza una de tus categorías o crea una nueva escribiendo. Todo queda guardado para la próxima vez.
+                  </p>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">{editingProduct ? 'Stock actual' : 'Stock inicial'}</label>
+                  {editingProduct ? (
+                    <>
+                      <input type="number" className="form-input" value={form.stock ?? 0} disabled readOnly title="El stock de un producto existente no se edita aquí, para evitar pisar ventas o compras registradas mientras el formulario estaba abierto." />
+                      <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Para ajustar el stock de un producto existente usa Suministros → Movimientos manuales (entrada, salida o merma). Así queda un registro de por qué cambió.
+                      </p>
+                    </>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
+                        <button type="button" aria-label="Restar una unidad" onClick={() => setForm(f => ({ ...f, stock: Math.max(0, (Number(f.stock) || 0) - 1) }))} style={{ padding: '0 14px', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                          <Minus size={15} />
+                        </button>
+                        <input type="number" value={form.stock || ''} onChange={e => setForm(f => ({ ...f, stock: Math.max(0, Number(e.target.value) || 0) }))} placeholder="0" style={{ width: '80px', textAlign: 'center', border: 'none', borderLeft: '1px solid var(--border)', borderRight: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, fontFamily: 'inherit' }} />
+                        <button type="button" aria-label="Sumar una unidad" onClick={() => setForm(f => ({ ...f, stock: (Number(f.stock) || 0) + 1 }))} style={{ padding: '0 14px', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                          <Plus size={15} />
+                        </button>
+                      </div>
+                      <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>unidades disponibles hoy</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Categoría *</label>
+                  <CategoryPicker
+                    value={String(form.category || tenantCategories[0] || 'General')}
+                    categories={tenantCategories}
+                    icon={getBusinessTypeIcon(user?.business_type || 'otro', 13)}
+                    onChange={value => setForm(f => ({ ...f, category: value }))}
+                    onCreate={handleCreateCategory}
+                    onRename={handleRenameCategory}
+                    onDelete={handleDeleteCategory}
+                  />
+                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                    Toca una categoría para asignarla. Escribe para buscar o crear una nueva.
+                    Con “Gestionar” puedes renombrarlas o eliminarlas.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* PASO 4 — Últimos detalles */}
+            {step === 4 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px' }}>Revisa y listo</h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
+                    Todo lo de abajo es opcional. Si no lo necesitas ahora, {editingProduct ? 'guarda' : 'crea el producto'} y edítalo cuando quieras.
+                  </p>
+                </div>
+
+                {/* Tarjeta de resumen */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '13px', padding: '14px 15px', borderRadius: 'var(--r-lg)', background: 'var(--primary-dim)', border: '1px solid var(--border-active)' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '11px', overflow: 'hidden', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '20px' }}>
+                    {productImage
+                      ? (productImage.startsWith('preset-')
+                          ? (productImage === 'preset-food' ? '🥩' : productImage === 'preset-med' ? '💊' : productImage === 'preset-service' ? '🩺' : '📦')
+                          : <img src={productImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />)
+                      : '📦'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {form.name || 'Producto sin nombre'}
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${priceNum.toLocaleString('es-CO')}</span>
+                      <span>·</span>
+                      <span>{editingProduct ? `${form.stock ?? 0} en stock` : `${Number(form.stock) || 0} en stock`}</span>
+                      <span>·</span>
+                      <span className="cat-tag-icon" style={{ fontSize: '11px' }}>
+                        {getBusinessTypeIcon(user?.business_type || 'otro', 11)}
+                        {normalizeCategoryName(String(form.category || '')) || 'Sin categoría'}
+                      </span>
+                    </div>
+                  </div>
+                  {priceNum > 0 && costNum > 0 && (
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: marginColor, background: 'rgba(255,255,255,0.06)', padding: '5px 9px', borderRadius: 'var(--r-full)' }}>
+                      {marginPct.toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
+                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
+                    <label className="form-label">SKU / Código interno</label>
+                    <input className="form-input" value={form.sku || ''} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="Ej. ALM-PERRO-10" />
+                  </div>
+                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label className="form-label">Código de barras</label>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#10b881', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b881', display: 'inline-block', boxShadow: '0 0 8px #10b881', animation: 'pulse 1.5s infinite' }} />
+                        Pistola lista
+                      </span>
+                    </div>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        className="form-input"
+                        value={form.barcode || ''}
+                        onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                        placeholder="Escanear o escribir"
+                        style={{ paddingRight: '36px' }}
+                      />
+                      <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#10b881', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                        <Barcode size={16} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {archivedSuggestion && (
-                  <div style={{
-                    marginTop: '8px',
-                    padding: '10px 12px',
-                    background: 'rgba(99, 102, 241, 0.1)',
-                    border: '1px solid rgba(99, 102, 241, 0.25)',
-                    borderRadius: '8px',
-                    fontSize: '0.78rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '8px',
-                  }}>
+                  <div style={{ padding: '10px 12px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '8px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                     <div style={{ color: 'var(--text-muted)' }}>
-                      💡 Se detectó un producto archivado con este código: <strong style={{ color: 'var(--text)' }}>"{archivedSuggestion.name}"</strong>
+                      💡 Producto archivado con este código: <strong style={{ color: 'var(--text)' }}>"{archivedSuggestion.name}"</strong>
                     </div>
                     <button
                       type="button"
@@ -743,9 +1020,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                           tax_rate: archivedSuggestion.tax_rate || 19,
                           meta_data: archivedSuggestion.meta_data || {},
                         }));
-                        if (archivedSuggestion.image) {
-                          setProductImage(archivedSuggestion.image);
-                        }
+                        if (archivedSuggestion.image) setProductImage(archivedSuggestion.image);
                         if (archivedSuggestion.meta_data) {
                           const entries = Object.entries(archivedSuggestion.meta_data)
                             .filter(([k]) => k !== 'category_path')
@@ -755,43 +1030,48 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                         setArchivedSuggestion(null);
                         success('Sugerencia cargada en el formulario');
                       }}
-                      style={{
-                        background: '#6366f1',
-                        color: 'white',
-                        border: 'none',
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        whiteSpace: 'nowrap',
-                        fontSize: '0.74rem'
-                      }}
+                      style={{ background: '#6366f1', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.74rem' }}
                     >
                       Sugerir datos
                     </button>
                   </div>
                 )}
-              </div>
-              <div className="form-group form-group-full">
-                <label className="form-label">Detalle adicional</label>
-                <textarea 
-                  className="form-input" 
-                  value={metaExtra} 
-                  onChange={e => setMetaExtra(e.target.value)} 
-                  placeholder="Ej. Raza/Especie, marca, lote, fecha de vencimiento, etc." 
-                  rows={2} 
-                  style={{ resize: 'vertical', width: '100%', minHeight: '60px' }}
-                />
-              </div>
-            </div>        </div>
 
-            <div className="modal-actions">
-              <button onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
-              <button onClick={handleSave} disabled={isSaving} className="btn-primary">
-                <Save size={16} />
-                {isSaving ? 'Guardando...' : 'Guardar Producto'}
-              </button>
+                <div className="form-group">
+                  <label className="form-label">Detalle adicional</label>
+                  <textarea
+                    className="form-input"
+                    value={metaExtra}
+                    onChange={e => setMetaExtra(e.target.value)}
+                    placeholder="Ej. Raza/Especie, marca, lote, fecha de vencimiento, etc."
+                    rows={2}
+                    style={{ resize: 'vertical', width: '100%', minHeight: '60px' }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Navegación */}
+            <div className="modal-actions" style={{ justifyContent: 'space-between' }}>
+              {step === 1 ? (
+                <button onClick={() => setShowForm(false)} className="btn-secondary">Cancelar</button>
+              ) : (
+                <button onClick={goBack} className="btn-secondary">
+                  <ArrowLeft size={16} /> Atrás
+                </button>
+              )}
+              {step < 4 ? (
+                <button onClick={goNext} className="btn-primary">
+                  Siguiente <ArrowRight size={16} />
+                </button>
+              ) : (
+                <button onClick={handleSave} disabled={isSaving} className="btn-primary">
+                  {isSaving ? <Save size={16} /> : <Check size={16} />}
+                  {isSaving ? 'Guardando...' : editingProduct ? 'Guardar cambios' : 'Crear producto'}
+                </button>
+              )}
             </div>
+
           </div>
         </div>
       )}

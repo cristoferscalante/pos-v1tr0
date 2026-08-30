@@ -2133,6 +2133,201 @@ body {
 }
 
 /* ============================
+   CATEGORY PICKER (formulario de producto)
+   ============================ */
+.category-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.category-picker.is-disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.category-picker-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.category-picker-search {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  transition: var(--t-fast);
+}
+.category-picker-search:focus-within {
+  border-color: var(--border-active);
+  box-shadow: 0 0 0 3px var(--primary-dim);
+}
+.category-picker-search > svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.category-picker-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+}
+.category-picker-input::placeholder { color: var(--text-muted); }
+
+.category-picker-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--r-full);
+}
+.category-picker-clear:hover { color: var(--text-primary); }
+
+.category-picker-manage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--t-fast);
+  white-space: nowrap;
+}
+.category-picker-manage:hover { border-color: var(--border-active); color: var(--text-primary); }
+.category-picker-manage.active {
+  background: var(--primary-dim);
+  border-color: var(--border-active);
+  color: var(--primary);
+}
+
+.category-picker-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--t-fast);
+  max-width: 100%;
+}
+.category-chip:hover {
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+.category-chip.selected {
+  background: var(--primary-dim);
+  border-color: var(--border-active);
+  color: var(--primary);
+}
+.category-chip.is-managing {
+  cursor: default;
+  padding-right: 6px;
+}
+.category-chip.is-managing:hover {
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+.category-chip-icon {
+  display: inline-flex;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+.category-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.category-chip-check { flex-shrink: 0; }
+
+.category-chip.create {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border-active);
+  color: var(--primary);
+  font-family: var(--font);
+}
+.category-chip.create:hover {
+  background: var(--primary-dim);
+}
+.category-chip.create:disabled { opacity: 0.6; cursor: progress; }
+
+.category-chip.is-editing {
+  cursor: default;
+  padding: 4px 6px 4px 10px;
+  gap: 4px;
+}
+.category-chip-edit-input {
+  width: 130px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-active);
+  border-radius: var(--r-sm);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+}
+
+.category-chip-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--r-full);
+  transition: var(--t-fast);
+  flex-shrink: 0;
+}
+.category-chip-icon-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.category-chip-icon-btn.confirm:hover { color: var(--success); }
+.category-chip-icon-btn.danger:hover { color: var(--danger); background: var(--danger-bg); }
+.category-chip-icon-btn:disabled { opacity: 0.5; cursor: progress; }
+
+.category-picker-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 2px;
+}
+
+/* ============================
    SETTINGS — Type & Role display
    ============================ */
 .info-type-display {
