@@ -19,6 +19,7 @@ interface InventoryViewProps {
   isOnline: boolean;
   onProductsChange: () => void;
   user: AuthUser | null;
+  onUserUpdate?: (user: AuthUser) => void;
 }
 
 type SortKey = 'name' | 'price' | 'cost' | 'stock';
@@ -86,7 +87,7 @@ function clearProductDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch { /* storage no disponible */ }
 }
 
-export function InventoryView({ products, token, isOnline, onProductsChange, user }: InventoryViewProps) {
+export function InventoryView({ products, token, isOnline, onProductsChange, user, onUserUpdate }: InventoryViewProps) {
   const { success, error, warning } = useToast();
   const { confirm } = useConfirm();
   const [search, setSearch] = useState('');
@@ -99,7 +100,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const [metaExtra, setMetaExtra] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [tenantCategories, setTenantCategories] = useState<string[]>(() => getTenantProductCategories(user));
+  const [tenantCategories, setTenantCategories] = useState<string[]>(() => getTenantProductCategories(user, products));
   const [step, setStep] = useState(1);
   const [visitedMax, setVisitedMax] = useState(1);
   const [draftRestored, setDraftRestored] = useState(false);
@@ -122,8 +123,8 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   }, [showForm, editingProduct, form, productImage, metaExtra, step]);
 
   useEffect(() => {
-    setTenantCategories(getTenantProductCategories(user));
-  }, [user]);
+    setTenantCategories(getTenantProductCategories(user, products));
+  }, [user, products]);
 
   // Chequear si el código de barras corresponde a un producto archivado
   useEffect(() => {
@@ -266,8 +267,9 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
       : <ChevronUp size={14} style={{ opacity: 0.2 }} />;
 
   const startBlankCreate = () => {
-    const defaultCategory = tenantCategories[0] || 'General';
-    setForm({ ...EMPTY_FORM, category: defaultCategory });
+    // Preseleccionamos una categoría existente del negocio si la hay; si el
+    // negocio aún no tiene ninguna, se queda vacío y el paso 3 obliga a crearla.
+    setForm({ ...EMPTY_FORM, category: tenantCategories[0] || '' });
     setMetaExtra('');
     setProductImage('');
     setStep(1);
@@ -337,17 +339,27 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const syncTenantCategories = async (categories: string[]) => {
     const normalized = buildCategoryOptions(categories);
     setTenantCategories(normalized);
-    if (!token) return normalized;
+    if (!token || !isOnline) return normalized;
 
-    const updatedTenant = await authApi.updateTenant(token, { product_categories: normalized });
-    const refreshedCategories = buildCategoryOptions(updatedTenant.meta_data?.product_categories || normalized);
-    setTenantCategories(refreshedCategories);
-    return refreshedCategories;
+    try {
+      const updatedTenant = await authApi.updateTenant(token, { product_categories: normalized });
+      const refreshedCategories = buildCategoryOptions(updatedTenant.meta_data?.product_categories || normalized);
+      setTenantCategories(refreshedCategories);
+      return refreshedCategories;
+    } catch {
+      // Sin conexión con el servidor: el listado queda guardado localmente
+      // (user.meta_data → localStorage) y se reintenta al crear/editar otra
+      // categoría o al guardar un producto (handleSave reenvía la lista).
+      return normalized;
+    }
   };
 
+  // Persiste el listado de categorías del negocio en el usuario (y de ahí a
+  // localStorage vía App.onUserUpdate), para que sobreviva a recargar la página
+  // o cerrar sesión. El servidor ya lo tiene por authApi.updateTenant.
   const persistUserCategories = (categories: string[]) => {
-    if (user) {
-      user.meta_data = { ...(user.meta_data || {}), product_categories: categories };
+    if (user && onUserUpdate) {
+      onUserUpdate({ ...user, meta_data: { ...(user.meta_data || {}), product_categories: categories } });
     }
   };
 
@@ -464,7 +476,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
       setForm(prev =>
         normalizeCategoryName(String(prev.category || '')).toLowerCase() === name.toLowerCase()
-          ? { ...prev, category: syncedCategories[0] || 'General' }
+          ? { ...prev, category: syncedCategories[0] || '' }
           : prev
       );
       success('Categoría eliminada de la lista');
@@ -507,9 +519,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
       if (!tenantCategories.some(category => category.toLowerCase() === selectedCategory.toLowerCase())) {
         const syncedCategories = await syncTenantCategories([...tenantCategories, selectedCategory]);
-        if (user) {
-          user.meta_data = { ...(user.meta_data || {}), product_categories: syncedCategories };
-        }
+        persistUserCategories(syncedCategories);
       }
 
       // Save/update in IndexedDB
@@ -1034,7 +1044,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                 <div className="form-group">
                   <label className="form-label">Categoría *</label>
                   <CategoryPicker
-                    value={String(form.category || tenantCategories[0] || 'General')}
+                    value={String(form.category || tenantCategories[0] || '')}
                     categories={tenantCategories}
                     icon={getBusinessTypeIcon(user?.business_type || 'otro', 13)}
                     onChange={value => setForm(f => ({ ...f, category: value }))}

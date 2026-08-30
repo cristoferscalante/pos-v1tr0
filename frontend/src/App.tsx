@@ -298,6 +298,40 @@ function AppInner() {
     }
   }, [token, isOnline, loadProducts, checkPending, pullProducts, syncSales]);
 
+  // ---- Guardar cambios del usuario (persisten en localStorage) ----
+  const handleUserUpdate = useCallback((updatedUser: AuthUser) => {
+    setUser(updatedUser);
+    localStorage.setItem('pos_user', JSON.stringify(updatedUser));
+  }, []);
+
+  // ---- Hidratar meta del negocio al abrir la app ----
+  // El /login solo trae lo básico y el pos_user de localStorage puede quedar
+  // viejo (categorías creadas en otro equipo o antes de este cambio). Traemos
+  // las categorías del negocio desde el servidor y las mezclamos.
+  useEffect(() => {
+    if (!token || !isOnline) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const tenant = await authApi.getTenant(token);
+        if (cancelled) return;
+        const categories = Array.isArray(tenant?.meta_data?.product_categories)
+          ? tenant.meta_data.product_categories
+          : null;
+        if (!categories) return;
+        setUser(prev => {
+          if (!prev) return prev;
+          const prevCategories = prev.meta_data?.product_categories || [];
+          if (JSON.stringify(prevCategories) === JSON.stringify(categories)) return prev;
+          const next = { ...prev, meta_data: { ...(prev.meta_data || {}), product_categories: categories } };
+          localStorage.setItem('pos_user', JSON.stringify(next));
+          return next;
+        });
+      } catch { /* sin permisos de admin u offline: se ignora */ }
+    })();
+    return () => { cancelled = true; };
+  }, [token, isOnline]);
+
   // ---- Auth Handlers ----
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -564,6 +598,7 @@ function AppInner() {
             isOnline={isOnline}
             onProductsChange={loadProducts}
             user={user}
+            onUserUpdate={handleUserUpdate}
           />
         )}
         {view === 'supplies' && (
@@ -580,13 +615,10 @@ function AppInner() {
           <DashboardView token={token} isOnline={isOnline} />
         )}
         {view === 'settings' && (
-          <SettingsView 
-            user={user} 
-            token={token} 
-            onUserUpdate={(updatedUser: AuthUser) => {
-              setUser(updatedUser);
-              localStorage.setItem('pos_user', JSON.stringify(updatedUser));
-            }} 
+          <SettingsView
+            user={user}
+            token={token}
+            onUserUpdate={handleUserUpdate}
           />
         )}
         {view === 'superadmin' && user?.is_superadmin && (

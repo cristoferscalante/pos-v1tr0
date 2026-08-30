@@ -17,6 +17,35 @@ from datetime import datetime, timedelta
 
 router = APIRouter()
 
+
+# Campos de tenant.meta_data que SÍ es seguro devolver en la respuesta de
+# login/registro (los usa el front para categorías de producto y branding).
+# NUNCA incluir aquí electronic_invoicing_* / factus_* (credenciales del
+# proveedor de facturación en texto plano). Ver hallazgo 3.2 del plan de mejora.
+_SAFE_USER_TENANT_META_FIELDS = (
+    "product_categories",
+    "brand_color",
+    "display_name",
+    "logo_url",
+    "banner_url",
+    "whatsapp_number",
+)
+
+
+def _safe_user_tenant_meta(tenant) -> dict:
+    """Subconjunto seguro de tenant.meta_data para exponer junto al usuario."""
+    meta = (tenant.meta_data if tenant and tenant.meta_data else {}) or {}
+    out: dict = {}
+    for key in _SAFE_USER_TENANT_META_FIELDS:
+        value = meta.get(key)
+        if key == "product_categories":
+            if isinstance(value, list):
+                out[key] = value
+        elif value:
+            out[key] = value
+    return out
+
+
 # Esquema de entrada para registro de negocio
 class TenantRegister(BaseModel):
     business_name: str
@@ -97,7 +126,8 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
             "tenant_id": tenant.id,
             "business_name": tenant.name,
             "business_type": tenant.business_type,
-            "slug": tenant.slug
+            "slug": tenant.slug,
+            "meta_data": _safe_user_tenant_meta(tenant),
         }
     }
 
@@ -140,7 +170,8 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
             "tenant_id": user.tenant_id,
             "business_name": tenant.name if tenant else "Sistema",
             "business_type": tenant.business_type if tenant else "retail",
-            "slug": tenant.slug if tenant else None
+            "slug": tenant.slug if tenant else None,
+            "meta_data": _safe_user_tenant_meta(tenant),
         }
     }
 
