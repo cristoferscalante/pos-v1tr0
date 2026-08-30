@@ -109,8 +109,12 @@ function AppInner() {
 
       if (serverProducts.length === 0) {
         const localProducts = await db.products.toArray();
+        // Nunca borramos productos que aún no se sincronizaron con el servidor:
+        // un producto recién creado sin conexión (sync_status 'pending') todavía
+        // no aparece en la lista del servidor y lo perderíamos sin remedio.
+        const deletableProducts = localProducts.filter((product) => product.sync_status !== 'pending');
         const demoProductIds = new Set(
-          localProducts
+          deletableProducts
             .filter((product) => {
               const name = product.name.toLowerCase();
               const sku = (product.sku || '').toLowerCase();
@@ -120,7 +124,7 @@ function AppInner() {
             .map((product) => product.id)
         );
 
-        const productIdsToDelete = demoProductIds.size > 0 ? Array.from(demoProductIds) : localProducts.map((product) => product.id);
+        const productIdsToDelete = demoProductIds.size > 0 ? Array.from(demoProductIds) : deletableProducts.map((product) => product.id);
         if (productIdsToDelete.length > 0) {
           await db.products.bulkDelete(productIdsToDelete);
 

@@ -36,6 +36,56 @@ const TAX_RATE_OPTIONS: { value: number; label: string }[] = [
 
 const STEP_TITLES = ['Lo esencial', 'Precio y ganancia', 'Stock y categoría', 'Últimos detalles'];
 
+// Borrador del alta de producto: si el modal se cierra sin guardar (cierre
+// accidental, sesión expirada, se recarga la pestaña...) los campos NO se
+// pierden — quedan en localStorage y se ofrecen al reabrir "Nuevo producto".
+// Caduca a las 24h para no arrastrar un borrador viejo para siempre.
+const DRAFT_KEY = 'pos_product_draft';
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface ProductDraft {
+  form: Partial<LocalProduct>;
+  productImage: string;
+  metaExtra: string;
+  step: number;
+  savedAt: number;
+}
+
+function draftHasContent(form: Partial<LocalProduct>, productImage: string, metaExtra: string) {
+  return Boolean(
+    form.name?.trim() ||
+    (Number(form.price) || 0) > 0 ||
+    (Number(form.cost) || 0) > 0 ||
+    form.sku?.trim() ||
+    form.barcode?.trim() ||
+    metaExtra.trim() ||
+    productImage
+  );
+}
+
+function readProductDraft(): ProductDraft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as ProductDraft;
+    if (!draft || typeof draft.savedAt !== 'number' || Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    if (!draftHasContent(draft.form || {}, draft.productImage || '', draft.metaExtra || '')) {
+      localStorage.removeItem(DRAFT_KEY);
+      return null;
+    }
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function clearProductDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* storage no disponible */ }
+}
+
 export function InventoryView({ products, token, isOnline, onProductsChange, user }: InventoryViewProps) {
   const { success, error, warning } = useToast();
   const { confirm } = useConfirm();
@@ -52,8 +102,24 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const [tenantCategories, setTenantCategories] = useState<string[]>(() => getTenantProductCategories(user));
   const [step, setStep] = useState(1);
   const [visitedMax, setVisitedMax] = useState(1);
+  const [draftRestored, setDraftRestored] = useState(false);
 
   const [archivedSuggestion, setArchivedSuggestion] = useState<LocalProduct | null>(null);
+
+  // Guarda el borrador del alta mientras se está creando un producto (no al editar).
+  useEffect(() => {
+    if (!showForm || editingProduct) return;
+    if (!draftHasContent(form, productImage, metaExtra)) return;
+    const handle = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ form, productImage, metaExtra, step, savedAt: Date.now() } satisfies ProductDraft)
+        );
+      } catch { /* storage lleno o no disponible: seguimos sin borrador */ }
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [showForm, editingProduct, form, productImage, metaExtra, step]);
 
   useEffect(() => {
     setTenantCategories(getTenantProductCategories(user));
@@ -199,15 +265,37 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
       ? sortDir === 'asc' ? <ChevronUp size={14} /> : <ChevronDown size={14} />
       : <ChevronUp size={14} style={{ opacity: 0.2 }} />;
 
-  const openCreate = () => {
-    setEditingProduct(null);
+  const startBlankCreate = () => {
     const defaultCategory = tenantCategories[0] || 'General';
     setForm({ ...EMPTY_FORM, category: defaultCategory });
     setMetaExtra('');
     setProductImage('');
     setStep(1);
     setVisitedMax(1);
+    setDraftRestored(false);
+  };
+
+  const openCreate = () => {
+    setEditingProduct(null);
+    const draft = readProductDraft();
+    if (draft) {
+      // Retomamos lo que quedó a medias la última vez (ver DRAFT_KEY).
+      setForm({ ...EMPTY_FORM, ...draft.form });
+      setProductImage(draft.productImage || '');
+      setMetaExtra(draft.metaExtra || '');
+      const restoredStep = Math.min(4, Math.max(1, Math.round(draft.step) || 1));
+      setStep(restoredStep);
+      setVisitedMax(restoredStep);
+      setDraftRestored(true);
+    } else {
+      startBlankCreate();
+    }
     setShowForm(true);
+  };
+
+  const discardDraft = () => {
+    clearProductDraft();
+    startBlankCreate();
   };
 
   const openEdit = (p: LocalProduct) => {
@@ -218,6 +306,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     // Al editar, los 4 pasos ya están disponibles: los datos vienen precargados.
     setStep(1);
     setVisitedMax(4);
+    setDraftRestored(false);
     setShowForm(true);
   };
 
@@ -444,6 +533,11 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         }
       }
 
+      if (!editingProduct) {
+        // El producto quedó guardado: el borrador ya no hace falta.
+        clearProductDraft();
+        setDraftRestored(false);
+      }
       success(editingProduct ? 'Producto actualizado ✓' : 'Producto creado ✓');
       setShowForm(false);
       onProductsChange();
@@ -712,6 +806,29 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                 </button>
               ))}
             </div>
+
+            {/* Borrador recuperado: el alta anterior se cerró sin guardar */}
+            {draftRestored && !editingProduct && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+                padding: '10px 12px', marginBottom: '16px', borderRadius: 'var(--r-md)',
+                background: 'var(--primary-dim)', border: '1px solid var(--border-active)',
+              }}>
+                <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+                  Retomamos el producto que estabas agregando.
+                </span>
+                <button
+                  type="button"
+                  onClick={discardDraft}
+                  style={{
+                    background: 'transparent', border: 'none', color: 'var(--primary)',
+                    fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  Empezar de cero
+                </button>
+              </div>
+            )}
 
             {/* PASO 1 — Lo esencial */}
             {step === 1 && (
