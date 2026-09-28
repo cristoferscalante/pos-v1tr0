@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search, ShoppingCart, Plus, Minus, Trash2,
-  CheckCircle, QrCode, Package, CreditCard, Banknote, ArrowLeftRight, Barcode, Printer, X
+  CheckCircle, Package, CreditCard, Banknote, ArrowLeftRight, Barcode, Printer, X, ScanBarcode
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { db } from '../db/pos-db';
@@ -11,6 +11,9 @@ import { useToast, useConfirm } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
+import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
+import { findProductByCode } from '../utils/productLookup';
+import { resolveMediaSrc } from '../api/client';
 
 interface POSViewProps {
   products: LocalProduct[];
@@ -37,6 +40,9 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   // Móvil: el carrito es una hoja inferior que se abre desde la barra de cobro
   const [cartOpen, setCartOpen] = useState(false);
+  // Pestaña Detal / Por mayor: define qué precio se muestra, se cobra y sale en el recibo
+  const [priceMode, setPriceMode] = useState<PriceMode>('retail');
+  const priceOf = (product: LocalProduct) => unitPrice(product, priceMode);
   const [printMode, setPrintMode] = useState<'receipt' | 'invoice'>('receipt');
   const [customerDocumentCode, setCustomerDocumentCode] = useState('13');
   const [customerIdentification, setCustomerIdentification] = useState('');
@@ -283,12 +289,12 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const clearCart = () => { setCart([]); setCartOpen(false); };
 
   // Totals
-  const total = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
+  const total = cart.reduce((s, i) => s + priceOf(i.product) * i.quantity, 0);
   const itemCount = cart.reduce((s, i) => s + i.quantity, 0);
   const tax = requiresElectronicInvoice && isElectronicInvoicingAvailable
     ? Math.round(cart.reduce((s, i) => {
         const rate = i.product.tax_rate !== undefined ? i.product.tax_rate : 19;
-        const itemTotal = i.product.price * i.quantity;
+        const itemTotal = priceOf(i.product) * i.quantity;
         const itemTax = itemTotal - (itemTotal / (1 + rate / 100));
         return s + itemTax;
       }, 0))
@@ -335,7 +341,13 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         sync_status: 'synced',
         sync_error: undefined,
         meta_data: serverSale.meta_data,
-        details: (serverSale as any).details || [],
+        details: ((serverSale as any).details || []).map((d: any) => ({
+          ...d,
+          price: Number(d.price),
+          total: Number(d.total),
+          quantity: Number(d.quantity),
+          unit_cost: d.unit_cost != null ? Number(d.unit_cost) : undefined,
+        })),
       };
       await db.sales.put(normalizedSale);
       setCompletedSale(normalizedSale);
@@ -372,9 +384,11 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         product_id: i.product.id,
         name: i.product.name,
         quantity: i.quantity,
-        price: i.product.price,
-        total: i.product.price * i.quantity,
+        price: priceOf(i.product),
+        total: priceOf(i.product) * i.quantity,
         tax_rate: i.product.tax_rate,
+        price_mode: priceMode,
+        unit_cost: Number(i.product.cost) || 0,
       }));
 
       const sale: LocalSale = {
@@ -389,6 +403,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         sync_error: undefined,
         details,
         meta_data: {
+          price_mode: priceMode,
           requires_electronic_invoice: requiresElectronicInvoice,
           dian_status: requiresElectronicInvoice ? 'pending_sync' : 'not_requested',
           customer_document_code: customerDocumentCode,
@@ -436,7 +451,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
 
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
       success(`✅ Venta ${saleNumber} registrada — $${total.toLocaleString('es-CO')}`);
-      setCompletedSale(sale); // Mostrar modal de recibo
+      // Mostrar modal de recibo (sin pisar la versión del servidor si ya llegó, que trae el número oficial)
+      setCompletedSale(prev => (prev?.id === sale.id ? prev : sale));
       setPrintMode('receipt');
       setRequiresElectronicInvoice(false);
       setCustomerDocumentCode('13');
@@ -459,7 +475,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       const term = search.trim();
       if (!term) return;
       
-      const match = products.find(p => p.barcode === term || p.sku?.toLowerCase() === term.toLowerCase());
+      const match = findProductByCode(products, term);
       if (match) {
         addToCart(match);
         success(`⚡ Escaneado: ${match.name}`);
@@ -528,10 +544,27 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
           <button
             onClick={() => setIsScanning(true)}
             className="btn-icon-primary"
-            title="Escanear QR/Código"
+            title="Escanear con la cámara"
+            aria-label="Escanear código con la cámara"
           >
-            <QrCode size={18} />
+            <ScanBarcode size={20} />
           </button>
+        </div>
+
+        {/* Pestañas de precio: todo el POS (tarjetas, carrito, cobro y recibo) usa este precio */}
+        <div className="price-mode-toggle" role="tablist" aria-label="Tipo de precio">
+          {(['retail', 'wholesale'] as PriceMode[]).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              role="tab"
+              aria-selected={priceMode === mode}
+              className={`${priceMode === mode ? 'active' : ''} ${mode}`}
+              onClick={() => setPriceMode(mode)}
+            >
+              {mode === 'retail' ? 'Precios al detal' : 'Precios por mayor'}
+            </button>
+          ))}
         </div>
 
         {/* Category Pills */}
@@ -571,7 +604,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                       {product.image === 'preset-package' && '📦'}
                     </div>
                   ) : (
-                    <img src={product.image} alt={product.name} className="product-img" />
+                    <img src={resolveMediaSrc(product.image)} alt={product.name} className="product-img" loading="lazy" />
                   )
                 ) : (
                   <div className="product-preset-img preset-package">📦</div>
@@ -584,7 +617,10 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 )}
               </div>
               <div className="product-card-footer">
-                <span className="product-price">${product.price.toLocaleString('es-CO')}</span>
+                <span className="product-price-wrap">
+                  {priceMode === 'wholesale' && <span className="product-price-mode">Por mayor</span>}
+                  <span className="product-price">${priceOf(product).toLocaleString('es-CO')}</span>
+                </span>
                 <button className="btn-add-product" tabIndex={-1}>
                   <Plus size={16} />
                 </button>
@@ -609,7 +645,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             <span className="pos-mobile-bar-count">{itemCount}</span>
           </span>
           <span className="pos-mobile-bar-info">
-            <span className="pos-mobile-bar-items">{itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</span>
+            <span className="pos-mobile-bar-items">{itemCount} {itemCount === 1 ? 'artículo' : 'artículos'} · {PRICE_MODE_LABELS[priceMode]}</span>
             <span className="pos-mobile-bar-total">${total.toLocaleString('es-CO')}</span>
           </span>
           <span className="pos-mobile-bar-cta">Ver carrito</span>
@@ -625,6 +661,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             <ShoppingCart size={18} />
             <span>Venta Actual</span>
             {cart.length > 0 && <span className="cart-count">{itemCount}</span>}
+            {priceMode === 'wholesale' && <span className="price-mode-banner">· Por mayor</span>}
           </div>
           {cart.length > 0 && (
             <button onClick={clearCart} className="btn-ghost-danger">
@@ -648,7 +685,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <div key={item.product.id} className="cart-item animate-fade">
                 <div className="cart-item-info">
                   <p className="cart-item-name">{item.product.name}</p>
-                  <p className="cart-item-unit">${item.product.price.toLocaleString('es-CO')} c/u</p>
+                  <p className="cart-item-unit">${priceOf(item.product).toLocaleString('es-CO')} c/u{priceMode === 'wholesale' ? ' · por mayor' : ''}</p>
                 </div>
                 <div className="cart-item-controls">
                   <button onClick={() => updateQty(item.product.id, -1)} className="qty-btn">
@@ -659,7 +696,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                     <Plus size={12} />
                   </button>
                   <span className="cart-item-total">
-                    ${(item.product.price * item.quantity).toLocaleString('es-CO')}
+                    ${(priceOf(item.product) * item.quantity).toLocaleString('es-CO')}
                   </span>
                   <button onClick={() => removeFromCart(item.product.id)} className="btn-remove-item">
                     <Trash2 size={12} />
@@ -769,12 +806,13 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       {isScanning && (
         <QrScannerModal
           onScanSuccess={code => {
-            const match = products.find(p => p.barcode === code || p.sku?.toLowerCase() === code.toLowerCase());
+            const match = findProductByCode(products, code);
             if (match) { addToCart(match); success(`Producto escaneado: ${match.name}`); }
             else warning(`Código "${code}" no encontrado en inventario`);
             setIsScanning(false);
           }}
           onClose={() => setIsScanning(false)}
+          title="Escanear producto para vender"
         />
       )}
 
@@ -789,6 +827,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
                 Fecha: {new Date(completedSale.created_at).toLocaleString()}<br />
                 Factura N°: {completedSale.sale_number}
+                {completedSale.meta_data?.price_mode === 'wholesale' && (<><br /><strong>VENTA AL POR MAYOR</strong></>)}
               </div>
               <div style={{ borderBottom: '1px dashed black', paddingBottom: '6px', marginBottom: '6px' }}>
                 {completedSale.details.map((item, idx) => (
@@ -830,6 +869,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 <div><strong>Numero:</strong> {completedSale.sale_number}</div>
                 <div><strong>Fecha:</strong> {new Date(completedSale.created_at).toLocaleString()}</div>
                 <div><strong>Metodo:</strong> {completedSale.payment_method === 'cash' ? 'Efectivo' : completedSale.payment_method === 'card' ? 'Tarjeta' : 'Transferencia'}</div>
+                <div><strong>Precio:</strong> {completedSale.meta_data?.price_mode === 'wholesale' ? 'Por mayor' : 'Detal'}</div>
                 <div><strong>Estado DIAN:</strong> {completedSale.meta_data?.dian_status || 'Pendiente'}</div>
                 <div><strong>CUFE:</strong> {completedSale.meta_data?.cufe || 'Pendiente de generar'}</div>
                 <div><strong>QR DIAN:</strong> {completedSale.meta_data?.qr_url || 'Pendiente de generar'}</div>
@@ -881,7 +921,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <div className="ticket-virtual">
                 <div className="ticket-header">
                   <h4 className="ticket-title">{businessName}</h4>
-                  <p className="ticket-subtitle">{completedSale.meta_data?.requires_electronic_invoice ? 'Venta con facturacion electronica' : 'Ticket de Venta'}</p>
+                  <p className="ticket-subtitle">{completedSale.meta_data?.requires_electronic_invoice ? 'Venta con facturacion electronica' : 'Ticket de Venta'}{completedSale.meta_data?.price_mode === 'wholesale' ? ' · Por mayor' : ''}</p>
                 </div>
                 <div className="ticket-meta">
                   <strong>Factura N°:</strong> {completedSale.sale_number}<br />

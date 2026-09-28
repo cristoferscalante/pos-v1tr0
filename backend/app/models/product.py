@@ -12,6 +12,8 @@ class ProductBase(SQLModel):
     # medio "sin validaciones de negativos" del plan de mejora.
     price: Decimal = Field(default=0.0, max_digits=12, decimal_places=2, ge=0)
     cost: Decimal = Field(default=0.0, max_digits=12, decimal_places=2, ge=0)
+    # `price` es el precio al detal. Precio al por mayor; si es NULL se usa `price`.
+    wholesale_price: Optional[Decimal] = Field(default=None, max_digits=12, decimal_places=2, ge=0)
     stock: float = Field(default=0.0)
     tenant_id: Optional[uuid.UUID] = Field(default=None, foreign_key="tenant.id", index=True)
     image: Optional[str] = Field(default=None)

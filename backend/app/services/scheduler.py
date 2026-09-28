@@ -36,7 +36,8 @@ def _build_summary(session: Session, tenant_id) -> dict:
     profit = 0.0
     for sale in sales:
         for detail in sale.details:
-            profit += float(detail.total) - (costs.get(detail.product_id, 0.0) * detail.quantity)
+            unit_cost = float(detail.unit_cost) if detail.unit_cost is not None else costs.get(detail.product_id, 0.0)
+            profit += float(detail.total) - (unit_cost * detail.quantity)
 
     return {
         "sales_count": len(sales),

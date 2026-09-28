@@ -28,6 +28,8 @@ class SaleDetailSync(BaseModel):
     total: Decimal
     name: str | None = None
     tax_rate: Decimal | None = None
+    # 'retail' (detal) o 'wholesale' (por mayor). Ventas de clientes antiguos no lo envían.
+    price_mode: str = "retail"
 
 class SaleSync(BaseModel):
     id: uuid.UUID  # Generado en el cliente para mantener consistencia
@@ -119,12 +121,24 @@ def sync_offline_sales(
                 # cliente. Ver hallazgo 5.3 del plan de mejora (vector de fraude
                 # interno: registrar una venta con precio bajo mientras se cobra
                 # el valor real en efectivo).
-                trusted_unit_price = product.price
+                # Con precio al por mayor la fuente de verdad es product.wholesale_price
+                # (o product.price si el producto no tiene precio por mayor).
+                price_mode = "wholesale" if detail_data.price_mode == "wholesale" else "retail"
+                if price_mode == "wholesale" and product.wholesale_price is not None:
+                    trusted_unit_price = product.wholesale_price
+                else:
+                    trusted_unit_price = product.price
                 if abs(detail_data.price - trusted_unit_price) > Decimal("0.01"):
                     pricing_adjusted = True
+                # La factura electrónica (_emit_with_factus) se arma con estos
+                # detalles, así que también debe llevar el precio confiable.
+                detail_data.price = trusted_unit_price
+                detail_data.price_mode = price_mode
                 line_total = (trusted_unit_price * Decimal(str(detail_data.quantity))).quantize(Decimal("0.01"))
+                detail_data.total = line_total
 
-                tax_rate = detail_data.tax_rate if detail_data.tax_rate is not None else (product.tax_rate or Decimal("0"))
+                tax_rate = product.tax_rate or Decimal("0")
+                detail_data.tax_rate = tax_rate
                 if tax_rate and tax_rate > 0:
                     net_line_total = line_total / (1 + tax_rate / Decimal("100"))
                     line_tax = (line_total - net_line_total).quantize(Decimal("0.01"))
@@ -140,6 +154,8 @@ def sync_offline_sales(
                         quantity=detail_data.quantity,
                         price=trusted_unit_price,
                         total=line_total,
+                        price_mode=price_mode,
+                        unit_cost=product.cost,
                     )
                 )
 
@@ -165,6 +181,9 @@ def sync_offline_sales(
             sale_meta["client_sale_number"] = sale_data.sale_number
             if pricing_adjusted:
                 sale_meta["pricing_adjusted"] = True
+            sale_meta["price_mode"] = (
+                "wholesale" if any(d.price_mode == "wholesale" for d in detail_rows) else "retail"
+            )
             if oversold_products:
                 sale_meta["oversold_products"] = oversold_products
 
@@ -292,7 +311,9 @@ def get_sales(
                     name=product.name if product else "Producto Eliminado",
                     quantity=detail.quantity,
                     price=detail.price,
-                    total=detail.total
+                    total=detail.total,
+                    price_mode=detail.price_mode or "retail",
+                    unit_cost=detail.unit_cost,
                 )
             )
         result.append(
@@ -334,7 +355,9 @@ def get_sale(
                 name=product.name if product else "Producto Eliminado",
                 quantity=detail.quantity,
                 price=detail.price,
-                total=detail.total
+                total=detail.total,
+                price_mode=detail.price_mode or "retail",
+                unit_cost=detail.unit_cost,
             )
         )
         

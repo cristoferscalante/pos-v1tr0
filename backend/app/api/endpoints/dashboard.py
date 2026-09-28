@@ -50,13 +50,40 @@ def get_dashboard_summary(
     products_db = session.exec(select(Product).where(Product.tenant_id == tenant_id)).all()
     product_costs = {p.id: float(p.cost) for p in products_db}
 
+    def detail_cost(detail) -> float:
+        # Costo congelado al vender; las ventas anteriores a price modes no lo
+        # tienen y usan el costo actual del producto.
+        if detail.unit_cost is not None:
+            return float(detail.unit_cost)
+        return product_costs.get(detail.product_id, 0.0)
+
     def calculate_sales_profit(sales_list) -> float:
         total_profit = 0.0
         for s in sales_list:
             for detail in s.details:
-                cost = product_costs.get(detail.product_id, 0.0)
-                total_profit += float(detail.total) - (cost * detail.quantity)
+                total_profit += float(detail.total) - (detail_cost(detail) * detail.quantity)
         return total_profit
+
+    def breakdown_by_price_mode(sales_list) -> Dict[str, Dict[str, float]]:
+        # Ingresos y ganancia por modalidad, a nivel de línea (una venta es
+        # 'wholesale' si se cobró al por mayor).
+        result = {
+            mode: {"count": 0, "revenue": 0.0, "profit": 0.0}
+            for mode in ("retail", "wholesale")
+        }
+        for s in sales_list:
+            modes_in_sale = set()
+            for detail in s.details:
+                mode = "wholesale" if detail.price_mode == "wholesale" else "retail"
+                modes_in_sale.add(mode)
+                result[mode]["revenue"] += float(detail.total)
+                result[mode]["profit"] += float(detail.total) - (detail_cost(detail) * detail.quantity)
+            for mode in modes_in_sale:
+                result[mode]["count"] += 1
+        for values in result.values():
+            values["revenue"] = round(values["revenue"], 2)
+            values["profit"] = round(values["profit"], 2)
+        return result
 
     # Calcular KPIs
     sales_today = [s for s in all_sales if s.created_at >= today_start]
@@ -133,6 +160,10 @@ def get_dashboard_summary(
             for p in low_stock_products[:5]
         ],
         "payment_breakdown": payment_breakdown,
+        "by_price_mode": {
+            "today": breakdown_by_price_mode(sales_today),
+            "month": breakdown_by_price_mode(sales_month),
+        },
         "current_cash_session": current_cash_session,
     }
 

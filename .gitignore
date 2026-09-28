@@ -20,3 +20,6 @@ pos.tar.gz
 # Credenciales de rotación (plan de mejora 2026-08-19) - nunca comitear
 credenciales_nuevas.txt
 env.prod.nuevo
+
+# Fotos de productos subidas en desarrollo
+backend/media/

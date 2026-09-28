@@ -38,6 +38,10 @@ class Settings(BaseSettings):
 
     APP_NAME: str = "V1TR0 POS"
 
+    # Fotos de productos (ya comprimidas a WebP/JPEG en el navegador)
+    MEDIA_DIR: str = "media"
+    MEDIA_MAX_UPLOAD_BYTES: int = 1_500_000
+
     @property
     def is_production(self) -> bool:
         return self.ENV.lower() == "production"

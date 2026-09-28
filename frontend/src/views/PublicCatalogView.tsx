@@ -92,6 +92,10 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
     setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
+  // Precio al por mayor solo se muestra si existe y es distinto del detal
+  const hasWholesale = (product: ApiProduct) =>
+    product.wholesale_price != null && Number(product.wholesale_price) > 0 && Number(product.wholesale_price) !== Number(product.price);
+
   const getCartTotal = () => {
     return cart.reduce((acc, item) => acc + (Number(item.product.price) * item.quantity), 0);
   };
@@ -111,7 +115,8 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
     let message = `*Pedido para ${storeName}*\n\n`;
     cart.forEach(item => {
       const itemTotal = Number(item.product.price) * item.quantity;
-      message += `• *${item.quantity}x* ${item.product.name} _(${formatCurrency(Number(item.product.price))} c/u)_ = *${formatCurrency(itemTotal)}*\n`;
+      const wholesaleNote = hasWholesale(item.product) ? ` · por mayor ${formatCurrency(Number(item.product.wholesale_price))}` : '';
+      message += `• *${item.quantity}x* ${item.product.name} _(${formatCurrency(Number(item.product.price))} c/u${wholesaleNote})_ = *${formatCurrency(itemTotal)}*\n`;
     });
     message += `\n*Total a pagar: ${formatCurrency(getCartTotal())}*\n\n_Enviado desde el catálogo público de ${storeName}._`;
     openWhatsApp(message);
@@ -288,6 +293,9 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
                         <div className="catalog-product-bottom">
                           <div className="product-card-price-row">
                             <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
+                            {hasWholesale(product) && (
+                              <span className="product-card-wholesale">Por mayor {formatCurrency(Number(product.wholesale_price))}</span>
+                            )}
                           </div>
                           <div className="catalog-product-actions">
                             <button className="btn-add-cart" onClick={() => addToCart(product)}>
@@ -335,6 +343,9 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
                       <div className="catalog-product-bottom">
                         <div className="product-card-price-row">
                           <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
+                          {hasWholesale(product) && (
+                            <span className="product-card-wholesale">Por mayor {formatCurrency(Number(product.wholesale_price))}</span>
+                          )}
                         </div>
                         <div className="catalog-product-actions">
                           <button className="btn-add-cart" onClick={() => addToCart(product)}>

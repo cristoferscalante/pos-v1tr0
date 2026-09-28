@@ -60,7 +60,8 @@ export interface LocalProduct {
   name: string;
   sku?: string;
   barcode?: string;
-  price: number;
+  price: number;          // precio al detal
+  wholesale_price?: number; // precio al por mayor (si falta, se usa price)
   cost: number;
   stock: number;
   category?: string;
@@ -79,6 +80,8 @@ export interface LocalSaleDetail {
   price: number;
   total: number;
   tax_rate?: number;
+  price_mode?: 'retail' | 'wholesale';
+  unit_cost?: number;
 }
 
 export interface LocalSale {
@@ -110,6 +113,7 @@ export interface ApiProduct {
   sku?: string;
   barcode?: string;
   price: number;
+  wholesale_price?: number;
   cost: number;
   stock: number;
   category?: string;
@@ -146,6 +150,7 @@ export interface DashboardSummary {
   low_stock_count: number;
   low_stock_products: { id: string; name: string; stock: number }[];
   payment_breakdown: Record<string, number>;
+  by_price_mode?: Record<'today' | 'month', Record<'retail' | 'wholesale', { count: number; revenue: number; profit: number }>>;
    current_cash_session?: CashSessionSummary | null;
 }
 

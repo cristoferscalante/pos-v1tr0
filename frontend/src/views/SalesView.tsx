@@ -32,6 +32,15 @@ const PAYMENT_FILTER_OPTIONS: SelectOption<string>[] = [
   { value: 'transfer', label: 'Transferencia', icon: <ArrowLeftRight size={14} /> }
 ];
 
+const PRICE_MODE_FILTER_OPTIONS: SelectOption<string>[] = [
+  { value: 'all',       label: 'Detal y por mayor' },
+  { value: 'retail',    label: 'Solo al detal' },
+  { value: 'wholesale', label: 'Solo por mayor' },
+];
+
+const saleIsWholesale = (sale: LocalSale) =>
+  sale.meta_data?.price_mode === 'wholesale' || sale.details.some(d => d.price_mode === 'wholesale');
+
 const SYNC_FILTER_OPTIONS: SelectOption<string>[] = [
   { value: 'all',     label: 'Todo el estado' },
   { value: 'pending', label: 'Pendiente sync', icon: <Clock size={14} /> },
@@ -44,6 +53,7 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
   const [search, setSearch] = useState('');
   const [filterPayment, setFilterPayment] = useState<string>('all');
   const [filterSync, setFilterSync] = useState<string>('all');
+  const [filterPriceMode, setFilterPriceMode] = useState<string>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -122,7 +132,8 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
     const matchSearch = !search || s.sale_number.toLowerCase().includes(search.toLowerCase());
     const matchPayment = filterPayment === 'all' || s.payment_method === filterPayment;
     const matchSync = filterSync === 'all' || s.sync_status === filterSync;
-    return matchSearch && matchPayment && matchSync;
+    const matchMode = filterPriceMode === 'all' || (filterPriceMode === 'wholesale') === saleIsWholesale(s);
+    return matchSearch && matchPayment && matchSync && matchMode;
   });
 
   // Summary of filtered
@@ -233,6 +244,12 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
           style={{ width: '200px' }}
         />
         <CustomSelect
+          options={PRICE_MODE_FILTER_OPTIONS}
+          value={filterPriceMode}
+          onChange={val => setFilterPriceMode(val)}
+          style={{ width: '200px' }}
+        />
+        <CustomSelect
           options={SYNC_FILTER_OPTIONS}
           value={filterSync}
           onChange={val => setFilterSync(val)}
@@ -270,6 +287,9 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
                     {PAYMENT_ICONS[sale.payment_method]}
                     {PAYMENT_LABELS[sale.payment_method] || sale.payment_method}
                   </span>
+                  {saleIsWholesale(sale) && (
+                    <span className="payment-pill wholesale">Por mayor</span>
+                  )}
                   {sale.meta_data?.requires_electronic_invoice && (
                     <span className="payment-pill card">
                       FE

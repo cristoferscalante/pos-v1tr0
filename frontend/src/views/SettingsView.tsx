@@ -8,7 +8,7 @@ import { API_URL, authApi, einvoiceApi } from '../api/client';
 import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import type { AuthUser, FactusConnectionResult, FactusNumberingRangesResult, NotificationLog, NotificationRule } from '../types';
-import { fileToDataUrl } from '../utils/imageUpload';
+import { compressImageToDataUrl } from '../utils/imageUpload';
 import '../styles/branding-upload.css';
 
 interface SettingsViewProps {
@@ -352,7 +352,8 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   ) => {
     if (!file) return;
     try {
-      setter(await fileToDataUrl(file));
+      // Logo pequeño; el banner es ancho y necesita más resolución
+      setter(await compressImageToDataUrl(file, { maxSize: label === 'banner' ? 1600 : 512 }));
     } catch (err: any) {
       error(err.message || `No se pudo cargar el ${label}`);
     }

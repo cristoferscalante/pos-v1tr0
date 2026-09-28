@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { QrCode } from 'lucide-react';
 import { db, requestPersistentStorage } from './db/pos-db';
-import { authApi, salesApi, setUnauthorizedHandler } from './api/client';
+import { authApi, salesApi, mediaApi, setUnauthorizedHandler } from './api/client';
 import { ToastProvider, useToast } from './components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { BusinessTypeSelect } from './components/BusinessTypeSelect';
@@ -15,6 +15,8 @@ import { SuperAdminView } from './views/SuperAdminView';
 import { PublicCatalogView } from './views/PublicCatalogView';
 import type { AuthUser, LocalProduct, View, BusinessType } from './types';
 import { getProductCategory } from './utils/productCategories';
+import { normalizeProduct } from './utils/pricing';
+import { dataUrlToBlob } from './utils/imageUpload';
 
 const LEGACY_DEMO_PRODUCT_HINTS = [
   'vacuna parvovirus',
@@ -144,7 +146,7 @@ function AppInner() {
       }
 
       for (const p of serverProducts) {
-        await db.products.put(p as LocalProduct);
+        await db.products.put(normalizeProduct(p as LocalProduct));
       }
       loadProducts();
     } catch { /* offline OK */ }
@@ -159,20 +161,29 @@ function AppInner() {
 
     for (const product of pendingProducts) {
       try {
+        // Foto tomada sin conexión: se guardó comprimida como data URL; ahora se
+        // sube como archivo para no cargar la base de datos con base64.
+        let image = product.image;
+        if (image?.startsWith('data:')) {
+          try {
+            image = await mediaApi.uploadProductImage(token, await dataUrlToBlob(image));
+          } catch { /* se reintenta en la próxima sincronización */ }
+        }
         const created = await (await import('./api/client')).productsApi.create(token, {
           id: product.id,
           name: product.name,
           sku: product.sku,
           barcode: product.barcode,
           price: product.price,
+          wholesale_price: product.wholesale_price,
           cost: product.cost,
           stock: product.stock,
           category: product.category,
-          image: product.image,
+          image,
           tax_rate: product.tax_rate,
           meta_data: product.meta_data,
         } as any);
-        await db.products.put({ ...(created as LocalProduct), sync_status: 'synced', sync_error: undefined });
+        await db.products.put({ ...normalizeProduct(created as LocalProduct), sync_status: 'synced', sync_error: undefined });
       } catch (error: any) {
         product.sync_error = error?.message || 'Producto pendiente de sincronización';
         await db.products.put(product);

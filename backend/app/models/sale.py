@@ -31,6 +31,10 @@ class SaleDetailBase(SQLModel):
     quantity: float = Field(default=1.0)
     price: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
     total: Decimal = Field(default=0.0, max_digits=12, decimal_places=2)
+    # Modalidad de precio con la que se vendió la línea: 'retail' (detal) o 'wholesale' (por mayor)
+    price_mode: str = Field(default="retail")
+    # Costo del producto congelado al momento de la venta (para calcular la ganancia real)
+    unit_cost: Optional[Decimal] = Field(default=None, max_digits=12, decimal_places=2)
 
 class SaleDetail(SaleDetailBase, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
@@ -44,6 +48,8 @@ class SaleDetailRead(SQLModel):
     quantity: float
     price: Decimal
     total: Decimal
+    price_mode: str = "retail"
+    unit_cost: Optional[Decimal] = None
 
 class SaleReadWithDetails(SaleBase):
     id: uuid.UUID

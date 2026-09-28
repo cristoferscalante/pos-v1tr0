@@ -1,131 +1,169 @@
-import { useEffect } from 'react';
-import { Html5QrcodeScanner } from 'html5-qrcode';
-import { X } from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { X, Flashlight, FlashlightOff, ImageUp, CameraOff } from 'lucide-react';
 
 interface QrScannerModalProps {
   onScanSuccess: (decodedText: string) => void;
   onClose: () => void;
+  title?: string;
 }
 
-export function QrScannerModal({ onScanSuccess, onClose }: QrScannerModalProps) {
+// QR + los códigos de barras que traen los productos en Colombia (EAN/UPC) y
+// los que suelen imprimir las etiquetadoras (Code 128/39).
+const FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+];
+
+type ScannerState = 'starting' | 'scanning' | 'denied' | 'unavailable';
+
+/**
+ * Lector de QR y código de barras con la cámara trasera del celular.
+ * Se cierra solo al leer un código y devuelve el texto en onScanSuccess.
+ */
+export function QrScannerModal({ onScanSuccess, onClose, title = 'Escanear código' }: QrScannerModalProps) {
+  const reactId = useId();
+  const elementId = `qr-reader-${reactId.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const doneRef = useRef(false);
+  // Callbacks en refs: los padres pasan funciones inline y un re-render no debe reiniciar la cámara
+  const onScanRef = useRef(onScanSuccess);
+  const onCloseRef = useRef(onClose);
+  onScanRef.current = onScanSuccess;
+  onCloseRef.current = onClose;
+
+  const [state, setState] = useState<ScannerState>('starting');
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
+  const [fileError, setFileError] = useState('');
+
+  const finish = (text: string) => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    try { navigator.vibrate?.(60); } catch { /* */ }
+    onScanRef.current(text.trim());
+    onCloseRef.current();
+  };
+
   useEffect(() => {
-    // Función para traducir los elementos del escáner al español
-    const translateScanner = () => {
-      const container = document.getElementById('qr-reader-container');
-      if (!container) return;
-
-      // Traducir botón de permisos de cámara
-      const permissionBtn = document.getElementById('html5-qrcode-button-camera-permission');
-      if (permissionBtn && permissionBtn.textContent !== 'Permitir uso de cámara') {
-        permissionBtn.textContent = 'Permitir uso de cámara';
-      }
-
-      // Traducir botón de selección de archivo de imagen
-      const fileBtn = document.getElementById('html5-qrcode-button-file-selection');
-      if (fileBtn && fileBtn.textContent !== 'Escanear archivo de imagen') {
-        fileBtn.textContent = 'Escanear archivo de imagen';
-      }
-
-      // Traducir el enlace alternativo de tipo de escaneo
-      const scanTypeAnchor = document.getElementById('html5-qrcode-anchor-scan-type');
-      if (scanTypeAnchor) {
-        if (scanTypeAnchor.textContent?.includes('Scan an Image File')) {
-          scanTypeAnchor.textContent = 'Escanear un archivo de imagen';
-        } else if (scanTypeAnchor.textContent?.includes('Scan using chip camera')) {
-          scanTypeAnchor.textContent = 'Escanear usando la cámara del dispositivo';
-        }
-      }
-
-      // Traducir etiqueta del selector de archivo privado
-      const fileInputLabel = container.querySelector('label[for="html5-qrcode-private-files-selection"]');
-      if (fileInputLabel && fileInputLabel.textContent !== 'Seleccionar archivo de imagen') {
-        fileInputLabel.textContent = 'Seleccionar archivo de imagen';
-      }
-      
-      // Traducir opción vacía en selección de cámara
-      const selectCamera = container.querySelector('select#html5-qrcode-select-camera');
-      if (selectCamera) {
-        const option = selectCamera.querySelector('option[value=""]');
-        if (option && option.textContent === 'Select Camera') {
-          option.textContent = 'Seleccionar cámara';
-        }
-      }
-
-      // Traducir botones de iniciar y detener escaneo
-      const startBtn = document.getElementById('html5-qrcode-button-camera-start');
-      if (startBtn && startBtn.textContent !== 'Iniciar cámara') {
-        startBtn.textContent = 'Iniciar cámara';
-      }
-      const stopBtn = document.getElementById('html5-qrcode-button-camera-stop');
-      if (stopBtn && stopBtn.textContent !== 'Detener cámara') {
-        stopBtn.textContent = 'Detener cámara';
-      }
-    };
-
-    // Inicializar el escáner de html5-qrcode
-    const scanner = new Html5QrcodeScanner(
-      'qr-reader-container',
-      { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 },
-        aspectRatio: 1.0
-      },
-      /* verbose= */ false
-    );
-
-    scanner.render(
-      (decodedText) => {
-        onScanSuccess(decodedText);
-        scanner.clear().then(() => {
-          onClose();
-        }).catch(err => {
-          console.error("Error al limpiar escáner:", err);
-          onClose();
-        });
-      },
-      () => {
-        // Silenciar errores repetitivos de escaneo fallido en frames individuales
-      }
-    );
-
-    // Observador para traducir elementos dinámicos en español cuando cambie el DOM
-    const observer = new MutationObserver(() => {
-      translateScanner();
+    const scanner = new Html5Qrcode(elementId, {
+      verbose: false,
+      formatsToSupport: FORMATS,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
     });
-    
-    const targetNode = document.getElementById('qr-reader-container');
-    if (targetNode) {
-      observer.observe(targetNode, { childList: true, subtree: true });
-    }
+    scannerRef.current = scanner;
+    let cancelled = false;
 
-    // Traducir inmediatamente la primera carga
-    translateScanner();
+    scanner.start(
+      { facingMode: 'environment' },
+      {
+        fps: 12,
+        // Recuadro ancho y bajo: sirve para QR y para códigos de barras 1D
+        qrbox: (w, h) => {
+          const width = Math.floor(Math.min(w * 0.85, 420));
+          return { width, height: Math.floor(Math.min(h * 0.6, width * 0.6)) };
+        },
+        videoConstraints: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      },
+      text => finish(text),
+      () => { /* frame sin código: normal */ },
+    ).then(() => {
+      if (cancelled) return;
+      setState('scanning');
+      try {
+        setTorchSupported(scanner.getRunningTrackCameraCapabilities().torchFeature().isSupported());
+      } catch { /* sin linterna */ }
+    }).catch((err: unknown) => {
+      if (cancelled) return;
+      const msg = String((err as any)?.name || err || '');
+      setState(/NotAllowed|Permission/i.test(msg) ? 'denied' : 'unavailable');
+    });
 
-    // Limpieza al desmontar el componente
     return () => {
-      observer.disconnect();
-      scanner.clear().catch(err => {
-        console.warn("Escáner ya cerrado o error al limpiar:", err);
-      });
+      cancelled = true;
+      if (scanner.isScanning) {
+        scanner.stop().then(() => scanner.clear()).catch(() => { /* ya detenido */ });
+      } else {
+        try { scanner.clear(); } catch { /* */ }
+      }
     };
-  }, [onScanSuccess, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elementId]);
 
-  return (
-    <div className="modal-backdrop animate-fade">
-      <div className="modal-content glass">
-        <div className="modal-header">
-          <h3>Escanear Código QR o Barras</h3>
-          <button onClick={onClose} className="btn-close-modal">
-            <X className="close-icon" />
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onCloseRef.current(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const toggleTorch = async () => {
+    try {
+      await scannerRef.current?.getRunningTrackCameraCapabilities().torchFeature().apply(!torchOn);
+      setTorchOn(v => !v);
+    } catch { setTorchSupported(false); }
+  };
+
+  // Alternativa sin cámara en vivo: leer el código desde una foto
+  const scanFromFile = async (file?: File) => {
+    if (!file || !scannerRef.current) return;
+    setFileError('');
+    try {
+      if (scannerRef.current.isScanning) await scannerRef.current.stop();
+      const text = await scannerRef.current.scanFile(file, false);
+      finish(text);
+    } catch {
+      setFileError('No se encontró ningún código en la foto. Intenta con más luz y más cerca.');
+    }
+  };
+
+  return createPortal(
+    <div className="scanner-backdrop" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="scanner-sheet">
+        <div className="scanner-header">
+          <h3 className="scanner-title">{title}</h3>
+          <button type="button" className="sheet-close" onClick={onClose} aria-label="Cerrar escáner">
+            <X size={20} />
           </button>
         </div>
-        <div className="modal-body">
-          <div id="qr-reader-container"></div>
-          <p className="scanner-instruction">
-            Apunta la cámara de tu dispositivo hacia el código QR o código de barras del producto.
-          </p>
+
+        <div className="scanner-viewport">
+          <div id={elementId} className="scanner-video" />
+          {state === 'starting' && <p className="scanner-status">Abriendo cámara…</p>}
+          {(state === 'denied' || state === 'unavailable') && (
+            <div className="scanner-status scanner-error">
+              <CameraOff size={32} />
+              <p>
+                {state === 'denied'
+                  ? 'Permite el acceso a la cámara en tu navegador para leer códigos.'
+                  : 'No se encontró una cámara disponible en este dispositivo.'}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <p className="scanner-hint">Apunta al código QR o de barras del producto; se lee solo.</p>
+        {fileError && <p className="scanner-file-error">{fileError}</p>}
+
+        <div className="scanner-actions">
+          {torchSupported && (
+            <button type="button" className="btn-secondary" onClick={toggleTorch}>
+              {torchOn ? <FlashlightOff size={18} /> : <Flashlight size={18} />}
+              {torchOn ? 'Apagar linterna' : 'Linterna'}
+            </button>
+          )}
+          <label className="btn-secondary scanner-file-btn">
+            <ImageUp size={18} /> Leer desde foto
+            <input type="file" accept="image/*" hidden onChange={e => scanFromFile(e.target.files?.[0])} />
+          </label>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

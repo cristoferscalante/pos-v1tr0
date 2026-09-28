@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Building2, History, Pencil, Plus, RefreshCw, RotateCcw, ShoppingBag, Trash2, Truck, Wallet } from 'lucide-react';
+import { Building2, History, Pencil, Plus, RefreshCw, RotateCcw, ScanBarcode, ShoppingBag, Trash2, Truck, Wallet } from 'lucide-react';
 
 import { productsApi, purchasesApi, suppliersApi } from '../api/client';
 import { useToast, useConfirm } from '../components/Toast';
+import { QrScannerModal } from '../components/QrScannerModal';
+import { findProductByCode } from '../utils/productLookup';
 import type { ApiProduct, InventoryMovement, Purchase, Supplier } from '../types';
 
 
@@ -40,6 +42,8 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [selectedProductId, setSelectedProductId] = useState('');
+  // Escáner con cámara: número de línea de compra a llenar, o 'movement' para movimientos/kardex
+  const [scanTarget, setScanTarget] = useState<number | 'movement' | null>(null);
   const [purchaseLines, setPurchaseLines] = useState<PurchaseLineForm[]>([{ ...EMPTY_LINE }]);
   const [purchaseTax, setPurchaseTax] = useState('0');
   const [purchasePaidAmount, setPurchasePaidAmount] = useState('0');
@@ -451,7 +455,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
                 {!editingPurchase && purchaseLines.map((line, index) => (
                   <div key={index} className="form-grid-2" style={{ alignItems: 'end' }}>
-                    <div className="form-group"><label className="form-label">Producto</label><select className="form-select" value={line.product_id} onChange={e => updatePurchaseLine(index, 'product_id', e.target.value)}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                    <div className="form-group"><label className="form-label">Producto</label><div className="input-with-action"><select className="form-select" value={line.product_id} onChange={e => updatePurchaseLine(index, 'product_id', e.target.value)}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="button" className="scan-btn" onClick={() => setScanTarget(index)} aria-label="Escanear producto de esta línea"><ScanBarcode size={18} /></button></div></div>
                     <div className="grid-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px' }}>
                       <div className="form-group"><label className="form-label">Cantidad</label><input type="number" className="form-input" value={line.quantity} onChange={e => updatePurchaseLine(index, 'quantity', e.target.value)} /></div>
                       <div className="form-group"><label className="form-label">Costo</label><input type="number" className="form-input" value={line.unit_cost} onChange={e => updatePurchaseLine(index, 'unit_cost', e.target.value)} /></div>
@@ -533,7 +537,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
             <div className="dashboard-panel glass">
               <div className="panel-header"><h3 className="panel-title">Movimientos Manuales y Devolución</h3></div>
               <div className="pos-form">
-                <div className="form-group"><label className="form-label">Producto</label><select className="form-select" value={selectedProductId} onChange={e => { setSelectedProductId(e.target.value); loadKardex(e.target.value); }}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+                <div className="form-group"><label className="form-label">Producto</label><div className="input-with-action"><select className="form-select" value={selectedProductId} onChange={e => { setSelectedProductId(e.target.value); loadKardex(e.target.value); }}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="button" className="scan-btn" onClick={() => setScanTarget('movement')} aria-label="Escanear producto"><ScanBarcode size={18} /></button></div></div>
                 <div className="form-grid-2">
                   <div className="form-group"><label className="form-label">Tipo</label><select className="form-select" value={manualMovementType} onChange={e => setManualMovementType(e.target.value)}><option value="adjustment_in">Ajuste entrada</option><option value="adjustment_out">Ajuste salida</option><option value="waste">Merma</option></select></div>
                   <div className="form-group"><label className="form-label">Cantidad</label><input type="number" className="form-input" value={manualQty} onChange={e => setManualQty(e.target.value)} /></div>
@@ -626,6 +630,23 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
             </div>
           )}
         </>
+      )}
+      {scanTarget !== null && (
+        <QrScannerModal
+          title="Escanear producto"
+          onScanSuccess={code => {
+            const match = findProductByCode(products, code);
+            if (!match) { warning(`No hay productos con el código "${code}"`); return; }
+            if (scanTarget === 'movement') {
+              setSelectedProductId(match.id);
+              loadKardex(match.id);
+            } else {
+              updatePurchaseLine(scanTarget, 'product_id', match.id);
+            }
+            success(`Producto: ${match.name}`);
+          }}
+          onClose={() => setScanTarget(null)}
+        />
       )}
     </div>
   );

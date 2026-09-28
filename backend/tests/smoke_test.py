@@ -258,6 +258,73 @@ r = client.post("/api/v1/purchases/", json={
 }, headers=admin_headers)
 check("compra con cantidad NEGATIVA -> rechazada (400)", r.status_code == 400, f"{r.status_code} {r.text[:300]}")
 
+# --- 13. Precio al por mayor: el servidor usa wholesale_price y congela el costo ---
+wholesale_product_id = str(uuid.uuid4())
+r = client.post("/api/v1/products/", json={
+    "id": wholesale_product_id,
+    "name": "Producto Mayorista",
+    "price": "5000.00",
+    "wholesale_price": "4000.00",
+    "cost": "3000.00",
+    "stock": 100,
+    "tax_rate": "0.00",
+}, headers=admin_headers)
+check("crear producto con precio por mayor", r.status_code == 201 and Decimal(str(r.json().get("wholesale_price"))) == Decimal("4000.00"), f"{r.status_code} {r.text[:200]}")
+
+def wholesale_sale(sale_id, mode, client_price):
+    return {"sales": [{
+        "id": sale_id, "sale_number": "LOCAL-W", "subtotal": "0", "tax": "0", "total": "0",
+        "payment_method": "cash", "created_at": datetime.now(timezone.utc).isoformat(), "meta_data": {},
+        "details": [{"product_id": wholesale_product_id, "quantity": 10, "price": client_price,
+                     "total": "0", "price_mode": mode}],
+    }]}
+
+w_sale_id = str(uuid.uuid4())
+client.post("/api/v1/sales/sync", json=wholesale_sale(w_sale_id, "wholesale", "4000.00"), headers=admin_headers)
+r = client.get(f"/api/v1/sales/{w_sale_id}", headers=admin_headers)
+w_sale = r.json() if r.status_code == 200 else {}
+w_detail = (w_sale.get("details") or [{}])[0]
+check("venta al por mayor usa wholesale_price (10 x 4000 = 40000)", Decimal(str(w_sale.get("total", 0))) == Decimal("40000.00"), str(w_sale.get("total")))
+check("detalle guarda price_mode=wholesale y unit_cost=3000", w_detail.get("price_mode") == "wholesale" and Decimal(str(w_detail.get("unit_cost") or 0)) == Decimal("3000.00"), str(w_detail))
+check("venta marcada meta_data.price_mode=wholesale", (w_sale.get("meta_data") or {}).get("price_mode") == "wholesale")
+
+# Un cliente que manda precio al por mayor pero dice 'retail' se corrige al detal
+t_sale_id = str(uuid.uuid4())
+client.post("/api/v1/sales/sync", json=wholesale_sale(t_sale_id, "retail", "4000.00"), headers=admin_headers)
+r = client.get(f"/api/v1/sales/{t_sale_id}", headers=admin_headers)
+t_sale = r.json() if r.status_code == 200 else {}
+check("precio de mayor reportado en venta al detal se corrige a 50000", Decimal(str(t_sale.get("total", 0))) == Decimal("50000.00"), str(t_sale.get("total")))
+check("...y queda marcada pricing_adjusted", (t_sale.get("meta_data") or {}).get("pricing_adjusted") is True)
+
+r = client.get("/api/v1/dashboard/summary", headers=admin_headers)
+by_mode = (r.json().get("by_price_mode") or {}).get("today", {}) if r.status_code == 200 else {}
+check(
+    "dashboard separa ganancia por mayor (40000 - 30000 = 10000)",
+    abs(by_mode.get("wholesale", {}).get("profit", 0) - 10000) < 0.01,
+    str(by_mode),
+)
+
+# --- 14. Subida de fotos de producto ---
+webp_bytes = b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 32
+r = client.post("/api/v1/media/products", files={"file": ("foto.webp", webp_bytes, "image/webp")}, headers=admin_headers)
+check("subir foto WebP -> 201", r.status_code == 201, f"{r.status_code} {r.text[:200]}")
+media_path = r.json().get("path") if r.status_code == 201 else None
+if media_path:
+    r = client.get(media_path)
+    check("la foto subida se sirve con cache inmutable", r.status_code == 200 and "immutable" in r.headers.get("cache-control", ""), str(r.headers.get("cache-control")))
+    stored = os.path.join(BACKEND_DIR, "media", *media_path.split("/")[2:])
+    if os.path.exists(stored):
+        os.remove(stored)
+
+r = client.post("/api/v1/media/products", files={"file": ("x.webp", b"<svg>no soy imagen</svg>", "image/webp")}, headers=admin_headers)
+check("subir archivo que no es imagen -> 415", r.status_code == 415, f"{r.status_code}")
+
+r = client.post("/api/v1/media/products", files={"file": ("big.jpg", b"\xff\xd8\xff" + b"\x00" * 1_600_000, "image/jpeg")}, headers=admin_headers)
+check("subir foto demasiado grande -> 413", r.status_code == 413, f"{r.status_code}")
+
+r = client.post("/api/v1/media/products", files={"file": ("foto.webp", webp_bytes, "image/webp")}, headers=cashier_headers)
+check("cajero no puede subir fotos -> 403", r.status_code == 403, f"{r.status_code}")
+
 # --- 12. HALLAZGO 5.10: guard-rail de JWT_SECRET inseguro en produccion ---
 import subprocess
 guard_db_path = os.path.join(BACKEND_DIR, "tests", "_smoke_test_guard.db")

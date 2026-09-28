@@ -2934,9 +2934,20 @@ body {
 
 .product-card-price-row {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 4px 10px;
   width: 100%;
+}
+
+.product-card-wholesale {
+  font-size: 13px;
+  font-weight: 700;
+  color: #b45309;
+  background: rgba(251,191,36,0.14);
+  padding: 2px 8px;
+  border-radius: 999px;
 }
 
 .product-card-price {
@@ -3426,6 +3437,172 @@ body {
 }
 .more-sheet-label { flex: 1; }
 
+/* Escáner QR / código de barras (QrScannerModal) */
+.scanner-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: var(--surface-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.scanner-sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.scanner-header { display: flex; align-items: center; gap: 10px; }
+.scanner-title { flex: 1; font-size: 17px; font-weight: 700; margin: 0; }
+.scanner-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: #000;
+}
+.scanner-video, .scanner-video video { width: 100% !important; height: 100% !important; object-fit: cover; }
+.scanner-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: #e2e8f0;
+  font-size: 14px;
+}
+.scanner-error { background: rgba(0,0,0,0.85); }
+.scanner-hint { font-size: 13px; color: var(--text-secondary); text-align: center; }
+.scanner-file-error { font-size: 13px; color: var(--warning); text-align: center; }
+.scanner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.scanner-actions > * { flex: 1 1 140px; justify-content: center; min-height: 48px; }
+.scanner-file-btn { cursor: pointer; }
+
+/* Botón de escanear pegado a un campo (código de barras, buscadores) */
+.input-with-action { display: flex; gap: 8px; align-items: stretch; }
+.input-with-action > :first-child { flex: 1; min-width: 0; }
+.scan-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-active);
+  background: var(--primary-dim);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.scan-btn:hover { background: var(--primary); color: #fff; }
+
+/* Campos de dinero, ganancia por modalidad y fotos (alta de producto) */
+.money-input {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface-input);
+}
+.money-input > span {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  border-right: 1px solid var(--border);
+}
+.money-input .form-input { border: none; border-radius: 0; background: transparent; font-size: 16px; font-weight: 700; }
+.profit-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.profit-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid;
+}
+.profit-card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-secondary); }
+.profit-card strong { font-size: 15px; }
+.profit-card-sub { font-size: 12px; color: var(--text-muted); }
+.photo-actions { display: flex; gap: 8px; margin-top: 8px; }
+.photo-actions .photo-btn { flex: 1; justify-content: center; min-height: 44px; cursor: pointer; }
+.product-price-wrap { display: flex; flex-direction: column; gap: 1px; }
+
+/* Panel: resumen por tipo de precio */
+.price-mode-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.price-mode-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  min-width: 0;
+}
+.price-mode-summary-card.wholesale { border-color: rgba(251,191,36,0.35); }
+.price-mode-summary-title { font-size: 13px; font-weight: 800; }
+.price-mode-summary-card.wholesale .price-mode-summary-title { color: #fbbf24; }
+.price-mode-summary-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.price-mode-summary-row strong { color: var(--text-primary); text-align: right; overflow-wrap: anywhere; }
+.price-mode-summary-row strong.profit { color: var(--success); }
+.price-mode-summary-row.muted { font-size: 12px; color: var(--text-muted); }
+.payment-pill.wholesale { border-color: rgba(251,191,36,0.35); color: #fbbf24; background: rgba(251,191,36,0.1); }
+
+/* Selector Detal / Por mayor */
+.price-mode-toggle {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--r-md);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+.price-mode-toggle button {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.price-mode-toggle button.active { background: var(--primary); color: #fff; }
+.price-mode-toggle button.active.wholesale { background: #b45309; }
+.price-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fbbf24;
+}
+.product-price-mode { font-size: 10px; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.4px; }
+
 /* ---------- Tablet / móvil (≤768px) ---------- */
 @media (max-width: 768px) {
   /* Barra inferior */
@@ -3676,6 +3853,16 @@ body {
   div:has(> .sa-modal) { align-items: flex-end !important; padding: 0 !important; }
 
   .confirm-actions > button { flex: 1; min-height: 48px; }
+
+  .scanner-backdrop { padding: 0; align-items: stretch; }
+  .scanner-sheet {
+    max-width: none;
+    border-radius: 0;
+    border: none;
+    padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(16px + var(--safe-bottom));
+  }
+  .scanner-viewport { flex: 1; aspect-ratio: auto; min-height: 50dvh; }
+  .price-mode-toggle button { min-height: 40px; font-size: 14px; }
 
   /* ---------- Tablas → tarjetas ---------- */
   .data-table.cards-mobile thead { display: none; }

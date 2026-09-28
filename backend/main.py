@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from app.api.endpoints.media import media_root
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.db import init_db
@@ -41,6 +43,20 @@ app.add_middleware(
 
 # Enrutadores de la API
 app.include_router(api_router, prefix="/api/v1")
+
+
+class ImmutableStaticFiles(StaticFiles):
+    """Fotos de productos: nombres aleatorios que nunca se reescriben, así que
+    el navegador (y la PWA offline) puede cachearlas para siempre."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
+app.mount("/media", ImmutableStaticFiles(directory=str(media_root())), name="media")
 
 @app.get("/")
 def read_root():

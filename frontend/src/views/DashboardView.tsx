@@ -239,6 +239,31 @@ export function DashboardView({ token, isOnline }: DashboardViewProps) {
             </div>
           </div>
 
+          {/* Cuentas separadas por tipo de precio */}
+          {summary.by_price_mode && (
+            <div className="dashboard-panel glass">
+              <div className="panel-header">
+                <h3 className="panel-title">Detal vs Por mayor</h3>
+              </div>
+              <div className="price-mode-summary">
+                {(['retail', 'wholesale'] as const).map(mode => {
+                  const today = summary.by_price_mode!.today[mode];
+                  const month = summary.by_price_mode!.month[mode];
+                  return (
+                    <div key={mode} className={`price-mode-summary-card ${mode}`}>
+                      <p className="price-mode-summary-title">{mode === 'retail' ? 'Al detal' : 'Al por mayor'}</p>
+                      <div className="price-mode-summary-row"><span>Ventas hoy</span><strong>{today.count}</strong></div>
+                      <div className="price-mode-summary-row"><span>Ingresos hoy</span><strong>${today.revenue.toLocaleString('es-CO')}</strong></div>
+                      <div className="price-mode-summary-row"><span>Ganancia hoy</span><strong className="profit">${today.profit.toLocaleString('es-CO')}</strong></div>
+                      <div className="price-mode-summary-row muted"><span>Ingresos del mes</span><strong>${month.revenue.toLocaleString('es-CO')}</strong></div>
+                      <div className="price-mode-summary-row muted"><span>Ganancia del mes</span><strong>${month.profit.toLocaleString('es-CO')}</strong></div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Chart + Top Products */}
           <div className="dashboard-grid">
             <div className="dashboard-panel glass">

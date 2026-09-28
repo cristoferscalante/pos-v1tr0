@@ -49,6 +49,10 @@ services:
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
       - DAILY_SUMMARY_HOUR_UTC=${DAILY_SUMMARY_HOUR_UTC:-23}
       - RUN_MIGRATIONS_ON_STARTUP=${RUN_MIGRATIONS_ON_STARTUP:-false}
+      - MEDIA_DIR=/app/media
+    volumes:
+      # Fotos de productos subidas desde la app (persisten entre rebuilds)
+      - pos_media_prod:/app/media
     depends_on:
       pos_db:
         condition: service_healthy
@@ -68,3 +72,4 @@ services:
 
 volumes:
   pos_pgdata_prod:
+  pos_media_prod:

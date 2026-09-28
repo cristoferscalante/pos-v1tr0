@@ -2,14 +2,17 @@ import { useState, useEffect } from 'react';
 import {
   Package, Plus, Pencil, Trash2, Search, X, Save,
   TrendingUp, AlertTriangle, ChevronUp, ChevronDown, Barcode,
-  ArrowLeft, ArrowRight, Check, Minus
+  ArrowLeft, ArrowRight, Check, Minus, Camera, Images, ScanBarcode
 } from 'lucide-react';
 import { db } from '../db/pos-db';
-import { authApi, productsApi } from '../api/client';
+import { authApi, productsApi, mediaApi, resolveMediaSrc } from '../api/client';
+import { QrScannerModal } from '../components/QrScannerModal';
+import { wholesalePrice, marginPct as calcMarginPct, normalizeProduct } from '../utils/pricing';
+import { findProductByCode } from '../utils/productLookup';
 import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon } from '../components/BusinessTypeSelect';
 import { CategoryPicker } from '../components/CategoryPicker';
-import { fileToDataUrl } from '../utils/imageUpload';
+import { compressImage, blobToDataUrl, dataUrlToBlob } from '../utils/imageUpload';
 import type { LocalProduct, AuthUser } from '../types';
 import { buildCategoryOptions, getProductCategory, getTenantProductCategories, normalizeCategoryName } from '../utils/productCategories';
 
@@ -26,7 +29,7 @@ type SortKey = 'name' | 'price' | 'cost' | 'stock';
 type SortDir = 'asc' | 'desc';
 
 const EMPTY_FORM: Partial<LocalProduct> = {
-  name: '', sku: '', barcode: '', price: 0, cost: 0, stock: 0, category: '', tax_rate: 19, meta_data: {}
+  name: '', sku: '', barcode: '', price: 0, wholesale_price: 0, cost: 0, stock: 0, category: '', tax_rate: 19, meta_data: {}
 };
 
 const TAX_RATE_OPTIONS: { value: number; label: string }[] = [
@@ -35,7 +38,7 @@ const TAX_RATE_OPTIONS: { value: number; label: string }[] = [
   { value: 0,  label: '0% Exento' }
 ];
 
-const STEP_TITLES = ['Lo esencial', 'Precio y ganancia', 'Stock y categoría', 'Últimos detalles'];
+const STEP_TITLES = ['Lo esencial', 'Costo y precios', 'Stock y categoría', 'Últimos detalles'];
 
 // Borrador del alta de producto: si el modal se cierra sin guardar (cierre
 // accidental, sesión expirada, se recarga la pestaña...) los campos NO se
@@ -106,6 +109,11 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const [draftRestored, setDraftRestored] = useState(false);
 
   const [archivedSuggestion, setArchivedSuggestion] = useState<LocalProduct | null>(null);
+  // Foto: se comprime en el navegador (WebP) antes de mostrarla y de subirla
+  const [optimizingImage, setOptimizingImage] = useState(false);
+  const [imageSizeKb, setImageSizeKb] = useState<number | null>(null);
+  // Escáner con cámara: para el campo código de barras o para buscar en el inventario
+  const [scannerTarget, setScannerTarget] = useState<'barcode' | 'search' | null>(null);
 
   // Guarda el borrador del alta mientras se está creando un producto (no al editar).
   useEffect(() => {
@@ -272,6 +280,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     setForm({ ...EMPTY_FORM, category: tenantCategories[0] || '' });
     setMetaExtra('');
     setProductImage('');
+    setImageSizeKb(null);
     setStep(1);
     setVisitedMax(1);
     setDraftRestored(false);
@@ -302,8 +311,9 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
   const openEdit = (p: LocalProduct) => {
     setEditingProduct(p);
-    setForm({ ...p, category: getProductCategory(p) });
+    setForm({ ...p, wholesale_price: wholesalePrice(p), category: getProductCategory(p) });
     setProductImage(p.image || '');
+    setImageSizeKb(null);
     setMetaExtra(p.meta_data?.detalle_especifico || '');
     // Al editar, los 4 pasos ya están disponibles: los datos vienen precargados.
     setStep(1);
@@ -315,7 +325,13 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
   const goNext = () => {
     if (step === 1) {
       if (!form.name?.trim()) { warning('Escribe el nombre del producto'); return; }
-      if (!form.price || Number(form.price) <= 0) { warning('El precio de venta debe ser mayor a 0'); return; }
+      if (!form.price || Number(form.price) <= 0) { warning('El precio al detal debe ser mayor a 0'); return; }
+      // Al pasar al paso 2, el precio por mayor arranca igual al detal para solo ajustarlo
+      if (!Number(form.wholesale_price)) setForm(f => ({ ...f, wholesale_price: Number(f.price) }));
+    }
+    if (step === 2) {
+      if (!Number(form.cost) || Number(form.cost) <= 0) { warning('Escribe cuánto te cuesta el producto'); return; }
+      if (!Number(form.wholesale_price) || Number(form.wholesale_price) <= 0) { warning('Escribe el precio al por mayor'); return; }
     }
     if (step === 3 && !normalizeCategoryName(String(form.category || ''))) {
       warning('Elige una categoría para el producto');
@@ -330,9 +346,11 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
   // Ganancia y margen en vivo (paso 2 y tarjeta de resumen)
   const priceNum = Number(form.price) || 0;
+  const wholesaleNum = Number(form.wholesale_price) || 0;
   const costNum = Number(form.cost) || 0;
-  const unitProfit = priceNum - costNum;
-  const marginPct = priceNum > 0 ? (unitProfit / priceNum) * 100 : 0;
+  const marginPct = calcMarginPct(priceNum, costNum);
+  const tierColor = (pct: number) => pct >= 30 ? 'var(--success)' : pct >= 10 ? 'var(--warning)' : 'var(--danger)';
+  const tierBg = (pct: number) => pct >= 30 ? 'var(--success-bg)' : pct >= 10 ? 'var(--warning-bg)' : 'var(--danger-bg)';
   const marginTier: 'good' | 'ok' | 'low' = marginPct >= 30 ? 'good' : marginPct >= 10 ? 'ok' : 'low';
   const marginColor = marginTier === 'good' ? 'var(--success)' : marginTier === 'ok' ? 'var(--warning)' : 'var(--danger)';
 
@@ -485,9 +503,24 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     }
   };
 
+  const handlePhotoSelected = async (file?: File) => {
+    if (!file) return;
+    setOptimizingImage(true);
+    try {
+      const optimized = await compressImage(file);
+      setProductImage(await blobToDataUrl(optimized));
+      setImageSizeKb(Math.max(1, Math.round(optimized.size / 1024)));
+    } catch (err) {
+      error(err instanceof Error ? err.message : 'No se pudo procesar la foto');
+    } finally {
+      setOptimizingImage(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!form.name) { warning('El nombre del producto es obligatorio'); return; }
-    if (!form.price || form.price <= 0) { warning('El precio debe ser mayor a 0'); return; }
+    if (!form.price || form.price <= 0) { warning('El precio al detal debe ser mayor a 0'); return; }
+    if (!Number(form.cost) || Number(form.cost) <= 0) { warning('Escribe cuánto te cuesta el producto'); setStep(2); return; }
     const selectedCategory = normalizeCategoryName(String(form.category || ''));
     if (!selectedCategory) { warning('Selecciona una categoría'); return; }
     setIsSaving(true);
@@ -498,6 +531,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         sku: form.sku || undefined,
         barcode: form.barcode || undefined,
         price: Number(form.price),
+        wholesale_price: Number(form.wholesale_price) || Number(form.price),
         cost: Number(form.cost) || 0,
         // Al editar un producto existente, el stock NO se toma del formulario:
         // el backend ya ignora el campo "stock" en PUT /products/{id} (para no
@@ -522,6 +556,17 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         persistUserCategories(syncedCategories);
       }
 
+      // Foto nueva (data URL ya comprimido): con conexión se sube como archivo y
+      // se guarda solo su ruta; sin conexión queda como data URL y
+      // App.syncProducts la sube al reconectar.
+      if (productData.image?.startsWith('data:') && isOnline && token) {
+        try {
+          productData.image = await mediaApi.uploadProductImage(token, await dataUrlToBlob(productData.image));
+        } catch {
+          warning('No se pudo subir la foto; queda guardada en este dispositivo.');
+        }
+      }
+
       // Save/update in IndexedDB
       await db.products.put(productData);
 
@@ -530,10 +575,10 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         try {
           if (editingProduct) {
             const updated = await productsApi.update(token, productData.id, productData);
-            await db.products.put({ ...(updated as LocalProduct), sync_status: 'synced', sync_error: undefined });
+            await db.products.put({ ...normalizeProduct(updated as LocalProduct), sync_status: 'synced', sync_error: undefined });
           } else {
             const created = await productsApi.create(token, productData as any);
-            await db.products.put({ ...(created as LocalProduct), sync_status: 'synced', sync_error: undefined });
+            await db.products.put({ ...normalizeProduct(created as LocalProduct), sync_status: 'synced', sync_error: undefined });
           }
         } catch (e) {
           productData.sync_status = 'pending';
@@ -639,15 +684,20 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
       </div>
 
       {/* Search */}
-      <div className="search-box" style={{ width: '100%', maxWidth: 380 }}>
-        <Search className="search-icon" />
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por nombre, SKU o código..."
-          className="search-input"
-        />
+      <div className="input-with-action" style={{ width: '100%', maxWidth: 460 }}>
+        <div className="search-box">
+          <Search className="search-icon" />
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, SKU o código..."
+            className="search-input"
+          />
+        </div>
+        <button type="button" className="scan-btn" onClick={() => setScannerTarget('search')} aria-label="Buscar producto escaneando su código">
+          <ScanBarcode size={18} /> Escanear
+        </button>
       </div>
 
       {/* Table */}
@@ -663,9 +713,10 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
               <th>SKU</th>
               <th onClick={() => handleSort('price')} className="sortable">
                 <span className="sortable-wrapper">
-                  Precio <SortIcon col="price" />
+                  Detal <SortIcon col="price" />
                 </span>
               </th>
+              <th>Mayor</th>
               <th onClick={() => handleSort('cost')} className="sortable">
                 <span className="sortable-wrapper">
                   Costo <SortIcon col="cost" />
@@ -711,7 +762,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                               {product.image === 'preset-package' && '📦'}
                             </div>
                           ) : (
-                            <img src={product.image} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={resolveMediaSrc(product.image)} alt={product.name} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           )
                         ) : (
                           <span style={{ fontSize: '14px' }}>📦</span>
@@ -726,12 +777,13 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                     </div>
                   </td>
                   <td data-label="SKU"><span className="sku-pill">{product.sku || '—'}</span></td>
-                  <td className="td-money" data-label="Precio">
+                  <td className="td-money" data-label="Detal">
                     <div>${product.price.toLocaleString('es-CO')}</div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
                       IVA: {product.tax_rate !== undefined ? product.tax_rate : 19}%
                     </div>
                   </td>
+                  <td className="td-money" data-label="Mayor">${wholesalePrice(product).toLocaleString('es-CO')}</td>
                   <td className="td-money" data-label="Costo">${product.cost.toLocaleString('es-CO')}</td>
                   <td data-label="Margen">
                     <span className={`margin-badge ${margin >= 30 ? 'good' : margin >= 10 ? 'ok' : 'low'}`}>
@@ -866,7 +918,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Precio de venta ($ COP) *</label>
+                  <label className="form-label">Precio al detal ($ COP) *</label>
                   <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
                     <span style={{ display: 'flex', alignItems: 'center', padding: '0 14px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '13px', fontWeight: 600, borderRight: '1px solid var(--border)' }}>$</span>
                     <input
@@ -893,28 +945,36 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                             {productImage === 'preset-package' && '📦'}
                           </div>
                         ) : (
-                          <img src={productImage} alt="Vista previa" className="image-preview" />
+                          <img src={resolveMediaSrc(productImage)} alt="Vista previa" className="image-preview" />
                         )}
-                        <button type="button" onClick={() => setProductImage('')} className="btn-remove-image">
+                        <button type="button" onClick={() => { setProductImage(''); setImageSizeKb(null); }} className="btn-remove-image" aria-label="Quitar foto">
                           <X size={12} />
                         </button>
                       </div>
+                    ) : optimizingImage ? (
+                      <span className="image-upload-trigger">Optimizando foto…</span>
                     ) : (
-                      <label className="image-upload-trigger">
-                        <Plus size={16} />
-                        <span>Subir archivo o elegir un ícono</span>
-                        <input type="file" accept="image/*" onChange={async e => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-                          try {
-                            setProductImage(await fileToDataUrl(file));
-                          } catch (err) {
-                            error(err instanceof Error ? err.message : 'No se pudo cargar la imagen');
-                          }
-                        }} style={{ display: 'none' }} />
-                      </label>
+                      <span className="image-upload-trigger">
+                        <Camera size={16} />
+                        <span>Toma una foto o elige un ícono</span>
+                      </span>
                     )}
                   </div>
+                  <div className="photo-actions">
+                    <label className="btn-primary photo-btn">
+                      <Camera size={18} /> Tomar foto
+                      <input type="file" accept="image/*" capture="environment" hidden onChange={e => { handlePhotoSelected(e.target.files?.[0]); e.target.value = ''; }} />
+                    </label>
+                    <label className="btn-secondary photo-btn">
+                      <Images size={18} /> Galería
+                      <input type="file" accept="image/*" hidden onChange={e => { handlePhotoSelected(e.target.files?.[0]); e.target.value = ''; }} />
+                    </label>
+                  </div>
+                  {imageSizeKb !== null && (
+                    <p className="form-hint" style={{ fontSize: '12px', color: 'var(--success)', marginTop: '6px' }}>
+                      Foto optimizada · {imageSizeKb} KB
+                    </p>
+                  )}
                   <div className="preset-options">
                     <button type="button" onClick={() => setProductImage('preset-package')} className={`preset-btn ${productImage === 'preset-package' ? 'active' : ''}`}>📦 Caja</button>
                     <button type="button" onClick={() => setProductImage('preset-food')} className={`preset-btn ${productImage === 'preset-food' ? 'active' : ''}`}>🥩 Comida</button>
@@ -929,52 +989,67 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
             {step === 2 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <h3 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px' }}>¿Cuánto te cuesta y cuánto ganas?</h3>
+                  <h3 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.2px' }}>¿Cuánto te cuesta y a cuánto lo vendes?</h3>
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
-                    Con el costo calculamos tu ganancia al instante. Si no lo sabes aún, déjalo en cero y ajústalo luego.
+                    Con el costo calculamos tu ganancia al detal y al por mayor por separado.
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
-                    <label className="form-label">Precio de venta ($ COP) *</label>
-                    <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600, borderRight: '1px solid var(--border)' }}>$</span>
-                      <input type="number" className="form-input" style={{ border: 'none', borderRadius: 0, background: 'transparent', fontSize: '15px', fontWeight: 700 }} value={form.price || ''} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} placeholder="0" />
+                <div className="form-group">
+                  <label className="form-label">¿Cuánto te cuesta el producto? ($ COP) *</label>
+                  <div className="money-input">
+                    <span>$</span>
+                    <input type="number" inputMode="numeric" className="form-input" value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" autoFocus />
+                  </div>
+                </div>
+
+                <div className="form-grid-2">
+                  <div className="form-group">
+                    <label className="form-label">Precio al detal *</label>
+                    <div className="money-input">
+                      <span>$</span>
+                      <input type="number" inputMode="numeric" className="form-input" value={form.price || ''} onChange={e => setForm(f => ({ ...f, price: Number(e.target.value) }))} placeholder="0" />
                     </div>
                   </div>
-                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
-                    <label className="form-label">Costo de compra ($ COP)</label>
-                    <div style={{ display: 'flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', padding: '0 12px', background: 'rgba(255,255,255,0.04)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600, borderRight: '1px solid var(--border)' }}>$</span>
-                      <input type="number" className="form-input" style={{ border: 'none', borderRadius: 0, background: 'transparent', fontSize: '15px', fontWeight: 700 }} value={form.cost || ''} onChange={e => setForm(f => ({ ...f, cost: Number(e.target.value) }))} placeholder="0" />
+                  <div className="form-group">
+                    <label className="form-label">Precio al por mayor *</label>
+                    <div className="money-input">
+                      <span>$</span>
+                      <input type="number" inputMode="numeric" className="form-input" value={form.wholesale_price || ''} onChange={e => setForm(f => ({ ...f, wholesale_price: Number(e.target.value) }))} placeholder="0" />
                     </div>
                   </div>
                 </div>
 
-                {priceNum > 0 && costNum > 0 ? (
-                  <div style={{ padding: '16px 17px', borderRadius: 'var(--r-lg)', background: marginTier === 'good' ? 'var(--success-bg)' : marginTier === 'ok' ? 'var(--warning-bg)' : 'var(--danger-bg)', border: `1px solid ${marginColor}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: marginColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <TrendingUp size={18} />
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '14.5px', fontWeight: 700, color: marginColor }}>
-                          {unitProfit >= 0 ? 'Ganas' : 'Pierdes'} ${Math.abs(unitProfit).toLocaleString('es-CO')} por unidad
+                {costNum > 0 ? (
+                  <div className="profit-cards">
+                    {([['Al detal', priceNum], ['Al por mayor', wholesaleNum]] as const).map(([label, price]) => {
+                      const profit = price - costNum;
+                      const pct = calcMarginPct(price, costNum);
+                      return (
+                        <div key={label} className="profit-card" style={{ background: tierBg(pct), borderColor: tierColor(pct) }}>
+                          <span className="profit-card-label">{label}</span>
+                          <strong style={{ color: tierColor(pct) }}>
+                            {profit >= 0 ? 'Ganas' : 'Pierdes'} ${Math.abs(profit).toLocaleString('es-CO')}
+                          </strong>
+                          <span className="profit-card-sub">por unidad · margen {pct.toFixed(1)}%</span>
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                          Margen del {marginPct.toFixed(1)}% sobre el precio de venta
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ marginTop: '12px', height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.max(0, Math.min(100, marginPct))}%`, height: '100%', background: marginColor }} />
-                    </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div style={{ padding: '14px 16px', borderRadius: 'var(--r-lg)', background: 'var(--bg-elevated)', border: '1px solid var(--border)', fontSize: '12.5px', color: 'var(--text-muted)' }}>
-                    Agrega el costo de compra para ver tu ganancia y margen al instante.
+                    Escribe cuánto te cuesta para ver la ganancia de cada precio.
                   </div>
+                )}
+                {wholesaleNum > priceNum && priceNum > 0 && (
+                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--warning)' }}>
+                    El precio al por mayor es más alto que el precio al detal. Revisa si es correcto.
+                  </p>
+                )}
+                {costNum > 0 && wholesaleNum > 0 && wholesaleNum < costNum && (
+                  <p className="form-hint" style={{ fontSize: '12px', color: 'var(--danger)' }}>
+                    Al por mayor estarías vendiendo por debajo del costo.
+                  </p>
                 )}
 
                 <div className="form-group">
@@ -1076,7 +1151,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                     {productImage
                       ? (productImage.startsWith('preset-')
                           ? (productImage === 'preset-food' ? '🥩' : productImage === 'preset-med' ? '💊' : productImage === 'preset-service' ? '🩺' : '📦')
-                          : <img src={productImage} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />)
+                          : <img src={resolveMediaSrc(productImage)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />)
                       : '📦'}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1084,7 +1159,9 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                       {form.name || 'Producto sin nombre'}
                     </div>
                     <div style={{ display: 'flex', gap: '8px', marginTop: '3px', flexWrap: 'wrap', alignItems: 'center', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>${priceNum.toLocaleString('es-CO')}</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Detal ${priceNum.toLocaleString('es-CO')}</span>
+                      <span>·</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Mayor ${wholesaleNum.toLocaleString('es-CO')}</span>
                       <span>·</span>
                       <span>{editingProduct ? `${form.stock ?? 0} en stock` : `${Number(form.stock) || 0} en stock`}</span>
                       <span>·</span>
@@ -1114,17 +1191,22 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                         Pistola lista
                       </span>
                     </div>
-                    <div style={{ position: 'relative' }}>
-                      <input
-                        className="form-input"
-                        value={form.barcode || ''}
-                        onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                        placeholder="Escanear o escribir"
-                        style={{ paddingRight: '36px' }}
-                      />
-                      <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#10b881', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
-                        <Barcode size={16} />
+                    <div className="input-with-action">
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          className="form-input"
+                          value={form.barcode || ''}
+                          onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                          placeholder="Escanear o escribir"
+                          style={{ paddingRight: '36px' }}
+                        />
+                        <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#10b881', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                          <Barcode size={16} />
+                        </div>
                       </div>
+                      <button type="button" className="scan-btn" onClick={() => setScannerTarget('barcode')} aria-label="Escanear código de barras con la cámara">
+                        <ScanBarcode size={18} /> Escanear
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1142,6 +1224,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                           name: archivedSuggestion.name,
                           sku: archivedSuggestion.sku || '',
                           price: archivedSuggestion.price,
+                          wholesale_price: wholesalePrice(archivedSuggestion),
                           cost: archivedSuggestion.cost,
                           category: archivedSuggestion.category || '',
                           tax_rate: archivedSuggestion.tax_rate || 19,
@@ -1201,6 +1284,26 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
           </div>
         </div>
+      )}
+      {scannerTarget && (
+        <QrScannerModal
+          title={scannerTarget === 'barcode' ? 'Escanear código del producto' : 'Buscar producto por código'}
+          onScanSuccess={code => {
+            if (scannerTarget === 'barcode') {
+              setForm(f => ({ ...f, barcode: code }));
+              success(`Código leído: ${code}`);
+              return;
+            }
+            const match = findProductByCode(products, code);
+            if (match) {
+              openEdit(match);
+            } else {
+              setSearch(code);
+              warning(`No hay productos con el código "${code}"`);
+            }
+          }}
+          onClose={() => setScannerTarget(null)}
+        />
       )}
     </div>
   );

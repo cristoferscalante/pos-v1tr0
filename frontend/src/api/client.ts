@@ -163,6 +163,37 @@ export const productsApi = {
     request(`/api/v1/products/${id}`, { method: 'DELETE' }, token),
 };
 
+// --- Fotos de productos ---
+export const mediaApi = {
+  // Sube una foto ya comprimida (WebP/JPEG) y devuelve la ruta relativa al API
+  // ("/media/<tenant>/<archivo>"), que es lo que se guarda en product.image.
+  uploadProductImage: async (token: string, image: Blob): Promise<string> => {
+    const form = new FormData();
+    const ext = image.type === 'image/webp' ? 'webp' : 'jpg';
+    form.append('file', image, `producto.${ext}`);
+    const res = await fetch(`${API_URL}/api/v1/media/products`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (res.status === 401 && onUnauthorized) onUnauthorized();
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { detail = (await res.json()).detail || detail; } catch { /* */ }
+      throw new ApiError(res.status, detail);
+    }
+    const data = await res.json();
+    return data.path as string;
+  },
+};
+
+/** Convierte product.image (preset, data URL, URL absoluta o ruta del API) en un src usable. */
+export function resolveMediaSrc(src?: string | null): string {
+  if (!src) return '';
+  if (src.startsWith('http') || src.startsWith('data:') || src.startsWith('blob:')) return src;
+  return src.startsWith('/media/') ? `${API_URL}${src}` : src;
+}
+
 // --- Sales ---
 export const salesApi = {
   list: (token: string): Promise<ApiSale[]> =>

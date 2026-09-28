@@ -198,6 +198,7 @@ def get_public_catalog(
                 "sku": product.sku,
                 "barcode": product.barcode,
                 "price": product.price,
+                "wholesale_price": product.wholesale_price,
                 "image": product.image,
                 "meta_data": product.meta_data,
                 # Deliberadamente NO se incluye "cost" (costo de compra, dato

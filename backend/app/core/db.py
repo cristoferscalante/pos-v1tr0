@@ -46,6 +46,10 @@ def init_db():
                 # recomendada en producción (DEPLOYMENT.md), así que este es el camino
                 # que realmente corre en cada arranque salvo que se ejecute Alembic a mano.
                 session.execute(text("ALTER TABLE tenant ADD COLUMN IF NOT EXISTS last_sale_seq INTEGER NOT NULL DEFAULT 0;"))
+                # Precio al por mayor y modalidad/costo por línea (migración 0008_price_modes)
+                session.execute(text("ALTER TABLE product ADD COLUMN IF NOT EXISTS wholesale_price NUMERIC(12,2);"))
+                session.execute(text("ALTER TABLE saledetail ADD COLUMN IF NOT EXISTS price_mode VARCHAR NOT NULL DEFAULT 'retail';"))
+                session.execute(text("ALTER TABLE saledetail ADD COLUMN IF NOT EXISTS unit_cost NUMERIC(12,2);"))
                 session.execute(text(
                     "UPDATE tenant SET last_sale_seq = COALESCE((SELECT COUNT(*) FROM sale WHERE sale.tenant_id = tenant.id), 0) "
                     "WHERE last_sale_seq = 0;"
@@ -73,6 +77,16 @@ def init_db():
             except Exception as e:
                 print(f"Intento de agregar columna is_archived en SQLite: {e}")
                 session.rollback()
+            for ddl in (
+                "ALTER TABLE product ADD COLUMN wholesale_price NUMERIC(12,2);",
+                "ALTER TABLE saledetail ADD COLUMN price_mode VARCHAR NOT NULL DEFAULT 'retail';",
+                "ALTER TABLE saledetail ADD COLUMN unit_cost NUMERIC(12,2);",
+            ):
+                try:
+                    session.execute(text(ddl))
+                    session.commit()
+                except Exception:
+                    session.rollback()  # la columna ya existe
 
         # Rellenar slugs vacíos para inquilinos existentes
         from app.models.tenant import Tenant
