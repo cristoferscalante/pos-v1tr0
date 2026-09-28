@@ -35,6 +35,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [isScanning, setIsScanning] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  // Móvil: el carrito es una hoja inferior que se abre desde la barra de cobro
+  const [cartOpen, setCartOpen] = useState(false);
   const [printMode, setPrintMode] = useState<'receipt' | 'invoice'>('receipt');
   const [customerDocumentCode, setCustomerDocumentCode] = useState('13');
   const [customerIdentification, setCustomerIdentification] = useState('');
@@ -278,10 +280,11 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     setCart(prev => prev.filter(i => i.product.id !== productId));
   };
 
-  const clearCart = () => setCart([]);
+  const clearCart = () => { setCart([]); setCartOpen(false); };
 
   // Totals
   const total = cart.reduce((s, i) => s + i.product.price * i.quantity, 0);
+  const itemCount = cart.reduce((s, i) => s + i.quantity, 0);
   const tax = requiresElectronicInvoice && isElectronicInvoicingAvailable
     ? Math.round(cart.reduce((s, i) => {
         const rate = i.product.tax_rate !== undefined ? i.product.tax_rate : 19;
@@ -468,7 +471,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   };
 
   return (
-    <div className="pos-layout">
+    <div className={`pos-layout ${cartOpen ? 'cart-open' : ''}`}>
       {/* Left: Product Catalog */}
       <div className="pos-catalog">
         {/* Search + Filter */}
@@ -598,20 +601,39 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         </div>
       </div>
 
+      {/* Móvil: barra de cobro fija que abre el carrito */}
+      {cart.length > 0 && (
+        <button type="button" className="pos-mobile-bar" onClick={() => setCartOpen(true)}>
+          <span className="pos-mobile-bar-icon">
+            <ShoppingCart size={22} />
+            <span className="pos-mobile-bar-count">{itemCount}</span>
+          </span>
+          <span className="pos-mobile-bar-info">
+            <span className="pos-mobile-bar-items">{itemCount} {itemCount === 1 ? 'artículo' : 'artículos'}</span>
+            <span className="pos-mobile-bar-total">${total.toLocaleString('es-CO')}</span>
+          </span>
+          <span className="pos-mobile-bar-cta">Ver carrito</span>
+        </button>
+      )}
+      <div className="pos-cart-backdrop" onClick={() => setCartOpen(false)} aria-hidden="true" />
+
       {/* Right: Cart */}
-      <div className="pos-cart-panel glass">
+      <div className="pos-cart-panel glass" role={cartOpen ? 'dialog' : undefined} aria-label="Carrito">
         {/* Cart Header */}
         <div className="cart-header">
           <div className="cart-title">
             <ShoppingCart size={18} />
             <span>Venta Actual</span>
-            {cart.length > 0 && <span className="cart-count">{cart.reduce((s, i) => s + i.quantity, 0)}</span>}
+            {cart.length > 0 && <span className="cart-count">{itemCount}</span>}
           </div>
           {cart.length > 0 && (
             <button onClick={clearCart} className="btn-ghost-danger">
               <Trash2 size={14} /> Vaciar
             </button>
           )}
+          <button type="button" className="sheet-close cart-close" onClick={() => setCartOpen(false)} aria-label="Cerrar carrito">
+            <X size={20} />
+          </button>
         </div>
 
         {/* Cart Items */}

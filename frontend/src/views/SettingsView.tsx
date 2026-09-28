@@ -477,7 +477,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
               <Globe size={18} style={{ color: 'var(--primary)' }} />
               <h2 className="settings-card-title">Configuración del Catálogo Público</h2>
             </div>
-            <form onSubmit={handleTenantUpdate} className="pos-form" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            <form onSubmit={handleTenantUpdate} className="pos-form grid-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               <div className="form-group" style={{ gridColumn: 'span 2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Tu catálogo público se encuentra activo en:</span>
@@ -643,7 +643,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
               <h2 className="settings-card-title">Gestión de Colaboradores y Cajeros</h2>
             </div>
             
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
+            <div className="grid-collapse" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '30px' }}>
               {/* Form to Register Collaborator */}
               <div>
                 <h3 style={{ fontSize: '14px', margin: '0 0 16px 0', color: 'var(--text-primary)' }}>Registrar Nuevo Cajero</h3>
@@ -785,7 +785,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
+              <div className="grid-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '12px', alignItems: 'end' }}>
                 <div className="form-group">
                   <label className="form-label">Correo de prueba</label>
                   <input
@@ -888,7 +888,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                 Habilitar facturación electrónica para este cliente
               </label>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="grid-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Proveedor</label>
                   <input className="form-input" value="Factus" disabled />
@@ -1042,7 +1042,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
             <Info size={18} style={{ color: 'var(--text-muted)' }} />
             <h2 className="settings-card-title">Sistema</h2>
           </div>
-          <div className="settings-info-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <div className="settings-info-grid grid-collapse-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <div className="info-item">
               <span className="info-label">Versión</span>
               <span className="info-value">V1TR0 POS v1.0.0</span>

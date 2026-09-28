@@ -102,7 +102,7 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '500px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className="sa-modal" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '500px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 800 }}>Gestionar suscripción</h3>
         <p style={{ margin: '0 0 20px', color: 'var(--primary)', fontWeight: 600 }}>{tenant.name}</p>
         {tenant.owner_email && <p style={{ margin: '-14px 0 18px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>✉️ {tenant.owner_email}</p>}
@@ -211,7 +211,7 @@ function DeleteModal({ tenant, token, onClose, onDeleted }: DeleteModalProps) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '16px' }}>
-      <div style={{ background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '420px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+      <div className="sa-modal" style={{ background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.4)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '420px', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
           <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'rgba(239,68,68,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Trash2 size={18} color="#f87171" />
@@ -316,7 +316,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
   const sel = { padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text)', fontSize: '0.83rem', cursor: 'pointer' };
 
   return (
-    <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="sa-view" style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
@@ -482,7 +482,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                   )}
 
                   {/* ── Acciones ── */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+                  <div className="sa-actions" style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
                     {/* Ver catálogo público */}
                     {tenant.slug && (
                       <a href={`/${tenant.slug}`} target="_blank" rel="noopener noreferrer"

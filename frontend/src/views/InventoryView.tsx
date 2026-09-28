@@ -652,7 +652,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
       {/* Table */}
       <div className="table-wrapper glass">
-        <table className="data-table">
+        <table className="data-table cards-mobile">
           <thead>
             <tr>
               <th onClick={() => handleSort('name')} className="sortable">
@@ -688,7 +688,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                 : 0;
               return (
                 <tr key={product.id} className="table-row">
-                  <td className="td-product-name">
+                  <td className="td-product-name td-card-title">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                       <div className="product-list-thumbnail" style={{
                         width: '36px',
@@ -725,31 +725,31 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                       </div>
                     </div>
                   </td>
-                  <td><span className="sku-pill">{product.sku || '—'}</span></td>
-                  <td className="td-money">
+                  <td data-label="SKU"><span className="sku-pill">{product.sku || '—'}</span></td>
+                  <td className="td-money" data-label="Precio">
                     <div>${product.price.toLocaleString('es-CO')}</div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
                       IVA: {product.tax_rate !== undefined ? product.tax_rate : 19}%
                     </div>
                   </td>
-                  <td className="td-money">${product.cost.toLocaleString('es-CO')}</td>
-                  <td>
+                  <td className="td-money" data-label="Costo">${product.cost.toLocaleString('es-CO')}</td>
+                  <td data-label="Margen">
                     <span className={`margin-badge ${margin >= 30 ? 'good' : margin >= 10 ? 'ok' : 'low'}`}>
                       {margin.toFixed(1)}%
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Stock">
                     <span className={`stock-badge ${product.stock > 5 ? 'good' : product.stock > 0 ? 'low' : 'empty'}`}>
                       {product.stock}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Categoría">
                     <span className="cat-tag-icon">
                       {getBusinessTypeIcon(user?.business_type || 'otro', 13)}
                       {getProductCategory(product)}
                     </span>
                   </td>
-                  <td>
+                  <td className="td-card-actions">
                     <div className="action-btns">
                       <button onClick={() => openEdit(product)} className="btn-action edit" title="Editar">
                         <Pencil size={14} />

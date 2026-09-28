@@ -51,6 +51,7 @@ function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: (val:
       }}
     >
       <div
+        className="confirm-dialog"
         onClick={e => e.stopPropagation()}
         style={{
           background: 'var(--bg-card, #1a1f2e)',
@@ -77,7 +78,7 @@ function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: (val:
         </div>
 
         {/* Buttons */}
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        <div className="confirm-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
           <button
             onClick={() => onClose(false)}
             style={{
@@ -211,7 +212,7 @@ const LABELS: Record<Toast['type'], string> = {
 function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
   if (toasts.length === 0) return null;
   return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 99998, display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 380 }}>
+    <div className="toast-container">
       {toasts.map(t => <ToastItem key={t.id} toast={t} onDismiss={onDismiss} />)}
     </div>
   );

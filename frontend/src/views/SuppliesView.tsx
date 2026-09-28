@@ -452,7 +452,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                 {!editingPurchase && purchaseLines.map((line, index) => (
                   <div key={index} className="form-grid-2" style={{ alignItems: 'end' }}>
                     <div className="form-group"><label className="form-label">Producto</label><select className="form-select" value={line.product_id} onChange={e => updatePurchaseLine(index, 'product_id', e.target.value)}>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px' }}>
+                    <div className="grid-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '10px' }}>
                       <div className="form-group"><label className="form-label">Cantidad</label><input type="number" className="form-input" value={line.quantity} onChange={e => updatePurchaseLine(index, 'quantity', e.target.value)} /></div>
                       <div className="form-group"><label className="form-label">Costo</label><input type="number" className="form-input" value={line.unit_cost} onChange={e => updatePurchaseLine(index, 'unit_cost', e.target.value)} /></div>
                       <button type="button" onClick={() => removePurchaseLine(index)} className="btn-secondary" style={{ height: '40px' }}>-</button>
