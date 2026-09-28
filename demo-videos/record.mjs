@@ -120,7 +120,6 @@ async function recordScenario(scenario) {
     timezoneId: 'America/Bogota',
     colorScheme: 'dark',
     permissions: ['camera'],
-    recordVideo: { dir: RAW_DIR, size: { width: VIEWPORT.width * SCALE, height: VIEWPORT.height * SCALE } },
   });
   await context.addInitScript(overlayScript);
   await context.addInitScript(({ loggedIn, user }) => {
@@ -150,6 +149,27 @@ async function recordScenario(scenario) {
   await page.goto(`${BASE_URL}${scenario.path || '/'}`);
   await page.waitForLoadState('networkidle');
   await h.sleep(800);
+
+  // Grabación por capturas: el grabador de video de Playwright captura a 390×844
+  // aunque se emule deviceScaleFactor 2 (el video salía con la app en una esquina).
+  // page.screenshot sí entrega 780×1688 nítido, ~20-25 cuadros por segundo.
+  const frameDir = path.join(RAW_DIR, scenario.id);
+  fs.rmSync(frameDir, { recursive: true, force: true });
+  fs.mkdirSync(frameDir, { recursive: true });
+  const frames = [];
+  let capturing = true;
+  const capture = (async () => {
+    while (capturing) {
+      try {
+        const buf = await page.screenshot({ type: 'jpeg', quality: 90, scale: 'device', caret: 'initial' });
+        const file = path.join(frameDir, `${String(frames.length).padStart(6, '0')}.jpg`);
+        fs.writeFileSync(file, buf);
+        frames.push({ file, t: Date.now() });
+      } catch {
+        await page.waitForTimeout(30).catch(() => {});
+      }
+    }
+  })();
   await page.evaluate(() => window.__demoUncover());
 
   try {
@@ -161,19 +181,29 @@ async function recordScenario(scenario) {
     await page.screenshot({ path: path.join(OUT_DIR, `${scenario.id}-error.png`) });
     throw err;
   } finally {
-    const video = page.video();
+    capturing = false;
+    await capture;
     await context.close();
-    const raw = path.join(RAW_DIR, `${scenario.id}.webm`);
-    await video.saveAs(raw);
-    await video.delete();
     await browser.close();
+
+    // Cada cuadro dura lo que tardó en llegar el siguiente (tiempo real)
+    const list = frames.map((f, i) => {
+      const next = frames[i + 1];
+      const dur = next ? (next.t - f.t) / 1000 : 0.5;
+      return `file '${f.file.replace(/\\/g, '/')}'\nduration ${dur.toFixed(3)}`;
+    });
+    if (frames.length) list.push(`file '${frames[frames.length - 1].file.replace(/\\/g, '/')}'`);
+    const listFile = path.join(frameDir, 'frames.txt');
+    fs.writeFileSync(listFile, list.join('\n'));
     const mp4 = path.join(OUT_DIR, `${scenario.file}.mp4`);
     execFileSync(ffmpegPath, [
-      '-y', '-loglevel', 'error', '-ss', '1.2', '-i', raw,
-      '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p',
-      '-r', '30', '-movflags', '+faststart', mp4,
+      '-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', listFile,
+      '-vf', 'fps=30,format=yuv420p', '-c:v', 'libx264', '-preset', 'slow', '-crf', '20',
+      '-movflags', '+faststart', mp4,
     ]);
-    console.log(`  ✓ ${path.relative(process.cwd(), mp4)}`);
+    fs.rmSync(frameDir, { recursive: true, force: true });
+    const fps = frames.length / ((frames.at(-1).t - frames[0].t) / 1000);
+    console.log(`  ✓ ${path.relative(process.cwd(), mp4)} (${frames.length} cuadros, ${fps.toFixed(1)} fps de captura)`);
   }
 }
 

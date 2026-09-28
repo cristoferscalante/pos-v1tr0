@@ -1,6 +1,6 @@
 # Videos demostrativos del POS
 
-Graba un video vertical de celular (780×1688, MP4) por cada módulo de la app, con subtítulos
+Graba un video vertical de celular (780×1688, MP4, capturado cuadro a cuadro en alta resolución) por cada módulo de la app, con subtítulos
 paso a paso y un círculo amarillo donde se toca. Usa Playwright: un navegador de celular
 recorre la app solo, siguiendo los guiones de `scenarios.mjs`.
 
