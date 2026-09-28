@@ -60,7 +60,7 @@ export function QrScannerModal({ onScanSuccess, onClose, title = 'Escanear códi
     scannerRef.current = scanner;
     let cancelled = false;
 
-    scanner.start(
+    const startPromise = scanner.start(
       { facingMode: 'environment' },
       {
         fps: 12,
@@ -73,7 +73,8 @@ export function QrScannerModal({ onScanSuccess, onClose, title = 'Escanear códi
       },
       text => finish(text),
       () => { /* frame sin código: normal */ },
-    ).then(() => {
+    );
+    startPromise.then(() => {
       if (cancelled) return;
       setState('scanning');
       try {
@@ -87,11 +88,13 @@ export function QrScannerModal({ onScanSuccess, onClose, title = 'Escanear códi
 
     return () => {
       cancelled = true;
-      if (scanner.isScanning) {
-        scanner.stop().then(() => scanner.clear()).catch(() => { /* ya detenido */ });
-      } else {
-        try { scanner.clear(); } catch { /* */ }
-      }
+      // Si la cámara todavía está arrancando (p. ej. el doble montaje de React en
+      // desarrollo, o cerrar muy rápido), hay que esperar a que arranque para
+      // detenerla; si no, queda un segundo lector con la cámara encendida.
+      startPromise
+        .then(() => scanner.stop())
+        .then(() => scanner.clear())
+        .catch(() => { try { scanner.clear(); } catch { /* ya limpio */ } });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elementId]);

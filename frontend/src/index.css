@@ -3022,7 +3022,8 @@ body {
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  /* Por encima del botón flotante de WhatsApp (1200): si no, en el celular tapa "Enviar pedido" */
+  z-index: 1300;
   display: flex;
   justify-content: flex-end;
   animation: fadeIn 0.2s ease;
@@ -3464,12 +3465,18 @@ body {
 .scanner-viewport {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  min-height: 240px;
   border-radius: var(--r-lg);
   overflow: hidden;
   background: #000;
+  display: flex;
+  align-items: center;
 }
-.scanner-video, .scanner-video video { width: 100% !important; height: 100% !important; object-fit: cover; }
+/* La imagen de la cámara se muestra completa (sin recortar): html5-qrcode calcula
+   la zona de lectura sobre el cuadro entero, y con object-fit: cover lo que se ve
+   dentro del recuadro no coincidía con lo que se analizaba. */
+.scanner-video { width: 100%; }
+.scanner-video video { width: 100% !important; height: auto !important; display: block; }
 .scanner-status {
   position: absolute;
   inset: 0;
@@ -3861,7 +3868,7 @@ body {
     border: none;
     padding: calc(12px + env(safe-area-inset-top, 0px)) 16px calc(16px + var(--safe-bottom));
   }
-  .scanner-viewport { flex: 1; aspect-ratio: auto; min-height: 50dvh; }
+  .scanner-viewport { flex: 1; min-height: 50dvh; }
   .price-mode-toggle button { min-height: 40px; font-size: 14px; }
 
   /* ---------- Tablas → tarjetas ---------- */
