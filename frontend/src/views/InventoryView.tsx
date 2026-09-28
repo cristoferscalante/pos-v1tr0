@@ -1178,12 +1178,13 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                   )}
                 </div>
 
-                <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
+                {/* Una fila por campo: el código de barras lleva el botón Escanear y no cabe al lado del SKU */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div className="form-group">
                     <label className="form-label">SKU / Código interno</label>
                     <input className="form-input" value={form.sku || ''} onChange={e => setForm(f => ({ ...f, sku: e.target.value }))} placeholder="Ej. ALM-PERRO-10" />
                   </div>
-                  <div className="form-group" style={{ flex: 1, minWidth: '160px' }}>
+                  <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="form-label">Código de barras</label>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#10b881', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
