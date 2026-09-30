@@ -186,9 +186,11 @@ export async function mockApi(page, store) {
     if (path === '/api/v1/purchases/notification-logs') return json(route, []);
 
     if (path.startsWith('/api/v1/products/public/')) {
+      const availability = stock => (stock <= 0 ? { availability: 'out', stock_left: null }
+        : stock <= 5 ? { availability: 'low', stock_left: stock } : { availability: 'available', stock_left: null });
       return json(route, {
-        tenant: { name: store.tenant.name, business_type: store.tenant.business_type, slug: store.tenant.slug, meta_data: store.tenant.meta_data },
-        products: store.products.filter(p => !p.is_archived).map(({ cost, ...p }) => p),
+        tenant: { name: store.tenant.name, business_type: store.tenant.business_type, slug: store.tenant.slug, meta_data: store.tenant.meta_data, wholesale_enabled: true },
+        products: store.products.filter(p => !p.is_archived).map(({ cost, stock, ...p }) => ({ ...p, ...availability(stock) })),
       });
     }
     if (path === '/api/v1/products/' && method === 'GET') return json(route, store.products);

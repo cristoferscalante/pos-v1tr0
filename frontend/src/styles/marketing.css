@@ -175,6 +175,20 @@
 .landing-screens img { width: 100%; border-radius: 26px; border: 1px solid var(--border); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4); display: block; }
 .landing-screens figcaption { text-align: center; font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-top: 10px; }
 
+.landing-videos {
+  display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 26px -20px 0; padding: 0 20px 12px;
+  scrollbar-width: none;
+}
+.landing-videos::-webkit-scrollbar { display: none; }
+.landing-video { flex: 0 0 72%; max-width: 300px; scroll-snap-align: center; display: flex; flex-direction: column; gap: 12px; }
+.landing-video video {
+  width: 100%; aspect-ratio: 780 / 1688; border-radius: 26px; background: #000; display: block;
+  border: 1px solid var(--border); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+.landing-video figcaption { display: flex; flex-direction: column; gap: 4px; padding: 0 4px; }
+.landing-video figcaption strong { font-size: 17px; }
+.landing-video figcaption span { font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
+
 .landing-steps { list-style: none; counter-reset: step; display: grid; gap: 12px; margin-top: 24px; }
 .landing-steps li {
   counter-increment: step; position: relative; padding: 18px 18px 18px 70px; border-radius: var(--r-xl);
@@ -259,6 +273,8 @@
   .landing-plans { grid-template-columns: repeat(3, 1fr); align-items: stretch; }
   .landing-steps { grid-template-columns: repeat(3, 1fr); }
   .landing-screens { justify-content: center; overflow: visible; }
+  .landing-videos { justify-content: center; overflow: visible; margin: 32px 0 0; padding: 0; gap: 28px; }
+  .landing-video { flex: 0 1 300px; }
   .landing-final { border-radius: var(--r-xl); border: 1px solid var(--border); padding: 56px 32px; }
   .landing-footer { flex-direction: row; align-items: center; justify-content: space-between; padding-bottom: 40px; }
 }

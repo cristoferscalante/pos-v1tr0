@@ -257,17 +257,25 @@ export const SCENARIOS = [
     async run(h) {
       const { page } = h;
       await h.title('Catálogo en línea', 'Tus clientes ven tus productos con precio al detal y por mayor, y te piden por WhatsApp.', '◎');
+      const card = name => page.locator('.pcat-card', { hasText: name });
       await h.say('Este es el catálogo que compartes con tus clientes: un enlace, sin instalar nada.', { pos: 'bottom', wait: 2800 });
-      await h.scroll(500, { wait: 900 });
-      await h.say('Cada producto muestra el precio al detal y el precio por mayor.', { pos: 'bottom', wait: 2400 });
-      const card = name => page.locator('.product-store-card:not(.product-store-card-featured)', { hasText: name }).locator('.btn-add-cart');
-      await h.tap(card('Arroz 500 g'), { wait: 700 });
-      await h.tap(card('Arroz 500 g'), { wait: 500 });
-      await h.tap(card('Aceite 1 L'), { wait: 800 });
-      await h.say('El cliente arma su pedido y lo envía por WhatsApp.', { pos: 'bottom', wait: 1400 });
-      await h.tap('.catalog-cart-btn', { wait: 1400 });
-      await h.pointAt(page.getByRole('button', { name: /Enviar pedido por WhatsApp/ }));
-      await h.say('Te llega el mensaje con los productos y el total, listo para despachar.', { pos: 'top', wait: 3000 });
+      await page.locator('.pcat-grid').scrollIntoViewIfNeeded();
+      await h.sleep(600);
+      await h.say('Muestra tus productos con foto, precio y si quedan pocas unidades.', { pos: 'bottom', wait: 2400 });
+      await h.say('El cliente toca "Agregar" y ajusta la cantidad.', { pos: 'bottom', wait: 1200 });
+      await h.tap(card('Arroz 500 g').locator('.pcat-add'), { wait: 700 });
+      await h.tap(card('Arroz 500 g').getByRole('button', { name: /Agregar uno/ }), { wait: 500 });
+      await h.tap(card('Aceite 1 L').locator('.pcat-add'), { wait: 900 });
+      const mode = page.locator('.pcat-mode-mobile .pcat-mode');
+      await mode.scrollIntoViewIfNeeded();
+      await h.sleep(400);
+      await h.say('Si compra por cantidad, elige "Por mayor" y el pedido se recalcula solo.', { pos: 'bottom', wait: 1400 });
+      await h.tap(mode.getByRole('button', { name: 'Por mayor' }), { wait: 1600 });
+      await h.say('Toca "Ver pedido" para revisarlo.', { pos: 'middle', wait: 1200 });
+      await h.hide();
+      await h.tap('.pcat-cartbar', { wait: 1400 });
+      await h.pointAt(page.getByRole('button', { name: /Enviar pedido por WhatsApp/ }).last());
+      await h.say('Lo envía por WhatsApp y te llega con los productos, el total y el ahorro por mayor.', { pos: 'top', wait: 3200 });
     },
   },
 ];

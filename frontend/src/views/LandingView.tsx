@@ -20,11 +20,11 @@ const FEATURES = [
   { icon: FileCheck, title: 'Facturación electrónica', text: 'En el plan Premium emites factura electrónica DIAN desde la misma venta.' },
 ];
 
-const SCREENS = [
-  { src: '/landing/vender.jpg', label: 'Vender' },
-  { src: '/landing/por-mayor.jpg', label: 'Precios por mayor' },
-  { src: '/landing/panel.jpg', label: 'Tus ganancias' },
-  { src: '/landing/inventario.jpg', label: 'Inventario' },
+// Videos demostrativos (grabados con demo-videos/); solo se descargan al darles play
+const VIDEOS = [
+  { name: 'vender', title: 'Vender', text: 'Agrega productos, escanea con la cámara, cambia a precio por mayor y cobra.' },
+  { name: 'inventario', title: 'Inventario', text: 'Crea un producto con foto, costo, precio al detal y por mayor en 4 pasos.' },
+  { name: 'catalogo', title: 'Catálogo en línea', text: 'Tus clientes arman el pedido y te lo envían por WhatsApp.' },
 ];
 
 const FAQ = [
@@ -46,6 +46,7 @@ export function LandingView() {
         <a href="/" className="landing-nav-brand" aria-label="V1TR0 POS, inicio"><BrandLogo size={36} /></a>
         <nav className="landing-nav-links" aria-label="Secciones">
           <a href="#funciones">Funciones</a>
+          <a href="#videos">Videos</a>
           <a href="#planes">Planes</a>
           <a href="#preguntas">Preguntas</a>
         </nav>
@@ -94,14 +95,25 @@ export function LandingView() {
         </div>
       </section>
 
-      {/* Capturas */}
-      <section className="landing-section">
-        <h2>Así se ve en tu celular</h2>
-        <div className="landing-screens">
-          {SCREENS.map(s => (
-            <figure key={s.src}>
-              <img src={s.src} alt={`Pantalla de ${s.label}`} loading="lazy" />
-              <figcaption>{s.label}</figcaption>
+      {/* Videos */}
+      <section id="videos" className="landing-section">
+        <h2>Míralo en acción</h2>
+        <p className="landing-section-sub">Así se usa en el celular, paso a paso.</p>
+        <div className="landing-videos">
+          {VIDEOS.map(v => (
+            <figure key={v.name} className="landing-video">
+              <video
+                src={`/landing/videos/${v.name}.mp4`}
+                poster={`/landing/videos/${v.name}.jpg`}
+                controls
+                playsInline
+                preload="none"
+                aria-label={`Video: ${v.title}`}
+              />
+              <figcaption>
+                <strong>{v.title}</strong>
+                <span>{v.text}</span>
+              </figcaption>
             </figure>
           ))}
         </div>
