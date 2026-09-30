@@ -3623,6 +3623,8 @@ body {
   font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; font-family: inherit;
 }
 .ticket-biz-line { font-size: 11px; color: #4b5563; margin: 1px 0 0; line-height: 1.35; }
+.receipt-image-actions { display: flex; gap: 8px; margin-top: 16px; }
+.receipt-image-actions > button { flex: 1; justify-content: center; min-height: 44px; }
 
 /* Selector Detal / Por mayor */
 .price-mode-toggle {

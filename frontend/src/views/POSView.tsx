@@ -10,6 +10,8 @@ import { salesApi } from '../api/client';
 import { useToast, useConfirm } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { ReceiptEmailForm, isValidEmail } from '../components/ReceiptEmailForm';
+import { ReceiptImageActions } from '../components/ReceiptImageActions';
+import { businessFromUser } from '../utils/receiptImage';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
 import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
@@ -59,14 +61,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
   const isElectronicInvoicingAvailable = Boolean(storedUser?.meta_data?.electronic_invoicing_enabled);
   // Datos del negocio para el ticket (Configuración → Datos del negocio para recibos)
-  const bizMeta = storedUser?.meta_data || {};
-  const bizLines: string[] = [
-    bizMeta.business_legal_name,
-    bizMeta.business_nit ? `NIT ${bizMeta.business_nit}` : '',
-    [bizMeta.business_address, bizMeta.business_city].filter(Boolean).join(', '),
-    [bizMeta.business_phone ? `Tel. ${bizMeta.business_phone}` : '', bizMeta.whatsapp_number ? `WhatsApp ${bizMeta.whatsapp_number}` : ''].filter(Boolean).join(' · '),
-  ].filter(Boolean);
-  const receiptFooter: string = bizMeta.receipt_footer || '¡Gracias por su compra!';
+  const { lines: bizLines, footer: receiptFooter } = businessFromUser(storedUser);
 
   // Categories from products
   const categories = ['all', ...Array.from(new Set(
@@ -1022,6 +1017,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                   {businessName}
                 </div>
               </div>
+              <ReceiptImageActions sale={completedSale} />
               <ReceiptEmailForm
                 key={completedSale.id}
                 sale={completedSale}

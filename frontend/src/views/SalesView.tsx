@@ -8,6 +8,7 @@ import { db } from '../db/pos-db';
 import { useConfirm } from '../components/Toast';
 import { CustomSelect } from '../components/CustomSelect';
 import { ReceiptEmailForm } from '../components/ReceiptEmailForm';
+import { ReceiptImageActions } from '../components/ReceiptImageActions';
 import { salesApi } from '../api/client';
 import type { SelectOption } from '../components/CustomSelect';
 import type { LocalSale } from '../types';
@@ -347,6 +348,7 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
                     <span>IVA (19%): ${sale.tax.toLocaleString('es-CO')}</span>
                     <strong>Total: ${sale.total.toLocaleString('es-CO')}</strong>
                   </div>
+                  <ReceiptImageActions sale={sale} />
                   <ReceiptEmailForm
                     key={sale.id}
                     sale={sale}

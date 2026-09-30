@@ -26,5 +26,11 @@ await p.screenshot({ path: `${out}/r2-venta.png` });
 await p.locator('.receipt-email-status').scrollIntoViewIfNeeded().catch(() => {});
 await p.screenshot({ path: `${out}/r3-venta-abajo.png` });
 console.log('sale meta', JSON.stringify(store.sales[0].meta_data));
+// Imagen del recibo: se captura la descarga
+await p.locator('.receipt-image-actions').scrollIntoViewIfNeeded();
+await p.screenshot({ path: `${out}/r4-botones.png` });
+const [download] = await Promise.all([p.waitForEvent('download'), p.click('button:has-text("Descargar imagen")')]);
+await download.saveAs(`${out}/r5-recibo.png`);
+console.log('descarga', download.suggestedFilename());
 console.log('status', await p.locator('.receipt-email-status').innerText().catch(() => 'no status'));
 await b.close();
