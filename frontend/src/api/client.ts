@@ -111,7 +111,7 @@ export const authApi = {
   getTenant: (token: string): Promise<any> =>
     request('/api/v1/auth/tenant', {}, token),
 
-  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string; display_name?: string; logo_url?: string; banner_url?: string; brand_color?: string; product_categories?: string[]; electronic_invoicing_enabled?: boolean; electronic_invoicing_provider?: string; electronic_invoicing_environment?: string; factus_client_id?: string; factus_client_secret?: string; factus_username?: string; factus_password?: string; factus_numbering_range_id?: number | null }): Promise<any> =>
+  updateTenant: (token: string, data: { name?: string; slug?: string; whatsapp_number?: string; display_name?: string; logo_url?: string; banner_url?: string; brand_color?: string; product_categories?: string[]; electronic_invoicing_enabled?: boolean; electronic_invoicing_provider?: string; electronic_invoicing_environment?: string; factus_client_id?: string; factus_client_secret?: string; factus_username?: string; factus_password?: string; factus_numbering_range_id?: number | null; receipt_reply_to_email?: string; business_legal_name?: string; business_nit?: string; business_address?: string; business_city?: string; business_phone?: string; receipt_footer?: string }): Promise<any> =>
     request('/api/v1/auth/tenant', { method: 'PUT', body: JSON.stringify(data) }, token),
 
   listCollaborators: (token: string): Promise<any[]> =>
@@ -201,6 +201,10 @@ export const salesApi = {
 
   get: (token: string, saleId: string): Promise<ApiSale & { details: any[] }> =>
     request(`/api/v1/sales/${saleId}`, {}, token),
+
+  // Envía (o reenvía) el recibo digital al correo del cliente
+  sendReceipt: (token: string, saleId: string, email: string): Promise<{ status: string; email: string }> =>
+    request(`/api/v1/sales/${saleId}/receipt`, { method: 'POST', body: JSON.stringify({ email }) }, token),
 
   syncOffline: (token: string, sales: LocalSale[]): Promise<{ synced_ids: string[]; errors: any[] }> =>
     request('/api/v1/sales/sync', { method: 'POST', body: JSON.stringify({ sales }) }, token),

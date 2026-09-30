@@ -325,6 +325,58 @@ check("subir foto demasiado grande -> 413", r.status_code == 413, f"{r.status_co
 r = client.post("/api/v1/media/products", files={"file": ("foto.webp", webp_bytes, "image/webp")}, headers=cashier_headers)
 check("cajero no puede subir fotos -> 403", r.status_code == 403, f"{r.status_code}")
 
+# --- 15. Recibo digital por correo: sale de la plataforma pero con la marca del negocio ---
+import app.services.receipts as receipts_module
+sent_mails = []
+def fake_send_email(recipients, subject, html, text, **kwargs):
+    sent_mails.append({"to": list(recipients), "subject": subject, "html": html, **kwargs})
+    return True, "ok"
+receipts_module.send_email = fake_send_email
+
+r = client.put("/api/v1/auth/tenant", json={
+    "display_name": "Panadería La Espiga", "receipt_reply_to_email": "ventas@laespiga.co",
+    "business_legal_name": "Panificadora La Espiga S.A.S.", "business_nit": "901.234.567-8",
+    "business_address": "Cra 7 # 12-34", "business_city": "Villavicencio", "business_phone": "608 123 4567",
+    "whatsapp_number": "+57 300 123 4567", "receipt_footer": "¡Gracias! Pan fresco todos los días desde las 6 a. m.",
+    "brand_color": "#b45309",
+}, headers=admin_headers)
+check("configurar correo de respuesta del recibo", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+r = client.put("/api/v1/auth/tenant", json={"receipt_reply_to_email": "no-es-correo"}, headers=admin_headers)
+check("correo de respuesta inválido -> 400", r.status_code == 400, f"{r.status_code}")
+
+r = client.post(f"/api/v1/sales/{w_sale_id}/receipt", json={"email": "cliente@correo.com"}, headers=cashier_headers)
+check("cajero envía recibo digital -> 200", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+mail = sent_mails[-1] if sent_mails else {}
+check("remitente visible = nombre del negocio", mail.get("sender_name") == "Panadería La Espiga", str(mail.get("sender_name")))
+check("Reply-To = correo del negocio", mail.get("reply_to_email") == "ventas@laespiga.co", str(mail.get("reply_to_email")))
+check("asunto y cuerpo con el negocio y el número de venta",
+      "Panadería La Espiga" in mail.get("subject", "") and w_sale["sale_number"] in mail.get("html", "") and "por mayor" in mail.get("html", "").lower(),
+      mail.get("subject", ""))
+check("el recibo trae los datos del negocio (NIT, dirección, pie propio)",
+      all(x in mail.get("html", "") for x in ("901.234.567-8", "Cra 7 # 12-34", "Villavicencio", "Pan fresco")),
+      "")
+if os.environ.get("RECEIPT_PREVIEW"):
+    with open(os.environ["RECEIPT_PREVIEW"], "w", encoding="utf-8") as fh:
+        fh.write(mail.get("html", ""))
+r = client.post("/api/v1/auth/login", data={"username": email, "password": password})
+user_meta = (r.json().get("user") or {}).get("meta_data", {}) if r.status_code == 200 else {}
+check("el login entrega los datos del recibo al POS (para imprimir sin conexión)", user_meta.get("business_nit") == "901.234.567-8", str(user_meta)[:200])
+
+r = client.post(f"/api/v1/sales/{w_sale_id}/receipt", json={"email": "no-es-correo"}, headers=admin_headers)
+check("recibo a correo inválido -> 422", r.status_code == 422, f"{r.status_code}")
+
+before = len(sent_mails)
+auto_sale_id = str(uuid.uuid4())
+auto = wholesale_sale(auto_sale_id, "retail", "5000.00")
+auto["sales"][0]["meta_data"] = {"receipt_email": "otro@correo.com"}
+client.post("/api/v1/sales/sync", json=auto, headers=cashier_headers)
+check("venta sincronizada con receipt_email envía el recibo sola", len(sent_mails) == before + 1 and sent_mails[-1]["to"] == ["otro@correo.com"], str(len(sent_mails) - before))
+
+r = client.post("/api/v1/auth/register", json={"business_name": "Otro Negocio", "business_type": "retail", "email": "otro@smoketest.com", "password": "otrosecreto123"})
+other_headers = {"Authorization": f"Bearer {r.json().get('access_token')}"} if r.status_code == 201 else {}
+r = client.post(f"/api/v1/sales/{w_sale_id}/receipt", json={"email": "x@correo.com"}, headers=other_headers)
+check("otro negocio NO puede enviar el recibo de esta venta -> 404", r.status_code == 404, f"{r.status_code}")
+
 # --- 12. HALLAZGO 5.10: guard-rail de JWT_SECRET inseguro en produccion ---
 import subprocess
 guard_db_path = os.path.join(BACKEND_DIR, "tests", "_smoke_test_guard.db")

@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, TypeAdapter
 from decimal import Decimal
 from datetime import datetime
 import uuid
@@ -16,6 +16,7 @@ from app.models.user import User
 from app.services.dian import DianService
 from app.services.factus import FactusService
 from app.services.notifications import notify_low_stock, notify_sale_created
+from app.services.receipts import send_sale_receipt
 from app.core.config import settings
 
 router = APIRouter()
@@ -44,6 +45,21 @@ class SaleSync(BaseModel):
 
 class SyncRequest(BaseModel):
     sales: List[SaleSync]
+
+class ReceiptRequest(BaseModel):
+    email: EmailStr
+
+
+_EMAIL_ADAPTER = TypeAdapter(EmailStr)
+
+
+def _valid_email(value) -> str | None:
+    if not value or not isinstance(value, str):
+        return None
+    try:
+        return str(_EMAIL_ADAPTER.validate_python(value.strip()))
+    except Exception:
+        return None
 
 @router.post("/sync")
 def sync_offline_sales(
@@ -262,6 +278,14 @@ def sync_offline_sales(
             except Exception as notification_error:
                 print(f"Error enviando notificación de venta {new_sale.id}: {notification_error}")
 
+            # Recibo digital pedido en el POS (también llega así desde ventas hechas sin conexión)
+            receipt_email = _valid_email((sale_data.meta_data or {}).get("receipt_email"))
+            if receipt_email:
+                try:
+                    send_sale_receipt(session, new_sale, receipt_email)
+                except Exception as receipt_error:
+                    print(f"Error enviando recibo digital de la venta {new_sale.id}: {receipt_error}")
+
             if low_stock_products:
                 try:
                     notify_low_stock(session, tenant_id, low_stock_products)
@@ -332,6 +356,30 @@ def get_sales(
             )
         )
     return result
+
+@router.post("/{sale_id}/receipt")
+def send_receipt(
+    sale_id: uuid.UUID,
+    payload: ReceiptRequest,
+    session: Session = Depends(get_session),
+    tenant_id: uuid.UUID = Depends(get_current_tenant_id),
+):
+    """Envía (o reenvía) el recibo digital de una venta al correo del cliente."""
+    sale = session.get(Sale, sale_id)
+    if not sale or sale.tenant_id != tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="La venta no existe o no tiene permisos para acceder a ella"
+        )
+    ok, message = send_sale_receipt(session, sale, str(payload.email))
+    if not ok:
+        print(f"Recibo digital de {sale.id} no enviado: {message}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo enviar el recibo. Intenta de nuevo en unos minutos."
+            if "varias veces" not in message else message,
+        )
+    return {"status": "sent", "email": str(payload.email)}
 
 @router.get("/{sale_id}", response_model=SaleReadWithDetails)
 def get_sale(

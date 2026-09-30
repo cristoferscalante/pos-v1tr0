@@ -1,0 +1,30 @@
+// Verificación visual del recibo digital en el POS (carrito + venta registrada)
+import { chromium } from 'playwright';
+import { createStore, mockApi, USER } from './demo-data.mjs';
+
+const out = process.argv[2] || '.';
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await ctx.addInitScript(u => { localStorage.setItem('pos_token', 'demo'); localStorage.setItem('pos_user', JSON.stringify(u)); }, USER);
+const p = await ctx.newPage();
+const store = createStore();
+await mockApi(p, store);
+p.on('pageerror', e => console.log('pageerror', e.message));
+await p.goto('http://localhost:5173/');
+await p.waitForTimeout(1500);
+await p.click('.product-card:has-text("Arroz 500 g")');
+await p.click('.product-card:has-text("Leche 1 L")');
+await p.click('.pos-mobile-bar');
+await p.waitForTimeout(500);
+await p.click('.receipt-toggle');
+await p.fill('.receipt-toggle-section input', 'cliente@correo.com');
+await p.locator('.receipt-toggle-section').scrollIntoViewIfNeeded();
+await p.screenshot({ path: `${out}/r1-carrito.png` });
+await p.click('.btn-checkout');
+await p.waitForTimeout(2500);
+await p.screenshot({ path: `${out}/r2-venta.png` });
+await p.locator('.receipt-email-status').scrollIntoViewIfNeeded().catch(() => {});
+await p.screenshot({ path: `${out}/r3-venta-abajo.png` });
+console.log('sale meta', JSON.stringify(store.sales[0].meta_data));
+console.log('status', await p.locator('.receipt-email-status').innerText().catch(() => 'no status'));
+await b.close();

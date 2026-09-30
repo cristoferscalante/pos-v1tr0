@@ -7,6 +7,7 @@ import {
 import { db } from '../db/pos-db';
 import { useConfirm } from '../components/Toast';
 import { CustomSelect } from '../components/CustomSelect';
+import { ReceiptEmailForm } from '../components/ReceiptEmailForm';
 import { salesApi } from '../api/client';
 import type { SelectOption } from '../components/CustomSelect';
 import type { LocalSale } from '../types';
@@ -346,6 +347,13 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
                     <span>IVA (19%): ${sale.tax.toLocaleString('es-CO')}</span>
                     <strong>Total: ${sale.total.toLocaleString('es-CO')}</strong>
                   </div>
+                  <ReceiptEmailForm
+                    key={sale.id}
+                    sale={sale}
+                    token={token}
+                    isOnline={isOnline}
+                    onUpdated={updated => setSales(prev => prev.map(s => (s.id === updated.id ? updated : s)))}
+                  />
                   {sale.sync_error && (
                     <div style={{ marginTop: '10px', color: 'var(--warning)', fontSize: '12px' }}>
                       Error de sync: {sale.sync_error}

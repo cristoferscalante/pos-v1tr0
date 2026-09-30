@@ -16,6 +16,13 @@ export const USER = {
     brand_color: '#4f46e5',
     whatsapp_number: '+573001234567',
     product_categories: ['Abarrotes', 'Bebidas', 'Lácteos', 'Aseo'],
+    business_legal_name: 'Rosa Martínez Tienda y Variedades',
+    business_nit: '40.123.456-7',
+    business_address: 'Calle 15 # 8-22, Barrio El Centro',
+    business_city: 'Villavicencio',
+    business_phone: '608 670 1234',
+    receipt_reply_to_email: 'rosa@tiendademo.co',
+    receipt_footer: '¡Gracias por su compra! Cambios hasta 8 días con este recibo.',
   },
 };
 
@@ -200,7 +207,9 @@ export async function mockApi(page, store) {
     if (path === '/api/v1/sales/sync') {
       const { sales } = body();
       for (const s of sales) {
-        store.sales.unshift({ ...s, sale_number: `POS-0${store.seq()}`, tenant_id: TENANT_ID, user_id: USER.id });
+        const meta = { ...(s.meta_data || {}) };
+        if (meta.receipt_email) meta.receipt_status = 'sent';
+        store.sales.unshift({ ...s, meta_data: meta, sale_number: `POS-0${store.seq()}`, tenant_id: TENANT_ID, user_id: USER.id });
         for (const d of s.details) {
           const p = store.products.find(x => x.id === d.product_id);
           if (p) p.stock -= d.quantity;
@@ -209,6 +218,13 @@ export async function mockApi(page, store) {
       return json(route, { status: 'success', synced_ids: sales.map(s => s.id), errors: [] });
     }
     if (path === '/api/v1/sales/') return json(route, store.sales);
+    const receiptMatch = path.match(/^\/api\/v1\/sales\/([^/]+)\/receipt$/);
+    if (receiptMatch && method === 'POST') {
+      const sale = store.sales.find(s => s.id === receiptMatch[1]);
+      const { email } = body();
+      if (sale) sale.meta_data = { ...(sale.meta_data || {}), receipt_email: email, receipt_status: 'sent' };
+      return json(route, { status: 'sent', email });
+    }
     const saleMatch = path.match(/^\/api\/v1\/sales\/([^/]+)$/);
     if (saleMatch) return json(route, store.sales.find(s => s.id === saleMatch[1]) || {}, 200);
 

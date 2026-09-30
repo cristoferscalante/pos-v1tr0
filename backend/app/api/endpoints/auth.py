@@ -8,7 +8,7 @@ from app.core.db import get_session, slugify
 from app.core.security import verify_password, get_password_hash, create_access_token
 from app.models.tenant import Tenant, TenantRead
 from app.models.user import User, UserCreate, UserRead
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, TypeAdapter
 from app.api.deps import get_current_user
 from app.models.notification import NotificationRuleRead, NotificationRuleUpdate, NotificationTestRequest
 from app.services.notifications import ensure_default_notification_rules, get_notification_rules, send_test_notification
@@ -29,7 +29,26 @@ _SAFE_USER_TENANT_META_FIELDS = (
     "logo_url",
     "banner_url",
     "whatsapp_number",
+    # Datos del negocio que se imprimen en los recibos (el POS los necesita sin conexión)
+    "business_legal_name",
+    "business_nit",
+    "business_address",
+    "business_city",
+    "business_phone",
+    "receipt_reply_to_email",
+    "receipt_footer",
 )
+
+# Campos de texto libre de tenant.meta_data que se editan desde Configuración
+# (datos del negocio para el recibo). Límite de largo para no romper el ticket.
+_RECEIPT_TEXT_FIELDS = {
+    "business_legal_name": 120,
+    "business_nit": 40,
+    "business_address": 160,
+    "business_city": 80,
+    "business_phone": 40,
+    "receipt_footer": 240,
+}
 
 
 def _safe_user_tenant_meta(tenant) -> dict:
@@ -225,6 +244,15 @@ class TenantUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    # Correo del negocio al que llegan las respuestas de los clientes al recibo digital
+    receipt_reply_to_email: Optional[str] = None
+    # Datos del negocio para los recibos (ticket impreso y recibo por correo)
+    business_legal_name: Optional[str] = None
+    business_nit: Optional[str] = None
+    business_address: Optional[str] = None
+    business_city: Optional[str] = None
+    business_phone: Optional[str] = None
+    receipt_footer: Optional[str] = None
     display_name: Optional[str] = None
     logo_url: Optional[str] = None
     banner_url: Optional[str] = None
@@ -309,6 +337,30 @@ def update_tenant(
     if data.whatsapp_number is not None:
         meta = dict(tenant.meta_data or {})
         meta["whatsapp_number"] = data.whatsapp_number.strip()
+        tenant.meta_data = meta
+
+    if data.receipt_reply_to_email is not None:
+        reply_to = data.receipt_reply_to_email.strip()
+        if reply_to:
+            try:
+                reply_to = str(TypeAdapter(EmailStr).validate_python(reply_to))
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El correo para respuestas de los recibos no es válido"
+                )
+        meta = dict(tenant.meta_data or {})
+        meta["receipt_reply_to_email"] = reply_to
+        tenant.meta_data = meta
+
+    receipt_updates = {
+        key: " ".join(str(getattr(data, key)).split())[:limit]
+        for key, limit in _RECEIPT_TEXT_FIELDS.items()
+        if getattr(data, key) is not None
+    }
+    if receipt_updates:
+        meta = dict(tenant.meta_data or {})
+        meta.update(receipt_updates)
         tenant.meta_data = meta
 
     if any(value is not None for value in [

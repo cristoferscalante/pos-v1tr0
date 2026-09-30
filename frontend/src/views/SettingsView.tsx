@@ -9,6 +9,7 @@ import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import type { AuthUser, FactusConnectionResult, FactusNumberingRangesResult, NotificationLog, NotificationRule } from '../types';
 import { compressImageToDataUrl } from '../utils/imageUpload';
+import { BusinessReceiptSettings } from '../components/BusinessReceiptSettings';
 import '../styles/branding-upload.css';
 
 interface SettingsViewProps {
@@ -448,6 +449,10 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
             </div>
           </div>
         </div>
+
+        {user?.role === 'admin' && (
+          <BusinessReceiptSettings token={token} user={user} onUserUpdate={onUserUpdate} />
+        )}
 
         {/* Account Info */}
         <div className="settings-card glass">

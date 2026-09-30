@@ -1,5 +1,7 @@
 import json
 import smtplib
+from email.headerregistry import Address
+from email.utils import formataddr
 from typing import Iterable
 from urllib import error, request
 from email.message import EmailMessage
@@ -7,13 +9,28 @@ from email.message import EmailMessage
 from app.core.config import settings
 
 
-def _send_via_api(recipients: list[str], subject: str, html: str, text: str) -> tuple[bool, str]:
+# El correo siempre SALE de la cuenta de la plataforma (EMAIL_FROM_EMAIL, el
+# único remitente verificado en el proveedor), pero puede mostrarse con el
+# nombre del negocio que lo envía (sender_name) y con Reply-To al correo del
+# negocio, para que las respuestas del cliente lleguen al negocio y no a la
+# plataforma. Nunca se usa el correo del negocio como remitente: el proveedor
+# lo rechazaría (no está verificado) y fallaría SPF/DKIM.
+def _clean_header(value: str | None) -> str | None:
+    if not value:
+        return None
+    return " ".join(value.replace("\r", " ").replace("\n", " ").split())[:120] or None
+
+
+def _send_via_api(
+    recipients: list[str], subject: str, html: str, text: str,
+    sender_name: str | None, reply_to: tuple[str, str | None] | None,
+) -> tuple[bool, str]:
     if not settings.EMAIL_API_TOKEN or not settings.EMAIL_FROM_EMAIL:
         return False, "Falta configurar EMAIL_API_TOKEN o EMAIL_FROM_EMAIL"
 
     payload = {
         "sender": {
-            "name": settings.EMAIL_FROM_NAME,
+            "name": sender_name or settings.EMAIL_FROM_NAME,
             "email": settings.EMAIL_FROM_EMAIL,
         },
         "to": [{"email": email} for email in recipients],
@@ -21,6 +38,8 @@ def _send_via_api(recipients: list[str], subject: str, html: str, text: str) -> 
         "htmlContent": html,
         "textContent": text,
     }
+    if reply_to:
+        payload["replyTo"] = {"email": reply_to[0], **({"name": reply_to[1]} if reply_to[1] else {})}
 
     body = json.dumps(payload).encode("utf-8")
     headers = {
@@ -40,7 +59,10 @@ def _send_via_api(recipients: list[str], subject: str, html: str, text: str) -> 
         return False, str(exc)
 
 
-def _send_via_smtp(recipients: list[str], subject: str, html: str, text: str) -> tuple[bool, str]:
+def _send_via_smtp(
+    recipients: list[str], subject: str, html: str, text: str,
+    sender_name: str | None, reply_to: tuple[str, str | None] | None,
+) -> tuple[bool, str]:
     required_values = {
         "EMAIL_FROM_EMAIL": settings.EMAIL_FROM_EMAIL,
         "EMAIL_SMTP_HOST": settings.EMAIL_SMTP_HOST,
@@ -53,8 +75,10 @@ def _send_via_smtp(recipients: list[str], subject: str, html: str, text: str) ->
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM_EMAIL}>"
+    message["From"] = formataddr((sender_name or settings.EMAIL_FROM_NAME, settings.EMAIL_FROM_EMAIL))
     message["To"] = ", ".join(recipients)
+    if reply_to:
+        message["Reply-To"] = formataddr((reply_to[1] or "", reply_to[0]))
     message.set_content(text)
     message.add_alternative(html, subtype="html")
 
@@ -69,7 +93,16 @@ def _send_via_smtp(recipients: list[str], subject: str, html: str, text: str) ->
         return False, f"SMTP [{settings.EMAIL_SMTP_HOST}:{settings.EMAIL_SMTP_PORT}] user={settings.EMAIL_SMTP_USERNAME}: {exc}"
 
 
-def send_email(recipients: Iterable[str], subject: str, html: str, text: str) -> tuple[bool, str]:
+def send_email(
+    recipients: Iterable[str],
+    subject: str,
+    html: str,
+    text: str,
+    *,
+    sender_name: str | None = None,
+    reply_to_email: str | None = None,
+    reply_to_name: str | None = None,
+) -> tuple[bool, str]:
     recipient_list = [email.strip() for email in recipients if email and email.strip()]
     if not recipient_list:
         return False, "No hay destinatarios configurados"
@@ -77,7 +110,16 @@ def send_email(recipients: Iterable[str], subject: str, html: str, text: str) ->
     if not settings.EMAIL_ENABLED:
         return False, "El envio de correo esta deshabilitado"
 
-    if settings.EMAIL_PROVIDER.lower() == "smtp":
-        return _send_via_smtp(recipient_list, subject, html, text)
+    name = _clean_header(sender_name)
+    reply_to = None
+    if reply_to_email:
+        try:
+            Address(addr_spec=reply_to_email.strip())  # descarta direcciones mal formadas
+            reply_to = (reply_to_email.strip(), _clean_header(reply_to_name))
+        except Exception:
+            reply_to = None
 
-    return _send_via_api(recipient_list, subject, html, text)
+    if settings.EMAIL_PROVIDER.lower() == "smtp":
+        return _send_via_smtp(recipient_list, subject, html, text, name, reply_to)
+
+    return _send_via_api(recipient_list, subject, html, text, name, reply_to)

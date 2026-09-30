@@ -2,13 +2,14 @@ import React, { useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Search, ShoppingCart, Plus, Minus, Trash2,
-  CheckCircle, Package, CreditCard, Banknote, ArrowLeftRight, Barcode, Printer, X, ScanBarcode
+  CheckCircle, Package, CreditCard, Banknote, ArrowLeftRight, Barcode, Printer, X, ScanBarcode, Mail
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { db } from '../db/pos-db';
 import { salesApi } from '../api/client';
 import { useToast, useConfirm } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
+import { ReceiptEmailForm, isValidEmail } from '../components/ReceiptEmailForm';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
 import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
@@ -50,10 +51,22 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  // Recibo digital: se pide el correo del cliente antes de cobrar (opcional)
+  const [sendReceipt, setSendReceipt] = useState(false);
+  const [receiptEmail, setReceiptEmail] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('pos_user') || 'null') : null;
   const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
   const isElectronicInvoicingAvailable = Boolean(storedUser?.meta_data?.electronic_invoicing_enabled);
+  // Datos del negocio para el ticket (Configuración → Datos del negocio para recibos)
+  const bizMeta = storedUser?.meta_data || {};
+  const bizLines: string[] = [
+    bizMeta.business_legal_name,
+    bizMeta.business_nit ? `NIT ${bizMeta.business_nit}` : '',
+    [bizMeta.business_address, bizMeta.business_city].filter(Boolean).join(', '),
+    [bizMeta.business_phone ? `Tel. ${bizMeta.business_phone}` : '', bizMeta.whatsapp_number ? `WhatsApp ${bizMeta.whatsapp_number}` : ''].filter(Boolean).join(' · '),
+  ].filter(Boolean);
+  const receiptFooter: string = bizMeta.receipt_footer || '¡Gracias por su compra!';
 
   // Categories from products
   const categories = ['all', ...Array.from(new Set(
@@ -373,6 +386,10 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         return;
       }
     }
+    if (sendReceipt && !isValidEmail(receiptEmail)) {
+      warning('Escribe el correo del cliente para enviarle el recibo, o desactiva esa opción');
+      return;
+    }
     setIsCheckingOut(true);
     try {
       const count = await db.sales.count();
@@ -404,6 +421,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         details,
         meta_data: {
           price_mode: priceMode,
+          // El servidor envía el recibo a este correo al registrar la venta (también si se sincroniza después)
+          receipt_email: sendReceipt ? receiptEmail.trim() : undefined,
           requires_electronic_invoice: requiresElectronicInvoice,
           dian_status: requiresElectronicInvoice ? 'pending_sync' : 'not_requested',
           customer_document_code: customerDocumentCode,
@@ -450,7 +469,9 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       }
 
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-      success(`✅ Venta ${saleNumber} registrada — $${total.toLocaleString('es-CO')}`);
+      // Si ya sincronizó, el número oficial es el que asignó el servidor
+      const finalNumber = (await db.sales.get(saleId))?.sale_number || saleNumber;
+      success(`✅ Venta ${finalNumber} registrada — $${total.toLocaleString('es-CO')}${sendReceipt ? ` · recibo a ${receiptEmail.trim()}` : ''}`);
       // Mostrar modal de recibo (sin pisar la versión del servidor si ya llegó, que trae el número oficial)
       setCompletedSale(prev => (prev?.id === sale.id ? prev : sale));
       setPrintMode('receipt');
@@ -461,6 +482,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       setCustomerEmail('');
       setCustomerPhone('');
       setCustomerAddress('');
+      setSendReceipt(false);
+      setReceiptEmail('');
       clearCart();
       onSaleComplete();
     } catch (e) {
@@ -775,6 +798,36 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             </div>
           )}
 
+          {/* Recibo digital por correo */}
+          <div className="payment-section receipt-toggle-section">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={sendReceipt}
+              className={`receipt-toggle ${sendReceipt ? 'on' : ''}`}
+              onClick={() => setSendReceipt(v => !v)}
+            >
+              <span className="receipt-toggle-icon"><Mail size={18} /></span>
+              <span className="receipt-toggle-text">
+                <strong>Enviar recibo por correo</strong>
+                <small>Le llega al cliente con los datos de tu negocio</small>
+              </span>
+              <span className="receipt-switch" aria-hidden="true"><span /></span>
+            </button>
+            {sendReceipt && (
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                className="form-input"
+                placeholder="Correo del cliente, ej. cliente@correo.com"
+                value={receiptEmail}
+                onChange={e => setReceiptEmail(e.target.value)}
+                autoFocus
+              />
+            )}
+          </div>
+
           {/* Totals */}
           <div className="totals-box">
             <div className="total-row">
@@ -821,9 +874,14 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         <div id="print-ticket-area">
           {printMode === 'receipt' ? (
             <>
-              <div style={{ textAlign: 'center', textTransform: 'uppercase', marginBottom: '8px' }}>
+              <div style={{ textAlign: 'center', textTransform: 'uppercase', marginBottom: '4px' }}>
                 <strong>{businessName}</strong>
               </div>
+              {bizLines.length > 0 && (
+                <div style={{ textAlign: 'center', fontSize: '10px', lineHeight: 1.35, marginBottom: '8px' }}>
+                  {bizLines.map(line => <div key={line}>{line}</div>)}
+                </div>
+              )}
               <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
                 Fecha: {new Date(completedSale.created_at).toLocaleString()}<br />
                 Factura N°: {completedSale.sale_number}
@@ -852,7 +910,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 </div>
               </div>
               <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '16px', borderTop: '1px dashed black', paddingTop: '8px' }}>
-                Gracias por su compra<br />
+                {receiptFooter}<br />
                 {businessName}
               </div>
             </>
@@ -921,6 +979,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <div className="ticket-virtual">
                 <div className="ticket-header">
                   <h4 className="ticket-title">{businessName}</h4>
+                  {bizLines.map(line => <p key={line} className="ticket-biz-line">{line}</p>)}
                   <p className="ticket-subtitle">{completedSale.meta_data?.requires_electronic_invoice ? 'Venta con facturacion electronica' : 'Ticket de Venta'}{completedSale.meta_data?.price_mode === 'wholesale' ? ' · Por mayor' : ''}</p>
                 </div>
                 <div className="ticket-meta">
@@ -959,10 +1018,17 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                   </div>
                 </div>
                 <div className="ticket-footer">
-                  ¡Gracias por su compra!<br />
+                  {receiptFooter}<br />
                   {businessName}
                 </div>
               </div>
+              <ReceiptEmailForm
+                key={completedSale.id}
+                sale={completedSale}
+                token={token}
+                isOnline={isOnline}
+                onUpdated={setCompletedSale}
+              />
             </div>
             <div className="modal-actions" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '0 20px 20px 20px' }}>
               <button 
