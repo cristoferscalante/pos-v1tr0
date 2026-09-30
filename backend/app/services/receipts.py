@@ -143,6 +143,14 @@ def render_receipt(session: Session, tenant: Tenant, sale: Sale) -> tuple[str, s
     ]
     if float(sale.tax or 0) > 0:
         total_rows.append(info_row("IVA", _money(sale.tax)))
+    # Pago en efectivo: con cuánto pagó y las vueltas (si el cajero lo registró)
+    cash_received = float(meta.get("cash_received") or 0)
+    cash_rows = ""
+    if cash_received > 0:
+        cash_rows = (
+            info_row("Recibido", _money(cash_received))
+            + info_row("Vueltas", _money(meta.get("cash_change") or 0))
+        )
 
     wholesale_badge = (
         "<span style=\"display:inline-block;margin-top:8px;padding:3px 10px;border-radius:999px;"
@@ -186,6 +194,7 @@ def render_receipt(session: Session, tenant: Tenant, sale: Sale) -> tuple[str, s
       {''.join(total_rows)}
       <tr><td style="padding-top:10px;font-size:17px;font-weight:700;color:#111827;">Total pagado</td>
           <td style="padding-top:10px;font-size:24px;font-weight:800;color:{color};text-align:right;">{_money(sale.total)}</td></tr>
+      {cash_rows}
     </table>
   </td></tr>
   <tr><td style="padding:18px 28px 24px;border-top:1px solid #e5e7eb;text-align:center;">
@@ -218,6 +227,7 @@ def render_receipt(session: Session, tenant: Tenant, sale: Sale) -> tuple[str, s
         f"Subtotal: {_money(sale.subtotal)}",
         *( [f"IVA: {_money(sale.tax)}"] if float(sale.tax or 0) > 0 else [] ),
         f"TOTAL PAGADO: {_money(sale.total)}",
+        *([f"Recibido: {_money(cash_received)}", f"Vueltas: {_money(meta.get('cash_change') or 0)}"] if cash_received > 0 else []),
         "",
         biz["footer"] or f"¡Gracias por comprar en {biz['name']}!",
         f"¿Preguntas? Responde este correo y le llegará a {biz['name']}.",

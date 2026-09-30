@@ -1,0 +1,31 @@
+// Verificación: "¿Con cuánto paga?" y vueltas en el carrito y en el recibo
+import { chromium } from 'playwright';
+import { createStore, mockApi, USER } from './demo-data.mjs';
+
+const out = process.argv[2] || '.';
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+await ctx.addInitScript(u => { localStorage.setItem('pos_token', 'demo'); localStorage.setItem('pos_user', JSON.stringify({ ...u, subscription_active: true })); }, USER);
+const p = await ctx.newPage();
+const store = createStore();
+await mockApi(p, store);
+p.on('pageerror', e => console.log('pageerror', e.message));
+await p.goto('http://localhost:5173/');
+await p.waitForTimeout(1500);
+await p.click('.product-card:has-text("Arroz 500 g")');
+await p.click('.product-card:has-text("Café molido")');
+await p.click('.pos-mobile-bar');
+await p.waitForTimeout(500);
+console.log('rápidos:', await p.locator('.cash-quick button').allInnerTexts());
+await p.fill('#cash-received', '10000');
+console.log('corto:', await p.locator('.cash-result').innerText());
+await p.click('.cash-quick button:has-text("$20.000")');
+console.log('ok:', await p.locator('.cash-result').innerText());
+await p.locator('.cash-change').scrollIntoViewIfNeeded();
+await p.screenshot({ path: `${out}/c1-carrito.png` });
+await p.click('.btn-checkout');
+await p.waitForTimeout(2200);
+console.log('meta venta:', JSON.stringify({ r: store.sales[0].meta_data.cash_received, c: store.sales[0].meta_data.cash_change, t: store.sales[0].total }));
+await p.locator('.ticket-totals').scrollIntoViewIfNeeded();
+await p.screenshot({ path: `${out}/c2-recibo.png` });
+await b.close();

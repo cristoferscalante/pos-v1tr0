@@ -11,6 +11,7 @@ import { useToast, useConfirm } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { ReceiptEmailForm, isValidEmail } from '../components/ReceiptEmailForm';
 import { ReceiptImageActions } from '../components/ReceiptImageActions';
+import { CashChange, parseAmount } from '../components/CashChange';
 import { businessFromUser } from '../utils/receiptImage';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
@@ -37,6 +38,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [search, setSearch] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  // Efectivo: con cuánto paga el cliente, para calcular las vueltas
+  const [cashReceived, setCashReceived] = useState('');
   const [requiresElectronicInvoice, setRequiresElectronicInvoice] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -381,6 +384,11 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         return;
       }
     }
+    const received = paymentMethod === 'cash' ? parseAmount(cashReceived) : 0;
+    if (received > 0 && received < total) {
+      warning(`Falta dinero: el cliente pagó $${received.toLocaleString('es-CO')} y el total es $${total.toLocaleString('es-CO')}`);
+      return;
+    }
     if (sendReceipt && !isValidEmail(receiptEmail)) {
       warning('Escribe el correo del cliente para enviarle el recibo, o desactiva esa opción');
       return;
@@ -416,6 +424,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         details,
         meta_data: {
           price_mode: priceMode,
+          cash_received: received > 0 ? received : undefined,
+          cash_change: received > 0 ? received - total : undefined,
           // El servidor envía el recibo a este correo al registrar la venta (también si se sincroniza después)
           receipt_email: sendReceipt ? receiptEmail.trim() : undefined,
           requires_electronic_invoice: requiresElectronicInvoice,
@@ -466,7 +476,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
       // Si ya sincronizó, el número oficial es el que asignó el servidor
       const finalNumber = (await db.sales.get(saleId))?.sale_number || saleNumber;
-      success(`✅ Venta ${finalNumber} registrada — $${total.toLocaleString('es-CO')}${sendReceipt ? ` · recibo a ${receiptEmail.trim()}` : ''}`);
+      success(`✅ Venta ${finalNumber} registrada — $${total.toLocaleString('es-CO')}${received > 0 ? ` · vueltas $${(received - total).toLocaleString('es-CO')}` : ''}${sendReceipt ? ` · recibo a ${receiptEmail.trim()}` : ''}`);
       // Mostrar modal de recibo (sin pisar la versión del servidor si ya llegó, que trae el número oficial)
       setCompletedSale(prev => (prev?.id === sale.id ? prev : sale));
       setPrintMode('receipt');
@@ -479,6 +489,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       setCustomerAddress('');
       setSendReceipt(false);
       setReceiptEmail('');
+      setCashReceived('');
       clearCart();
       onSaleComplete();
     } catch (e) {
@@ -744,6 +755,10 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             </div>
           </div>
 
+          {paymentMethod === 'cash' && cart.length > 0 && (
+            <CashChange total={total} value={cashReceived} onChange={setCashReceived} />
+          )}
+
           {isElectronicInvoicingAvailable && (
             <div className="payment-section">
               <label className="section-label">Factura electrónica</label>
@@ -903,6 +918,18 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                   <span>TOTAL COBRADO:</span>
                   <span>${completedSale.total.toLocaleString('es-CO')}</span>
                 </div>
+                {completedSale.meta_data?.cash_received > 0 && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Recibido:</span>
+                      <span>${Number(completedSale.meta_data?.cash_received).toLocaleString('es-CO')}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                      <span>Vueltas:</span>
+                      <span>${Number(completedSale.meta_data?.cash_change || 0).toLocaleString('es-CO')}</span>
+                    </div>
+                  </>
+                )}
               </div>
               <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '16px', borderTop: '1px dashed black', paddingTop: '8px' }}>
                 {receiptFooter}<br />
@@ -1011,6 +1038,18 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                     <span>TOTAL:</span>
                     <span>${completedSale.total.toLocaleString('es-CO')}</span>
                   </div>
+                  {completedSale.meta_data?.cash_received > 0 && (
+                    <>
+                      <div className="ticket-total-row">
+                        <span>Recibido:</span>
+                        <span>${Number(completedSale.meta_data?.cash_received).toLocaleString('es-CO')}</span>
+                      </div>
+                      <div className="ticket-total-row ticket-change">
+                        <span>Vueltas:</span>
+                        <span>${Number(completedSale.meta_data?.cash_change || 0).toLocaleString('es-CO')}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="ticket-footer">
                   {receiptFooter}<br />

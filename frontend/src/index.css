@@ -3627,6 +3627,30 @@ body {
   font-size: 13px; font-weight: 700; cursor: pointer; padding: 4px 0; font-family: inherit;
 }
 .ticket-biz-line { font-size: 11px; color: #4b5563; margin: 1px 0 0; line-height: 1.35; }
+/* Efectivo: con cuánto paga y vueltas */
+.cash-change {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: var(--r-md);
+  background: var(--surface-soft); border: 1px solid var(--border);
+}
+.cash-change .section-label { margin-bottom: 0; }
+.cash-change-input { position: relative; }
+.cash-change-input svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--success); pointer-events: none; }
+.cash-change-input .form-input { padding-left: 40px; font-size: 18px; font-weight: 700; }
+.cash-quick { display: flex; gap: 6px; flex-wrap: wrap; }
+.cash-quick button {
+  flex: 1 1 auto; min-height: 38px; padding: 0 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-secondary);
+  font-family: inherit; font-size: 13px; font-weight: 700; white-space: nowrap;
+}
+.cash-quick button.active { background: var(--primary-dim); border-color: var(--border-active); color: var(--primary); }
+.cash-result {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: var(--r-md);
+  font-size: 15px; font-weight: 700;
+}
+.cash-result strong { font-size: 22px; }
+.cash-result.ok { background: var(--success-bg); color: var(--success); }
+.cash-result.short { background: var(--danger-bg); color: var(--danger); }
+.ticket-change { font-weight: 700; }
 .receipt-image-actions { display: flex; gap: 8px; margin-top: 16px; }
 .receipt-image-actions > button { flex: 1; justify-content: center; min-height: 44px; }
 

@@ -158,6 +158,15 @@ export async function renderReceiptImage(sale: LocalSale, biz: ReceiptBusiness):
     y += 58;
     text('Total pagado', PAD, `700 30px ${FONT}`, '#111827');
     text(money(sale.total), W - PAD, `800 42px ${FONT}`, color, 'right');
+    const received = Number(sale.meta_data?.cash_received || 0);
+    if (received > 0) {
+      y += 46;
+      text('Recibido', PAD, `400 23px ${FONT}`, '#6b7280');
+      text(money(received), W - PAD, `600 23px ${FONT}`, '#111827', 'right');
+      y += 36;
+      text('Vueltas', PAD, `700 23px ${FONT}`, '#111827');
+      text(money(Number(sale.meta_data?.cash_change || 0)), W - PAD, `700 23px ${FONT}`, '#111827', 'right');
+    }
 
     // Pie
     y += 44;
