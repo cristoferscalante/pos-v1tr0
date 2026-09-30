@@ -108,6 +108,9 @@ export const authApi = {
   resetPassword: (tokenValue: string, newPassword: string): Promise<{ status: string; message: string }> =>
     request('/api/v1/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: tokenValue, new_password: newPassword }) }),
 
+  getSubscription: (token: string): Promise<{ plan_name: string; subscription_ends_at: string | null; subscription_active: boolean }> =>
+    request('/api/v1/auth/subscription', {}, token),
+
   getTenant: (token: string): Promise<any> =>
     request('/api/v1/auth/tenant', {}, token),
 

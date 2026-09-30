@@ -3571,7 +3571,11 @@ body {
 .price-mode-summary-title { font-size: 13px; font-weight: 800; }
 .price-mode-summary-card.wholesale .price-mode-summary-title { color: #fbbf24; }
 .price-mode-summary-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-secondary); }
-.price-mode-summary-row strong { color: var(--text-primary); text-align: right; overflow-wrap: anywhere; }
+.price-mode-summary-row strong { color: var(--text-primary); text-align: right; white-space: nowrap; }
+@media (max-width: 520px) {
+  /* En celular las dos tarjetas van una debajo de la otra: si no, las cifras se parten */
+  .price-mode-summary { grid-template-columns: 1fr; }
+}
 .price-mode-summary-row strong.profit { color: var(--success); }
 .price-mode-summary-row.muted { font-size: 12px; color: var(--text-muted); }
 .payment-pill.wholesale { border-color: rgba(251,191,36,0.35); color: #fbbf24; background: rgba(251,191,36,0.1); }

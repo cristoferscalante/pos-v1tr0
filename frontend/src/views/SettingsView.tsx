@@ -10,6 +10,7 @@ import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/Busines
 import type { AuthUser, FactusConnectionResult, FactusNumberingRangesResult, NotificationLog, NotificationRule } from '../types';
 import { compressImageToDataUrl } from '../utils/imageUpload';
 import { BusinessReceiptSettings } from '../components/BusinessReceiptSettings';
+import { PasswordInput } from '../components/PasswordInput';
 import '../styles/branding-upload.css';
 
 interface SettingsViewProps {
@@ -691,8 +692,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   </div>
                   <div className="form-group">
                     <label className="form-label">Contraseña</label>
-                    <input
-                      type="password"
+                    <PasswordInput
                       autoComplete="new-password"
                       required
                       value={collabPassword}
@@ -769,8 +769,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
           <form onSubmit={handlePasswordChange} className="pos-form" style={{ maxWidth: 480 }}>
             <div className="form-group">
               <label className="form-label">Contraseña actual</label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="current-password"
                 value={currentPwd}
                 onChange={e => setCurrentPwd(e.target.value)}
@@ -780,8 +779,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
             </div>
             <div className="form-group">
               <label className="form-label">Nueva contraseña</label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
                 value={newPwd}
                 onChange={e => setNewPwd(e.target.value)}
@@ -791,8 +789,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
             </div>
             <div className="form-group">
               <label className="form-label">Confirmar nueva contraseña</label>
-              <input
-                type="password"
+              <PasswordInput
                 autoComplete="new-password"
                 value={confirmPwd}
                 onChange={e => setConfirmPwd(e.target.value)}

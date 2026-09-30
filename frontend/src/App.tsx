@@ -1,10 +1,8 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { QrCode } from 'lucide-react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { db, requestPersistentStorage } from './db/pos-db';
 import { authApi, salesApi, mediaApi, setUnauthorizedHandler } from './api/client';
 import { ToastProvider, useToast } from './components/Toast';
 import { Sidebar } from './components/Sidebar';
-import { BusinessTypeSelect } from './components/BusinessTypeSelect';
 import { POSView } from './views/POSView';
 import { InventoryView } from './views/InventoryView';
 import { SuppliesView } from './views/SuppliesView';
@@ -13,7 +11,10 @@ import { DashboardView } from './views/DashboardView';
 import { SettingsView } from './views/SettingsView';
 import { SuperAdminView } from './views/SuperAdminView';
 import { PublicCatalogView } from './views/PublicCatalogView';
-import type { AuthUser, LocalProduct, View, BusinessType } from './types';
+import type { AuthResponse, AuthUser, LocalProduct, View } from './types';
+import { LandingView } from './views/LandingView';
+import { AuthView } from './views/AuthView';
+import { PlanExpiredScreen, PlanReminder, isPlanExpired } from './components/PlanGate';
 import { getProductCategory } from './utils/productCategories';
 import { normalizeProduct } from './utils/pricing';
 import { dataUrlToBlob } from './utils/imageUpload';
@@ -49,25 +50,16 @@ function AppInner() {
   const { success, error: showError, info } = useToast();
 
   // Detectar catálogo público según la ruta
-  const path = window.location.pathname.substring(1);
-  const isPublicCatalog = path && path !== 'login' && path !== 'register';
+  const path = window.location.pathname.substring(1).replace(/\/+$/, '');
+  const isAuthPath = path === 'login' || path === 'register' || path === 'registro';
+  const isPublicCatalog = path !== '' && !isAuthPath;
+  const hasResetToken = new URLSearchParams(window.location.search).has('reset_token');
 
   // --- Auth State ---
   const [token, setToken] = useState<string | null>(localStorage.getItem('pos_token'));
   const [user, setUser] = useState<AuthUser | null>(
     JSON.parse(localStorage.getItem('pos_user') || 'null')
   );
-
-  // --- Auth Form State ---
-  const [isRegisterMode, setIsRegisterMode] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [businessType, setBusinessType] = useState<BusinessType>('veterinaria');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isForgotPasswordMode, setIsForgotPasswordMode] = useState(false);
-  const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.search).get('reset_token') || '');
-  const [resetPasswordValue, setResetPasswordValue] = useState('');
 
   // --- App State ---
   const [view, setView] = useState<View>('pos');
@@ -343,80 +335,46 @@ function AppInner() {
     return () => { cancelled = true; };
   }, [token, isOnline]);
 
-  // ---- Auth Handlers ----
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const data = await authApi.login(loginEmail, loginPassword);
-      localStorage.setItem('pos_token', data.access_token);
-      localStorage.setItem('pos_user', JSON.stringify(data.user));
-      setToken(data.access_token);
-      setUser(data.user);
-      success(`Bienvenido, ${data.user.business_name}`);
-    } catch (e: any) {
-      showError(e.message || 'Credenciales incorrectas');
-    } finally {
-      setIsSubmitting(false);
-    }
+  // ---- Sesión iniciada desde AuthView (login o registro) ----
+  const handleAuthenticated = (data: AuthResponse, welcome: string) => {
+    localStorage.setItem('pos_token', data.access_token);
+    localStorage.setItem('pos_user', JSON.stringify(data.user));
+    setToken(data.access_token);
+    setUser(data.user);
+    window.history.replaceState({}, '', '/');
+    success(welcome);
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!businessName) { showError('Ingresa el nombre del negocio'); return; }
-    setIsSubmitting(true);
+  // ---- Estado del plan (prueba de 7 días / plan pago activado por el superadmin) ----
+  const [checkingPlan, setCheckingPlan] = useState(false);
+  const refreshSubscription = useCallback(async (manual = false) => {
+    const currentToken = localStorage.getItem('pos_token');
+    if (!currentToken || !navigator.onLine) return;
+    if (manual) setCheckingPlan(true);
     try {
-      const data = await authApi.register({
-        business_name: businessName,
-        business_type: businessType,
-        email: loginEmail,
-        password: loginPassword,
+      const sub = await authApi.getSubscription(currentToken);
+      setUser(prev => {
+        if (!prev) return prev;
+        const next = { ...prev, ...sub };
+        localStorage.setItem('pos_user', JSON.stringify(next));
+        return next;
       });
-      localStorage.setItem('pos_token', data.access_token);
-      localStorage.setItem('pos_user', JSON.stringify(data.user));
-      setToken(data.access_token);
-      setUser(data.user);
-      success(`¡Negocio "${businessName}" registrado con éxito!`);
-    } catch (e: any) {
-      showError(e.message || 'Error al registrar el negocio');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+      if (manual) {
+        if (sub.subscription_active) success('¡Tu plan está activo! Gracias por confiar en V1TR0 POS');
+        else info('Todavía no vemos tu plan activo. Si ya pagaste, escríbenos por WhatsApp.');
+      }
+    } catch { /* sin conexión: se usa el último estado guardado */ }
+    finally { if (manual) setCheckingPlan(false); }
+  }, [success, info]);
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginEmail) { showError('Ingresa tu correo'); return; }
-    setIsSubmitting(true);
-    try {
-      const response = await authApi.forgotPassword(loginEmail);
-      success(response.message);
-      setIsForgotPasswordMode(false);
-    } catch (e: any) {
-      showError(e.message || 'No se pudo procesar la solicitud');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!resetToken || !resetPasswordValue) { showError('Completa la información de recuperación'); return; }
-    setIsSubmitting(true);
-    try {
-      const response = await authApi.resetPassword(resetToken, resetPasswordValue);
-      success(response.message);
-      setResetPasswordValue('');
-      setResetToken('');
-      const url = new URL(window.location.href);
-      url.searchParams.delete('reset_token');
-      window.history.replaceState({}, '', url.toString());
-    } catch (e: any) {
-      showError(e.message || 'No se pudo restablecer la contraseña');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  useEffect(() => {
+    if (!token) return;
+    // Si llegó con sesión a /login o /registro, se va a la app
+    if (isAuthPath) window.history.replaceState({}, '', '/');
+    refreshSubscription();
+    const id = window.setInterval(() => refreshSubscription(), 10 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [token, isOnline, refreshSubscription, isAuthPath]);
 
   // ---- Cashier View Restrictions ----
   useEffect(() => {
@@ -461,118 +419,29 @@ function AppInner() {
   }
 
   // ========================
-  // LOGIN / REGISTER SCREEN
+  // LANDING / INGRESO
   // ========================
   if (!token) {
+    if (path === '' && !hasResetToken) return <LandingView />;
     return (
-      <div className="auth-page">
-        <div className="auth-bg-glow" />
-        <div className="auth-card glass animate-fade">
-          {/* Logo */}
-          <div className="auth-logo">
-            <div className="logo-badge">
-              <QrCode size={28} />
-            </div>
-            <div>
-              <h1 className="auth-brand">V1TR0 POS</h1>
-              <p className="auth-tagline">Sistema de Punto de Venta Multi-Negocio</p>
-            </div>
-          </div>
+      <AuthView
+        initialMode={path === 'registro' || path === 'register' ? 'register' : 'login'}
+        onAuthenticated={handleAuthenticated}
+      />
+    );
+  }
 
-          {/* Tabs */}
-          <div className="auth-tabs">
-            <button onClick={() => { setIsRegisterMode(false); setIsForgotPasswordMode(false); }} className={`auth-tab ${!isRegisterMode && !isForgotPasswordMode ? 'active' : ''}`}>
-              Iniciar Sesión
-            </button>
-            <button onClick={() => { setIsRegisterMode(true); setIsForgotPasswordMode(false); }} className={`auth-tab ${isRegisterMode ? 'active' : ''}`}>
-              Registrar Negocio
-            </button>
-          </div>
-
-          {resetToken ? (
-            <form onSubmit={handleResetPassword} className="auth-form">
-              <div className="form-group">
-                <label className="form-label">Token de recuperación</label>
-                <input
-                  type="text" required value={resetToken}
-                  onChange={e => setResetToken(e.target.value)}
-                  className="form-input" placeholder="Token recibido por correo"
-                />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Nueva contraseña</label>
-                <input
-                  type="password" autoComplete="new-password" required value={resetPasswordValue}
-                  onChange={e => setResetPasswordValue(e.target.value)}
-                  className="form-input" placeholder="Mínimo 8 caracteres"
-                  minLength={8}
-                />
-              </div>
-              <button type="submit" disabled={isSubmitting} className="btn-primary w-full auth-submit">
-                {isSubmitting ? 'Actualizando...' : 'Restablecer contraseña'}
-              </button>
-            </form>
-          ) : (
-          <form onSubmit={isForgotPasswordMode ? handleForgotPassword : (isRegisterMode ? handleRegister : handleLogin)} className="auth-form">
-            {isRegisterMode && (
-              <>
-                <div className="form-group">
-                  <label className="form-label">Nombre del Negocio *</label>
-                  <input
-                    type="text" required value={businessName}
-                    onChange={e => setBusinessName(e.target.value)}
-                    className="form-input" placeholder="Ej. Veterinaria Huellitas"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Tipo de Negocio</label>
-                  <BusinessTypeSelect value={businessType} onChange={setBusinessType} />
-                </div>
-              </>
-            )}
-            <div className="form-group">
-              <label className="form-label">Correo Electrónico</label>
-              <input
-                type="email" autoComplete="email" required value={loginEmail}
-                onChange={e => setLoginEmail(e.target.value)}
-                className="form-input" placeholder="correo@negocio.com"
-              />
-            </div>
-            {!isForgotPasswordMode && (
-            <div className="form-group">
-              <label className="form-label">Contraseña</label>
-              <input
-                type="password" autoComplete={isRegisterMode ? 'new-password' : 'current-password'} required value={loginPassword}
-                onChange={e => setLoginPassword(e.target.value)}
-                className="form-input" placeholder="••••••••"
-                minLength={isRegisterMode ? 8 : undefined}
-              />
-            </div>
-            )}
-            <button type="submit" disabled={isSubmitting} className="btn-primary w-full auth-submit">
-              {isSubmitting
-                ? (isForgotPasswordMode ? 'Enviando...' : isRegisterMode ? 'Registrando...' : 'Ingresando...')
-                : (isForgotPasswordMode ? 'Enviar correo de recuperación' : isRegisterMode ? 'Crear Cuenta y Comenzar' : 'Ingresar al Sistema')
-              }
-            </button>
-            {!isRegisterMode && (
-              <button
-                type="button"
-                onClick={() => setIsForgotPasswordMode(prev => !prev)}
-                className="btn-secondary w-full"
-                style={{ marginTop: '10px' }}
-              >
-                {isForgotPasswordMode ? 'Volver al login' : 'Olvidé mi contraseña'}
-              </button>
-            )}
-          </form>
-          )}
-
-          <p className="auth-disclaimer">
-            Sistema POS offline-first — tus ventas siempre seguras
-          </p>
-        </div>
-      </div>
+  // ========================
+  // PLAN VENCIDO: "Compra tu plan"
+  // ========================
+  if (isPlanExpired(user)) {
+    return (
+      <PlanExpiredScreen
+        user={user!}
+        checking={checkingPlan}
+        onRefresh={() => refreshSubscription(true)}
+        onLogout={handleLogout}
+      />
     );
   }
 
@@ -594,6 +463,7 @@ function AppInner() {
         onToggleTheme={handleToggleTheme}
       />
       <main className="app-main">
+        <PlanReminder user={user} />
         {view === 'pos' && (
           <POSView
             products={products}

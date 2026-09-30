@@ -12,6 +12,10 @@ export interface AuthUser {
   business_name: string;
   business_type: string;
   slug?: string;
+  // Estado del plan (prueba gratis de 7 días al registrarse; activación manual por el superadmin)
+  plan_name?: string;
+  subscription_ends_at?: string | null;
+  subscription_active?: boolean;
   meta_data?: {
     product_categories?: string[];
     electronic_invoicing_enabled?: boolean;

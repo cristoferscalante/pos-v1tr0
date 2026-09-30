@@ -17,6 +17,10 @@ from datetime import datetime, timedelta
 
 router = APIRouter()
 
+# Rutas propias del frontend (landing, ingreso): un catálogo con estos enlaces
+# quedaría inaccesible, así que no se permiten como slug de negocio.
+RESERVED_SLUGS = {"login", "registro", "register", "planes", "admin", "api", "app", "assets", "landing"}
+
 
 # Campos de tenant.meta_data que SÍ es seguro devolver en la respuesta de
 # login/registro (los usa el front para categorías de producto y branding).
@@ -50,6 +54,24 @@ _RECEIPT_TEXT_FIELDS = {
     "business_phone": 40,
     "receipt_footer": 240,
 }
+
+
+def _subscription_info(tenant, user=None) -> dict:
+    """Estado del plan del negocio. Sin fecha de vencimiento = sin límite.
+    El superadmin nunca queda bloqueado. La activación de planes pagos la hace
+    el superadmin a mano desde su panel (no hay cobro automático)."""
+    if user is not None and getattr(user, "is_superadmin", False):
+        return {"plan_name": getattr(tenant, "plan_name", "free"), "subscription_ends_at": None, "subscription_active": True}
+    if not tenant:
+        return {"plan_name": "free", "subscription_ends_at": None, "subscription_active": True}
+    ends = tenant.subscription_ends_at
+    active = bool(tenant.is_active) and (ends is None or ends > datetime.utcnow())
+    return {
+        "plan_name": tenant.plan_name,
+        # UTC explícito para que el navegador lo interprete bien
+        "subscription_ends_at": ends.isoformat() + "Z" if ends else None,
+        "subscription_active": active,
+    }
 
 
 def _safe_user_tenant_meta(tenant) -> dict:
@@ -94,6 +116,8 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
     
     # 2. Crear el Tenant (Negocio) con Slug auto-generado
     base_slug = slugify(data.business_name)
+    if not base_slug or base_slug in RESERVED_SLUGS:
+        base_slug = f"{base_slug or 'negocio'}-pos"
     slug = base_slug
     counter = 1
     while session.exec(select(Tenant).where(Tenant.slug == slug)).first():
@@ -148,6 +172,7 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
             "business_type": tenant.business_type,
             "slug": tenant.slug,
             "meta_data": _safe_user_tenant_meta(tenant),
+            **_subscription_info(tenant, user),
         }
     }
 
@@ -192,8 +217,20 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
             "business_type": tenant.business_type if tenant else "retail",
             "slug": tenant.slug if tenant else None,
             "meta_data": _safe_user_tenant_meta(tenant),
+            **_subscription_info(tenant, user),
         }
     }
+
+
+@router.get("/subscription")
+def get_subscription(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Estado del plan del negocio del usuario (la app lo consulta para mostrar
+    el aviso de "compra tu plan" y desbloquearse cuando el superadmin lo activa)."""
+    tenant = session.get(Tenant, current_user.tenant_id) if current_user.tenant_id else None
+    return _subscription_info(tenant, current_user)
 
 
 @router.post("/forgot-password")
@@ -324,6 +361,11 @@ def update_tenant(
         
     if data.slug is not None:
         new_slug = slugify(data.slug)
+        if new_slug in RESERVED_SLUGS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ese enlace está reservado por el sistema, elige otro"
+            )
         if not new_slug:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

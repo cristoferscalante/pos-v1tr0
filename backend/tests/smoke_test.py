@@ -392,6 +392,39 @@ other_headers = {"Authorization": f"Bearer {r.json().get('access_token')}"} if r
 r = client.post(f"/api/v1/sales/{w_sale_id}/receipt", json={"email": "x@correo.com"}, headers=other_headers)
 check("otro negocio NO puede enviar el recibo de esta venta -> 404", r.status_code == 404, f"{r.status_code}")
 
+# --- 16. Prueba gratis de 7 días y aviso de plan vencido ---
+from datetime import timedelta
+from sqlmodel import Session as _Session, select as _select
+from app.core.db import engine as _engine
+from app.models.tenant import Tenant as _Tenant
+
+r = client.post("/api/v1/auth/register", json={"business_name": "Negocio Prueba Trial", "business_type": "retail", "email": "trial@smoketest.com", "password": "trialsecreto123"})
+trial_user = r.json().get("user", {}) if r.status_code == 201 else {}
+ends = trial_user.get("subscription_ends_at") or ""
+check("registro nuevo = plan free, prueba vigente", trial_user.get("plan_name") == "free" and trial_user.get("subscription_active") is True, str(trial_user)[:200])
+try:
+    days = (datetime.fromisoformat(ends.replace("Z", "+00:00")) - datetime.now(timezone.utc)).days
+except ValueError:
+    days = -1
+check("la prueba dura 7 días", days in (6, 7), f"{days} ({ends})")
+trial_headers = {"Authorization": f"Bearer {r.json().get('access_token')}"}
+
+with _Session(_engine) as s:
+    t = s.exec(_select(_Tenant).where(_Tenant.name == "Negocio Prueba Trial")).first()
+    t.subscription_ends_at = datetime.utcnow() - timedelta(days=1)
+    s.add(t); s.commit()
+r = client.get("/api/v1/auth/subscription", headers=trial_headers)
+check("prueba vencida -> subscription_active False", r.status_code == 200 and r.json().get("subscription_active") is False, r.text[:200])
+r = client.post("/api/v1/auth/login", data={"username": "trial@smoketest.com", "password": "trialsecreto123"})
+check("con la prueba vencida aún puede iniciar sesión (para ver el aviso de planes)", r.status_code == 200 and r.json()["user"].get("subscription_active") is False, r.text[:200])
+
+with _Session(_engine) as s:
+    t = s.exec(_select(_Tenant).where(_Tenant.name == "Negocio Prueba Trial")).first()
+    t.plan_name = "standard"; t.subscription_ends_at = datetime.utcnow() + timedelta(days=365)
+    s.add(t); s.commit()
+r = client.get("/api/v1/auth/subscription", headers=trial_headers)
+check("al activarlo el superadmin, la app lo ve vigente sin reingresar", r.json().get("subscription_active") is True and r.json().get("plan_name") == "standard", r.text[:200])
+
 # --- 12. HALLAZGO 5.10: guard-rail de JWT_SECRET inseguro en produccion ---
 import subprocess
 guard_db_path = os.path.join(BACKEND_DIR, "tests", "_smoke_test_guard.db")
