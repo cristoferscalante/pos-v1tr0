@@ -17,8 +17,9 @@ interface SuperAdminViewProps {
 // ── Planes ────────────────────────────────────────────────────
 const PLANES = [
   { key: 'free',     label: 'Gratis — 7 días',        color: '#9ca3af', bg: 'rgba(156,163,175,0.12)', dias: 7,  precio: 0,      folios: 0,   incluye_facturacion: false },
-  { key: 'standard', label: 'Estándar — $400.000 COP', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 30, precio: 400000, folios: 0,   incluye_facturacion: false },
-  { key: 'premium',  label: 'Premium — $570.000 COP',  color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 30, precio: 570000, folios: 100, incluye_facturacion: true  },
+  // Estándar y Premium se pagan por año (365 días)
+  { key: 'standard', label: 'Estándar — $400.000 COP / año', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 365, precio: 400000, folios: 0,   incluye_facturacion: false },
+  { key: 'premium',  label: 'Premium — $570.000 COP / año',  color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 365, precio: 570000, folios: 100, incluye_facturacion: true  },
 ];
 const FOLIO_PACK_SIZE  = 100;
 const FOLIO_PACK_PRICE = 170000;
@@ -38,6 +39,10 @@ function isExpired(iso?: string | null) {
 }
 function cop(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+}
+function durationLabel(days: number) {
+  if (days % 365 === 0) return days === 365 ? '1 año' : `${days / 365} años`;
+  return `${days} días`;
 }
 function addDays(n: number) {
   const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString();
@@ -116,7 +121,7 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
                 <input type="radio" name="plan" value={p.key} checked={planKey === p.key} onChange={() => handlePlanChange(p.key)} style={{ accentColor: p.color }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: '0.87rem', color: planKey === p.key ? p.color : 'var(--text)' }}>{p.label}</div>
-                  <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{p.dias}d · {p.incluye_facturacion ? `${p.folios} folios DIAN` : 'sin DIAN'}</div>
+                  <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{durationLabel(p.dias)} · {p.incluye_facturacion ? `${p.folios} folios DIAN` : 'sin DIAN'}</div>
                 </div>
               </label>
             ))}
@@ -127,7 +132,7 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
             <Calendar size={14} color="#34d399" />
             <div>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Nueva fecha de vencimiento</div>
-              <div style={{ fontWeight: 700, color: '#34d399', fontSize: '0.9rem' }}>{fmt(nuevaFecha)} (+{plan.dias}d desde hoy)</div>
+              <div style={{ fontWeight: 700, color: '#34d399', fontSize: '0.9rem' }}>{fmt(nuevaFecha)} (+{durationLabel(plan.dias)} desde hoy)</div>
             </div>
           </div>
 
@@ -524,7 +529,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
             <div key={p.key} style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.color}40`, background: p.bg }}>
               <div style={{ fontWeight: 700, color: p.color, fontSize: '0.82rem', marginBottom: '3px' }}>{p.key.toUpperCase()}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div>{p.precio > 0 ? cop(p.precio) : 'Gratis'} · {p.dias}d</div>
+                <div>{p.precio > 0 ? `${cop(p.precio)} / año` : 'Gratis'} · {durationLabel(p.dias)}</div>
                 <div>{p.incluye_facturacion ? `✅ ${p.folios} folios DIAN` : '❌ Sin DIAN'}</div>
               </div>
             </div>
