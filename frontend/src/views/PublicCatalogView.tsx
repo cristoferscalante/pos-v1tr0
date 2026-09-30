@@ -1,53 +1,82 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ShoppingCart, Search, Plus, Minus, Trash2, Store, X, MessageCircle, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Search, Plus, Minus, Store, X, MessageCircle, ArrowRight, ScanLine, Check } from 'lucide-react';
 import { publicCatalogApi, API_URL } from '../api/client';
 import type { ApiProduct } from '../types';
-import { getBusinessTypeIcon, getBusinessTypeLabel } from '../components/BusinessTypeSelect';
+import { getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import { getProductCategory } from '../utils/productCategories';
+import { QrScannerModal } from '../components/QrScannerModal';
 import { useToast } from '../components/Toast';
+import '../styles/public-catalog.css';
 
 interface PublicCatalogViewProps {
   slug: string;
 }
 
-interface CartItem {
-  product: ApiProduct;
-  quantity: number;
-}
+// El catálogo público no recibe el stock exacto: el backend manda la disponibilidad
+// y solo la cantidad cuando quedan pocas unidades.
+type PublicProduct = ApiProduct & {
+  availability?: 'available' | 'low' | 'out';
+  stock_left?: number | null;
+};
+
+type PriceMode = 'detal' | 'mayor';
+
+// Colores de las fichas sin foto: [fondo, texto], elegidos por el nombre del producto
+const TILE_COLORS: [string, string][] = [
+  ['#EAD8C2', '#5A3517'],
+  ['#F6E7A6', '#5C4A00'],
+  ['#DCD6F5', '#35287A'],
+  ['#CFE4F5', '#153E5E'],
+  ['#F4CFC8', '#6E1E12'],
+  ['#D3EDE6', '#18513F'],
+  ['#E5EFC4', '#3D4B10'],
+  ['#EEEBE2', '#4A463C'],
+];
+
+const tileColors = (name: string) => {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return TILE_COLORS[hash % TILE_COLORS.length];
+};
+
+const initials = (name: string) => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '';
+  if (words.length === 1) return words[0].slice(0, 2);
+  return (words[0][0] + words[1][0]).toUpperCase();
+};
+
+const formatCurrency = (val: number) =>
+  new Intl.NumberFormat('es-CO', {
+    style: 'currency',
+    currency: 'COP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(val);
 
 export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
   const { warning } = useToast();
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [tenant, setTenant] = useState<any>(null);
-  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [products, setProducts] = useState<PublicProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [priceMode, setPriceMode] = useState<PriceMode>('detal');
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [orderNote, setOrderNote] = useState('');
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   const storeName = tenant?.meta_data?.display_name || tenant?.name || 'Tu negocio';
-
-  const resolveImageSrc = (src?: string) => {
-    if (!src) return '';
-    return src.startsWith('http') || src.startsWith('data:') ? src : `${API_URL}${src}`;
-  };
-
-  const openWhatsApp = (message: string) => {
-    const whatsappNumber = tenant?.meta_data?.whatsapp_number;
-    if (!whatsappNumber) {
-      warning('Este negocio no tiene configurado un número de WhatsApp para recibir pedidos.');
-      return;
-    }
-
-    const cleanNumber = whatsappNumber.replace(/[^\d+]/g, '');
-    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
-  };
 
   useEffect(() => {
     async function loadCatalog() {
       try {
         setLoading(true);
+        setErrorMsg(null);
         const data = await publicCatalogApi.fetch(slug);
         setTenant(data.tenant);
         setProducts(data.products);
@@ -60,87 +89,111 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
     loadCatalog();
   }, [slug]);
 
-  const addToCart = (product: ApiProduct) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.product.id === product.id);
-      if (existing) {
-        return prev.map(item =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { product, quantity: 1 }];
-    });
+  const resolveImageSrc = (src?: string) => {
+    if (!src) return '';
+    return src.startsWith('http') || src.startsWith('data:') ? src : `${API_URL}${src}`;
   };
 
-  const updateQuantity = (productId: string, delta: number) => {
-    setCart(prev =>
-      prev
-        .map(item => {
-          if (item.product.id === productId) {
-            const nextQty = item.quantity + delta;
-            return { ...item, quantity: nextQty };
-          }
-          return item;
-        })
-        .filter(item => item.quantity > 0)
-    );
+  const openWhatsApp = (message: string) => {
+    const whatsappNumber = tenant?.meta_data?.whatsapp_number;
+    if (!whatsappNumber) {
+      warning('Este negocio no tiene configurado un número de WhatsApp para recibir pedidos.');
+      return;
+    }
+    const cleanNumber = whatsappNumber.replace(/[^\d+]/g, '');
+    window.open(`https://wa.me/${cleanNumber}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
-  const removeFromCart = (productId: string) => {
-    setCart(prev => prev.filter(item => item.product.id !== productId));
-  };
-
-  // Precio al por mayor solo se muestra si existe y es distinto del detal
-  const hasWholesale = (product: ApiProduct) =>
+  // Precio al por mayor: solo si el negocio lo habilitó en Configuración (el backend
+  // ni lo envía si no) y si el producto tiene uno distinto del detal.
+  const hasWholesale = (product: PublicProduct) =>
     product.wholesale_price != null && Number(product.wholesale_price) > 0 && Number(product.wholesale_price) !== Number(product.price);
 
-  const getCartTotal = () => {
-    return cart.reduce((acc, item) => acc + (Number(item.product.price) * item.quantity), 0);
+  const wholesaleEnabled = Boolean(tenant?.wholesale_enabled) && products.some(hasWholesale);
+  const isMayor = wholesaleEnabled && priceMode === 'mayor';
+
+  const unitPrice = (product: PublicProduct) =>
+    isMayor && hasWholesale(product) ? Number(product.wholesale_price) : Number(product.price);
+
+  const isSoldOut = (product: PublicProduct) => product.availability === 'out';
+  const maxQty = (product: PublicProduct) =>
+    product.availability === 'low' && product.stock_left ? product.stock_left : Infinity;
+
+  const changeQty = (product: PublicProduct, delta: number) => {
+    if (isSoldOut(product) && delta > 0) return;
+    if (delta > 0 && (cart[product.id] || 0) >= maxQty(product)) {
+      warning(`Solo quedan ${maxQty(product)} unidades de "${product.name}".`);
+      return;
+    }
+    setCart(prev => {
+      const next = Math.max(0, Math.min(maxQty(product), (prev[product.id] || 0) + delta));
+      const updated = { ...prev };
+      if (next === 0) delete updated[product.id];
+      else updated[product.id] = next;
+      return updated;
+    });
   };
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
+  const productById = useMemo(() => new Map(products.map(p => [p.id, p])), [products]);
+
+  const cartLines = Object.entries(cart)
+    .map(([id, quantity]) => ({ product: productById.get(id), quantity }))
+    .filter((line): line is { product: PublicProduct; quantity: number } => Boolean(line.product));
+  const cartCount = cartLines.reduce((acc, l) => acc + l.quantity, 0);
+  const cartTotal = cartLines.reduce((acc, l) => acc + unitPrice(l.product) * l.quantity, 0);
+  const retailTotal = cartLines.reduce((acc, l) => acc + Number(l.product.price) * l.quantity, 0);
+  const savings = isMayor ? retailTotal - cartTotal : 0;
 
   const handleSendOrder = () => {
-    if (cart.length === 0) return;
-
-    let message = `*Pedido para ${storeName}*\n\n`;
-    cart.forEach(item => {
-      const itemTotal = Number(item.product.price) * item.quantity;
-      const wholesaleNote = hasWholesale(item.product) ? ` · por mayor ${formatCurrency(Number(item.product.wholesale_price))}` : '';
-      message += `• *${item.quantity}x* ${item.product.name} _(${formatCurrency(Number(item.product.price))} c/u${wholesaleNote})_ = *${formatCurrency(itemTotal)}*\n`;
+    if (cartLines.length === 0) return;
+    let message = `*Pedido para ${storeName}*\n`;
+    if (isMayor) message += `_Precios por mayor_\n`;
+    message += '\n';
+    cartLines.forEach(({ product, quantity }) => {
+      const price = unitPrice(product);
+      message += `• *${quantity}x* ${product.name} _(${formatCurrency(price)} c/u)_ = *${formatCurrency(price * quantity)}*\n`;
     });
-    message += `\n*Total a pagar: ${formatCurrency(getCartTotal())}*\n\n_Enviado desde el catálogo público de ${storeName}._`;
-    openWhatsApp(message);
-  };
-
-  const handleBuyNow = (product: ApiProduct) => {
-    const message = `*Compra directa para ${storeName}*\n\n• *1x* ${product.name} = *${formatCurrency(Number(product.price))}*\n\n_Enviado desde el catálogo público._`;
+    message += `\n*Total estimado: ${formatCurrency(cartTotal)}*`;
+    if (savings > 0) message += `\n_Ahorro por mayor: ${formatCurrency(savings)}_`;
+    if (orderNote.trim()) message += `\n\n*Nota:* ${orderNote.trim()}`;
+    message += `\n\n_Enviado desde el catálogo en línea de ${storeName}._`;
     openWhatsApp(message);
   };
 
   const categories = useMemo(() => {
-    const values = Array.from(new Set(products.map(p => getProductCategory(p)).filter(Boolean)));
-    return ['all', ...values];
+    const counts = new Map<string, number>();
+    products.forEach(p => {
+      const category = getProductCategory(p);
+      if (category) counts.set(category, (counts.get(category) || 0) + 1);
+    });
+    return [{ key: 'all', label: 'Todo', count: products.length }, ...Array.from(counts, ([key, count]) => ({ key, label: key, count }))];
   }, [products]);
 
+  const query = searchQuery.trim().toLowerCase();
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.sku && p.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-    const productCategory = getProductCategory(p);
-    const matchesCategory = selectedCategory === 'all' || productCategory === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesSearch = !query ||
+      p.name.toLowerCase().includes(query) ||
+      (p.sku && p.sku.toLowerCase().includes(query)) ||
+      (p.barcode && p.barcode.toLowerCase().includes(query));
+    const matchesCategory = selectedCategory === 'all' || getProductCategory(p) === selectedCategory;
+    const matchesAvailability = !onlyAvailable || !isSoldOut(p);
+    return matchesSearch && matchesCategory && matchesAvailability;
   });
 
-  const featuredProducts = filteredProducts.slice(0, 4);
+  const availableCount = products.filter(p => !isSoldOut(p)).length;
+  const detailProduct = detailId ? productById.get(detailId) : undefined;
+
+  const handleScan = (code: string) => {
+    const needle = code.trim().toLowerCase();
+    const found = products.find(p =>
+      (p.barcode && p.barcode.toLowerCase() === needle) || (p.sku && p.sku.toLowerCase() === needle));
+    if (found) {
+      setDetailId(found.id);
+    } else {
+      setSearchQuery(code);
+      warning('No encontramos un producto con ese código en el catálogo.');
+    }
+  };
 
   if (loading) {
     return (
@@ -164,270 +217,344 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
     );
   }
 
-  const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
+  const brandColor = tenant?.meta_data?.brand_color;
+  const logoUrl = tenant?.meta_data?.logo_url;
+  const bannerUrl = tenant?.meta_data?.banner_url;
+
+  const renderTile = (product: PublicProduct, className: string) => {
+    const [bg, fg] = tileColors(product.name);
+    return (
+      <span className={`pcat-tile ${className} ${isSoldOut(product) ? 'is-out' : ''}`} style={{ background: bg, color: fg }}>
+        {product.image ? (
+          <img src={resolveImageSrc(product.image)} alt="" loading="lazy" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        ) : null}
+        <span className="pcat-tile-mark">{initials(product.name)}</span>
+      </span>
+    );
+  };
+
+  const renderStock = (product: PublicProduct) => {
+    if (product.availability === 'out') return <span className="pcat-stock is-out">Agotado</span>;
+    if (product.availability === 'low') {
+      return <span className="pcat-stock is-low">{product.stock_left ? `Últimas ${product.stock_left}` : 'Últimas unidades'}</span>;
+    }
+    return <span className="pcat-stock">Disponible</span>;
+  };
+
+  const altPriceLabel = (product: PublicProduct) => {
+    if (!wholesaleEnabled) return null;
+    if (!hasWholesale(product)) return 'Solo precio detal';
+    return isMayor ? `Detal ${formatCurrency(Number(product.price))}` : `Por mayor ${formatCurrency(Number(product.wholesale_price))}`;
+  };
+
+  const renderStepper = (product: PublicProduct, variant: 'card' | 'line' | 'sheet') => (
+    <div className={`pcat-stepper is-${variant}`}>
+      <button type="button" aria-label={`Quitar uno de ${product.name}`} onClick={() => changeQty(product, -1)}>
+        <Minus size={16} />
+      </button>
+      <span>{cart[product.id] || 0}</span>
+      <button type="button" aria-label={`Agregar uno de ${product.name}`} onClick={() => changeQty(product, 1)}>
+        <Plus size={16} />
+      </button>
+    </div>
+  );
+
+  const priceModeToggle = (
+    <div className="pcat-mode" role="group" aria-label="Tipo de precio">
+      <button type="button" className={!isMayor ? 'active' : ''} aria-pressed={!isMayor} onClick={() => setPriceMode('detal')}>Precio detal</button>
+      <button type="button" className={isMayor ? 'active' : ''} aria-pressed={isMayor} onClick={() => setPriceMode('mayor')}>Por mayor</button>
+    </div>
+  );
+
+  const orderPanel = (
+    <>
+      <div className="pcat-order-head">
+        <h2>Tu pedido</h2>
+        {wholesaleEnabled && <span className="pcat-pill">{isMayor ? 'Precio por mayor' : 'Precio detal'}</span>}
+      </div>
+      {cartLines.length === 0 ? (
+        <div className="pcat-empty">Agrega productos y aquí verás el total antes de enviarlo.</div>
+      ) : (
+        <div className="pcat-lines">
+          {cartLines.map(({ product, quantity }) => (
+            <div key={product.id} className="pcat-line">
+              {renderTile(product, 'is-thumb')}
+              <div className="pcat-line-info">
+                <div className="pcat-line-name">{product.name}</div>
+                <div className="pcat-line-unit">{quantity} × {formatCurrency(unitPrice(product))}</div>
+                <div className="pcat-line-total">{formatCurrency(unitPrice(product) * quantity)}</div>
+              </div>
+              {renderStepper(product, 'line')}
+            </div>
+          ))}
+        </div>
+      )}
+      <label className="pcat-note">
+        Nota para el negocio (opcional)
+        <textarea
+          rows={2}
+          value={orderNote}
+          onChange={e => setOrderNote(e.target.value)}
+          placeholder="Ej.: entregar después de las 5 p. m."
+        />
+      </label>
+      <div className="pcat-totals">
+        <div className="pcat-totals-row"><span>{cartCount} {cartCount === 1 ? 'unidad' : 'unidades'}</span><span className="pcat-mono">{formatCurrency(cartTotal)}</span></div>
+        {savings > 0 && (
+          <div className="pcat-totals-row is-savings"><span>Ahorras por mayor</span><span className="pcat-mono">− {formatCurrency(savings)}</span></div>
+        )}
+        <div className="pcat-totals-row is-total"><span>Total estimado</span><span className="pcat-mono">{formatCurrency(cartTotal)}</span></div>
+      </div>
+      <button type="button" className="pcat-send" onClick={handleSendOrder} disabled={cartLines.length === 0}>
+        <MessageCircle size={20} />
+        Enviar pedido por WhatsApp
+      </button>
+      <p className="pcat-fineprint">El negocio confirma disponibilidad y total final por chat.</p>
+    </>
+  );
 
   return (
-    <div className="public-catalog-container" style={tenant?.meta_data?.brand_color ? ({ ['--catalog-accent' as string]: tenant.meta_data.brand_color } as React.CSSProperties) : undefined}>
-      {tenant?.meta_data?.banner_url && (
-        <div style={{ width: '100%', maxHeight: '260px', overflow: 'hidden', borderBottom: '1px solid var(--border)' }}>
-          <img src={resolveImageSrc(tenant.meta_data.banner_url)} alt={storeName} style={{ width: '100%', height: '260px', objectFit: 'cover', display: 'block' }} />
-        </div>
-      )}
-      {/* Header */}
-      <header className="catalog-header glass">
-        <div className="header-info">
-          <div className="store-badge" style={tenant?.meta_data?.brand_color ? { background: tenant.meta_data.brand_color } : undefined}>
-            {tenant?.meta_data?.logo_url ? (
-              <img src={resolveImageSrc(tenant.meta_data.logo_url)} alt={storeName} style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 8 }} />
-            ) : (
-              <Store size={24} />
-            )}
+    <div className="pcat" style={brandColor ? ({ ['--pcat-accent' as string]: brandColor } as React.CSSProperties) : undefined}>
+      <header className="pcat-header">
+        <div className="pcat-header-inner">
+          <div className="pcat-brand">
+            <div className="pcat-logo">
+              {logoUrl ? <img src={resolveImageSrc(logoUrl)} alt="" /> : initials(storeName)}
+            </div>
+            <div className="pcat-brand-text">
+              <div className="pcat-store-name">{storeName}</div>
+              <div className="pcat-store-sub">{getBusinessTypeLabel(tenant.business_type) || 'Catálogo en línea'}</div>
+            </div>
           </div>
-          <div>
-            <h1 className="store-name">{storeName}</h1>
-            <p className="store-type">
-              {getBusinessTypeIcon(tenant.business_type, 14)} {getBusinessTypeLabel(tenant.business_type)}
-            </p>
+          <div className="pcat-search is-header">
+            <label className="pcat-search-field">
+              <Search size={18} aria-hidden="true" />
+              <span className="pcat-sr">Buscar productos</span>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar por nombre, categoría o SKU"
+              />
+            </label>
+            <button type="button" className="pcat-scan" aria-label="Escanear código de barras" onClick={() => setIsScannerOpen(true)}>
+              <ScanLine size={20} />
+            </button>
           </div>
+          <button type="button" className="pcat-cart-btn" aria-label="Ver pedido" onClick={() => setIsCartOpen(true)}>
+            <ShoppingBag size={20} />
+            <span className="pcat-cart-btn-label">Pedido</span>
+            {cartCount > 0 && <span className="pcat-cart-badge">{cartCount}</span>}
+          </button>
         </div>
-
-        {/* Search Bar */}
-        <div className="catalog-search-wrapper">
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            className="catalog-search-input"
-            placeholder="Buscar productos por nombre o SKU..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </div>
-
-        {/* Cart Button */}
-        <button
-          className={`catalog-cart-btn ${cartCount > 0 ? 'pulse' : ''}`}
-          onClick={() => setIsCartOpen(true)}
-        >
-          <ShoppingCart size={20} />
-          {cartCount > 0 && <span className="cart-badge">{cartCount}</span>}
-        </button>
       </header>
 
-      <section className="catalog-hero glass">
-        <div className="catalog-hero-copy">
-          <span className="catalog-hero-kicker">Catálogo online</span>
-          <h2 className="catalog-hero-title">Compra directo con {storeName}</h2>
-          <p className="catalog-hero-text">Explora el catálogo, agrega al carrito o compra al instante por WhatsApp con el negocio dueño de este catálogo.</p>
-          <div className="catalog-hero-actions">
-            <button className="btn-add-cart" onClick={() => document.getElementById('catalog-products')?.scrollIntoView({ behavior: 'smooth' })}>
-              <ArrowRight size={16} /> Ver productos
+      <main className="pcat-main">
+        <section className={`pcat-hero ${wholesaleEnabled ? '' : 'is-retail'}`}>
+          <div className="pcat-hero-card" style={bannerUrl ? { ['--pcat-banner' as string]: `url("${resolveImageSrc(bannerUrl)}")` } as React.CSSProperties : undefined}>
+            <button type="button" className="pcat-sticker" onClick={() => openWhatsApp(`Hola ${storeName}, quiero hacer un pedido.`)}>
+              Pide por WhatsApp
             </button>
-            <button className="btn-secondary" onClick={() => openWhatsApp(`Hola ${storeName}, quiero información del catálogo.`)}>
-              <MessageCircle size={16} /> WhatsApp
-            </button>
+            <span className="pcat-kicker">Inventario en vivo</span>
+            <h1 className="pcat-hero-title">Lo que hay hoy en tienda.</h1>
+            <div className="pcat-hero-chips">
+              <span>{availableCount} {availableCount === 1 ? 'producto disponible' : 'productos disponibles'}</span>
+              <span>{wholesaleEnabled ? 'Precios detal y por mayor' : 'Precios actualizados desde inventario'}</span>
+            </div>
           </div>
-        </div>
-        <div className="catalog-hero-side">
-          <div className="catalog-hero-stat">
-            <span className="catalog-hero-stat-value">{products.length}</span>
-            <span className="catalog-hero-stat-label">Productos disponibles</span>
-          </div>
-          <div className="catalog-hero-stat">
-            <span className="catalog-hero-stat-value">{cartCount}</span>
-            <span className="catalog-hero-stat-label">Items en carrito</span>
-          </div>
-        </div>
-      </section>
-
-      {categories.length > 1 && (
-        <section className="catalog-categories">
-          {categories.map(category => (
-            <button
-              key={category}
-              type="button"
-              className={`catalog-category-chip ${selectedCategory === category ? 'active' : ''}`}
-              onClick={() => setSelectedCategory(category)}
-            >
-              {category === 'all' ? 'Todos' : category}
-            </button>
-          ))}
+          {wholesaleEnabled ? (
+            <div className="pcat-hero-side">
+              <div>
+                <h2>¿Compras para tu negocio?</h2>
+                <p>Activa precios por mayor y el catálogo y tu pedido se recalculan al instante.</p>
+              </div>
+              {priceModeToggle}
+            </div>
+          ) : (
+            <div className="pcat-hero-side">
+              <h2>Pedir es así de simple</h2>
+              <ol className="pcat-steps">
+                <li><span>1</span>Elige productos y cantidades</li>
+                <li><span>2</span>Revisa el total de tu pedido</li>
+                <li><span>3</span>Envíalo por WhatsApp al negocio</li>
+              </ol>
+            </div>
+          )}
         </section>
-      )}
 
-      {/* Main Grid */}
-      <main className="catalog-main" id="catalog-products">
-        {filteredProducts.length === 0 ? (
-          <div className="no-products-found">
-            <p>No se encontraron productos coincidentes en el inventario.</p>
-          </div>
-        ) : (
-          <>
-            {featuredProducts.length > 0 && (
-              <section className="catalog-section">
-                <div className="catalog-section-head">
-                  <h3 className="catalog-section-title">Destacados</h3>
-                  <span className="catalog-section-subtitle">Selección recomendada del negocio</span>
-                </div>
-                <div className="catalog-grid">
-                  {featuredProducts.map(product => (
-                    <div key={`featured-${product.id}`} className="product-store-card glass product-store-card-featured">
-                      <div className="product-card-img-container">
-                        {product.image ? (
-                          <img
-                            src={resolveImageSrc(product.image)}
-                            alt={product.name}
-                            className="product-card-img"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
-                            }}
-                          />
-                        ) : (
-                          <div className="product-card-no-img">
-                            <Store size={32} />
-                          </div>
-                        )}
-                      </div>
-                      <div className="product-card-body">
-                        <span className="product-card-sku">{product.sku || 'Producto destacado'}</span>
-                        <h3 className="product-card-title">{product.name}</h3>
-                        <div className="catalog-product-bottom">
-                          <div className="product-card-price-row">
-                            <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
-                            {hasWholesale(product) && (
-                              <span className="product-card-wholesale">Por mayor {formatCurrency(Number(product.wholesale_price))}</span>
-                            )}
-                          </div>
-                          <div className="catalog-product-actions">
-                            <button className="btn-add-cart" onClick={() => addToCart(product)}>
-                              <ShoppingCart size={16} /> Añadir
-                            </button>
-                            <button className="btn-secondary" onClick={() => handleBuyNow(product)}>
-                              Comprar
-                            </button>
-                          </div>
+        <div className="pcat-search is-mobile">
+          <label className="pcat-search-field">
+            <Search size={18} aria-hidden="true" />
+            <span className="pcat-sr">Buscar productos</span>
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Buscar producto o SKU"
+            />
+          </label>
+          <button type="button" className="pcat-scan" aria-label="Escanear código de barras" onClick={() => setIsScannerOpen(true)}>
+            <ScanLine size={22} />
+          </button>
+        </div>
+        {wholesaleEnabled && <div className="pcat-mode-mobile">{priceModeToggle}</div>}
+
+        <div className="pcat-layout">
+          <aside className="pcat-filters">
+            <div className="pcat-filters-label">Categorías</div>
+            <div className="pcat-cats">
+              {categories.map(category => (
+                <button
+                  key={category.key}
+                  type="button"
+                  className={selectedCategory === category.key ? 'active' : ''}
+                  aria-pressed={selectedCategory === category.key}
+                  onClick={() => setSelectedCategory(category.key)}
+                >
+                  {category.key === 'all' ? 'Todo el catálogo' : category.label}
+                  <span className="pcat-mono">{category.count}</span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              className={`pcat-avail ${onlyAvailable ? 'active' : ''}`}
+              aria-pressed={onlyAvailable}
+              onClick={() => setOnlyAvailable(v => !v)}
+            >
+              <Check size={16} /> Solo disponibles
+            </button>
+          </aside>
+
+          <section className="pcat-products" id="catalog-products">
+            <div className="pcat-products-head">
+              <h2>{selectedCategory === 'all' ? 'Todo el catálogo' : selectedCategory}</h2>
+              <span>
+                {filteredProducts.length === 1 ? '1 producto' : `${filteredProducts.length} productos`}
+                {wholesaleEnabled ? ` · ${isMayor ? 'Precio por mayor' : 'Precio detal'}` : ''}
+              </span>
+            </div>
+            {filteredProducts.length === 0 ? (
+              <div className="pcat-empty is-large">No encontramos productos con esa búsqueda. Prueba otra palabra o escanea el código.</div>
+            ) : (
+              <div className="pcat-grid">
+                {filteredProducts.map(product => {
+                  const qty = cart[product.id] || 0;
+                  const alt = altPriceLabel(product);
+                  return (
+                    <article key={product.id} className="pcat-card">
+                      <button type="button" className="pcat-card-media" aria-label={`Ver detalle de ${product.name}`} onClick={() => setDetailId(product.id)}>
+                        {renderTile(product, 'is-card')}
+                        {renderStock(product)}
+                      </button>
+                      <div className="pcat-card-body">
+                        {product.sku && <div className="pcat-sku">{product.sku}</div>}
+                        <h3 className="pcat-card-name">{product.name}</h3>
+                        <div className="pcat-card-prices">
+                          <span className="pcat-price">{formatCurrency(unitPrice(product))}</span>
+                          {alt && <span className="pcat-alt">{alt}</span>}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            <section className="catalog-section">
-              <div className="catalog-section-head">
-                <h3 className="catalog-section-title">Todo el catálogo</h3>
-                <span className="catalog-section-subtitle">Productos listos para agregar al carrito o comprar al instante</span>
-              </div>
-              <div className="catalog-grid">
-                {filteredProducts.map(product => (
-                  <div key={product.id} className="product-store-card glass">
-                    <div className="product-card-img-container">
-                      {product.image ? (
-                        <img
-                          src={resolveImageSrc(product.image)}
-                          alt={product.name}
-                          className="product-card-img"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400&q=80';
-                          }}
-                        />
+                      {isSoldOut(product) ? (
+                        <button type="button" className="pcat-soldout" disabled>Sin existencias</button>
+                      ) : qty > 0 ? (
+                        renderStepper(product, 'card')
                       ) : (
-                        <div className="product-card-no-img">
-                          <Store size={32} />
-                        </div>
+                        <button type="button" className="pcat-add" onClick={() => changeQty(product, 1)}>
+                          <Plus size={16} /> Agregar
+                        </button>
                       )}
-                    </div>
-                    <div className="product-card-body">
-                      <span className="product-card-sku">{product.sku || 'Sin SKU'}</span>
-                      <h3 className="product-card-title">{product.name}</h3>
-                      <div className="catalog-product-bottom">
-                        <div className="product-card-price-row">
-                          <span className="product-card-price">{formatCurrency(Number(product.price))}</span>
-                          {hasWholesale(product) && (
-                            <span className="product-card-wholesale">Por mayor {formatCurrency(Number(product.wholesale_price))}</span>
-                          )}
-                        </div>
-                        <div className="catalog-product-actions">
-                          <button className="btn-add-cart" onClick={() => addToCart(product)}>
-                            <ShoppingCart size={16} /> Añadir
-                          </button>
-                          <button className="btn-secondary" onClick={() => handleBuyNow(product)}>
-                            Comprar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
-            </section>
-          </>
-        )}
+            )}
+          </section>
+
+          <aside className="pcat-order" aria-label="Tu pedido">{orderPanel}</aside>
+        </div>
       </main>
 
-      <button className="catalog-whatsapp-fab" onClick={() => openWhatsApp(`Hola ${storeName}, necesito ayuda con mi pedido.`)}>
-        <MessageCircle size={18} /> WhatsApp
-      </button>
+      {cartCount > 0 && !isCartOpen && !detailProduct && (
+        <button type="button" className="pcat-cartbar" onClick={() => setIsCartOpen(true)}>
+          <span className="pcat-cartbar-count">{cartCount}</span>
+          <span className="pcat-cartbar-text">
+            <small>Tu pedido</small>
+            <strong>{formatCurrency(cartTotal)}</strong>
+          </span>
+          <span className="pcat-cartbar-cta">Ver pedido <ArrowRight size={16} /></span>
+        </button>
+      )}
 
-      {/* Cart Drawer */}
       {isCartOpen && (
-        <div className="cart-drawer-overlay" onClick={() => setIsCartOpen(false)}>
-          <div className="cart-drawer glass" onClick={e => e.stopPropagation()}>
-            <div className="drawer-header">
-              <h2>Tu Pedido</h2>
-              <button className="btn-close-drawer" onClick={() => setIsCartOpen(false)}>
-                <X size={20} />
+        <div className="pcat-overlay is-drawer" onClick={() => setIsCartOpen(false)}>
+          <div className="pcat-sheet" role="dialog" aria-modal="true" aria-label="Tu pedido" onClick={e => e.stopPropagation()}>
+            <div className="pcat-grabber" />
+            <button type="button" className="pcat-close" aria-label="Cerrar pedido" onClick={() => setIsCartOpen(false)}>
+              <X size={18} />
+            </button>
+            {orderPanel}
+          </div>
+        </div>
+      )}
+
+      {detailProduct && (
+        <div className="pcat-overlay is-detail" onClick={() => setDetailId(null)}>
+          <div className="pcat-sheet pcat-detail" role="dialog" aria-modal="true" aria-label={detailProduct.name} onClick={e => e.stopPropagation()}>
+            <div className="pcat-grabber" />
+            <div className="pcat-detail-media">
+              {renderTile(detailProduct, 'is-detail')}
+              {renderStock(detailProduct)}
+              <button type="button" className="pcat-close" aria-label="Cerrar ficha" onClick={() => setDetailId(null)}>
+                <X size={18} />
               </button>
             </div>
-
-            <div className="drawer-body">
-              {cart.length === 0 ? (
-                <div className="empty-cart-message">
-                  <ShoppingCart size={48} />
-                  <p>El carrito está vacío</p>
+            <div className="pcat-detail-info">
+              <div className="pcat-sku">
+                {[getProductCategory(detailProduct), detailProduct.sku && `SKU ${detailProduct.sku}`].filter(Boolean).join(' · ')}
+              </div>
+              <h2>{detailProduct.name}</h2>
+              {wholesaleEnabled && hasWholesale(detailProduct) ? (
+                <div className="pcat-detail-prices">
+                  <div className={!isMayor ? 'active' : ''}>
+                    <small>Detal</small>
+                    <strong>{formatCurrency(Number(detailProduct.price))}</strong>
+                  </div>
+                  <div className={isMayor ? 'active' : ''}>
+                    <small>Por mayor</small>
+                    <strong>{formatCurrency(Number(detailProduct.wholesale_price))}</strong>
+                  </div>
                 </div>
               ) : (
-                <div className="drawer-cart-list">
-                  {cart.map(item => (
-                    <div key={item.product.id} className="drawer-cart-item">
-                      <div className="item-details">
-                        <h4>{item.product.name}</h4>
-                        <span className="item-price">{formatCurrency(Number(item.product.price))}</span>
-                      </div>
-                      <div className="item-controls">
-                        <div className="quantity-selector">
-                          <button onClick={() => updateQuantity(item.product.id, -1)}>
-                            <Minus size={14} />
-                          </button>
-                          <span>{item.quantity}</span>
-                          <button onClick={() => updateQuantity(item.product.id, 1)}>
-                            <Plus size={14} />
-                          </button>
-                        </div>
-                        <button className="btn-delete-item" onClick={() => removeFromCart(item.product.id)}>
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="pcat-detail-price">{formatCurrency(Number(detailProduct.price))}</div>
+              )}
+              {isSoldOut(detailProduct) ? (
+                <div className="pcat-detail-out">Agotado por ahora</div>
+              ) : (
+                <div className="pcat-detail-actions">
+                  {renderStepper(detailProduct, 'sheet')}
+                  {(cart[detailProduct.id] || 0) > 0 ? (
+                    <button type="button" className="pcat-add is-big" onClick={() => { setDetailId(null); setIsCartOpen(true); }}>
+                      Ir al pedido · {formatCurrency(cartTotal)}
+                    </button>
+                  ) : (
+                    <button type="button" className="pcat-add is-big" onClick={() => changeQty(detailProduct, 1)}>
+                      <Plus size={16} /> Agregar al pedido
+                    </button>
+                  )}
                 </div>
               )}
             </div>
-
-            {cart.length > 0 && (
-              <div className="drawer-footer">
-                <div className="drawer-total-row">
-                  <span>Total</span>
-                  <span className="drawer-total">{formatCurrency(getCartTotal())}</span>
-                </div>
-                <button className="btn-send-whatsapp" onClick={handleSendOrder}>
-                  <MessageCircle size={18} />
-                  Enviar pedido por WhatsApp
-                </button>
-              </div>
-            )}
           </div>
         </div>
+      )}
+
+      {isScannerOpen && (
+        <QrScannerModal
+          title="Escanear producto"
+          onScanSuccess={handleScan}
+          onClose={() => setIsScannerOpen(false)}
+        />
       )}
     </div>
   );

@@ -29,6 +29,7 @@ _SAFE_USER_TENANT_META_FIELDS = (
     "logo_url",
     "banner_url",
     "whatsapp_number",
+    "catalog_wholesale_enabled",
     # Datos del negocio que se imprimen en los recibos (el POS los necesita sin conexión)
     "business_legal_name",
     "business_nit",
@@ -244,6 +245,8 @@ class TenantUpdate(BaseModel):
     name: Optional[str] = None
     slug: Optional[str] = None
     whatsapp_number: Optional[str] = None
+    # El catálogo público solo muestra precios por mayor si el negocio lo habilita
+    catalog_wholesale_enabled: Optional[bool] = None
     # Correo del negocio al que llegan las respuestas de los clientes al recibo digital
     receipt_reply_to_email: Optional[str] = None
     # Datos del negocio para los recibos (ticket impreso y recibo por correo)
@@ -337,6 +340,11 @@ def update_tenant(
     if data.whatsapp_number is not None:
         meta = dict(tenant.meta_data or {})
         meta["whatsapp_number"] = data.whatsapp_number.strip()
+        tenant.meta_data = meta
+
+    if data.catalog_wholesale_enabled is not None:
+        meta = dict(tenant.meta_data or {})
+        meta["catalog_wholesale_enabled"] = data.catalog_wholesale_enabled
         tenant.meta_data = meta
 
     if data.receipt_reply_to_email is not None:

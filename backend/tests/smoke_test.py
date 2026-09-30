@@ -296,6 +296,21 @@ t_sale = r.json() if r.status_code == 200 else {}
 check("precio de mayor reportado en venta al detal se corrige a 50000", Decimal(str(t_sale.get("total", 0))) == Decimal("50000.00"), str(t_sale.get("total")))
 check("...y queda marcada pricing_adjusted", (t_sale.get("meta_data") or {}).get("pricing_adjusted") is True)
 
+# El catalogo publico solo muestra precios por mayor si el negocio lo habilita
+def public_wholesale_product():
+    r = client.get(f"/api/v1/products/public/{tenant_slug}")
+    data = r.json() if r.status_code == 200 else {}
+    prod = next((p for p in data.get("products", []) if str(p.get("id")) == wholesale_product_id), {})
+    return data.get("tenant", {}), prod
+
+pub_tenant, pub_prod = public_wholesale_product()
+check("catalogo publico: por mayor deshabilitado por defecto", pub_tenant.get("wholesale_enabled") is False and pub_prod.get("wholesale_price") is None, str(pub_prod))
+check("catalogo publico NO expone el stock exacto", "stock" not in pub_prod and pub_prod.get("availability") == "available", str(pub_prod))
+r = client.put("/api/v1/auth/tenant", json={"catalog_wholesale_enabled": True}, headers=admin_headers)
+check("admin habilita precios por mayor en el catalogo", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+pub_tenant, pub_prod = public_wholesale_product()
+check("catalogo publico: con por mayor habilitado envia wholesale_price", pub_tenant.get("wholesale_enabled") is True and Decimal(str(pub_prod.get("wholesale_price"))) == Decimal("4000.00"), str(pub_prod))
+
 r = client.get("/api/v1/dashboard/summary", headers=admin_headers)
 by_mode = (r.json().get("by_price_mode") or {}).get("today", {}) if r.status_code == 200 else {}
 check(

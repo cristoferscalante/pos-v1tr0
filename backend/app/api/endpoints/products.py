@@ -162,6 +162,20 @@ _PUBLIC_TENANT_META_FIELDS = {
     "product_categories",
 }
 
+# Umbral de "últimas unidades" en el catálogo público (el mismo que usa el POS).
+_PUBLIC_LOW_STOCK = 5
+
+
+def _public_availability(stock) -> dict:
+    """Disponibilidad para el catálogo público sin exponer el inventario exacto:
+    solo se muestra la cantidad cuando quedan pocas unidades."""
+    qty = float(stock or 0)
+    if qty <= 0:
+        return {"availability": "out", "stock_left": None}
+    if qty <= _PUBLIC_LOW_STOCK:
+        return {"availability": "low", "stock_left": int(qty)}
+    return {"availability": "available", "stock_left": None}
+
 
 @router.get("/public/{slug}")
 def get_public_catalog(
@@ -183,6 +197,9 @@ def get_public_catalog(
         for key, value in (tenant.meta_data or {}).items()
         if key in _PUBLIC_TENANT_META_FIELDS
     }
+    # Los precios por mayor solo salen si el negocio los habilitó en Configuración;
+    # si no, el catálogo es solo detal y el precio por mayor ni se envía.
+    wholesale_enabled = bool((tenant.meta_data or {}).get("catalog_wholesale_enabled"))
 
     return {
         "tenant": {
@@ -190,6 +207,7 @@ def get_public_catalog(
             "business_type": tenant.business_type,
             "slug": tenant.slug,
             "meta_data": safe_meta,
+            "wholesale_enabled": wholesale_enabled,
         },
         "products": [
             {
@@ -198,9 +216,10 @@ def get_public_catalog(
                 "sku": product.sku,
                 "barcode": product.barcode,
                 "price": product.price,
-                "wholesale_price": product.wholesale_price,
+                "wholesale_price": product.wholesale_price if wholesale_enabled else None,
                 "image": product.image,
                 "meta_data": product.meta_data,
+                **_public_availability(product.stock),
                 # Deliberadamente NO se incluye "cost" (costo de compra, dato
                 # sensible del margen del negocio) ni ningún otro campo interno.
             }

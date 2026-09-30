@@ -51,6 +51,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
   const [logoUrl, setLogoUrl] = useState('');
   const [bannerUrl, setBannerUrl] = useState('');
   const [brandColor, setBrandColor] = useState('#6366f1');
+  const [catalogWholesaleEnabled, setCatalogWholesaleEnabled] = useState(false);
   const [savingTenant, setSavingTenant] = useState(false);
 
   // Collaborators management state
@@ -96,6 +97,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
           setLogoUrl(data.meta_data?.logo_url || '');
           setBannerUrl(data.meta_data?.banner_url || '');
           setBrandColor(data.meta_data?.brand_color || '#6366f1');
+          setCatalogWholesaleEnabled(Boolean(data.meta_data?.catalog_wholesale_enabled));
           setElectronicInvoicingEnabled(Boolean(data.meta_data?.electronic_invoicing_enabled));
           setFactusEnvironment(data.meta_data?.electronic_invoicing_environment === 'production' ? 'production' : 'sandbox');
           setFactusClientId(data.meta_data?.factus_client_id || '');
@@ -329,6 +331,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         logo_url: logoUrl,
         banner_url: bannerUrl,
         brand_color: brandColor,
+        catalog_wholesale_enabled: catalogWholesaleEnabled,
       });
       success('Configuración del catálogo actualizada correctamente');
       if (user && onUserUpdate) {
@@ -629,6 +632,27 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
                   Sub-ruta única para tu catálogo. Ej: pos.v1tr0.com/<strong>slug</strong>
                 </span>
+              </div>
+
+              <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                <label className="catalog-wholesale-toggle">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={catalogWholesaleEnabled}
+                    onChange={e => setCatalogWholesaleEnabled(e.target.checked)}
+                  />
+                  <span className="catalog-wholesale-switch" aria-hidden="true"></span>
+                  <span>
+                    <strong>Mostrar precios por mayor en el catálogo</strong>
+                    <small>
+                      {catalogWholesaleEnabled
+                        ? 'Activado: tus clientes ven ambos precios y pueden cambiar entre detal y por mayor.'
+                        : 'Desactivado: el catálogo solo muestra el precio detal y no menciona ventas por mayor.'}
+                      {' '}El precio por mayor de cada producto se edita en Inventario.
+                    </small>
+                  </span>
+                </label>
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
