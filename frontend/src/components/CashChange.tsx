@@ -1,18 +1,21 @@
 import { Banknote } from 'lucide-react';
 
-const BILLS = [1000, 2000, 5000, 10000, 20000, 50000, 100000];
+const BIG_BILLS = [10000, 20000, 50000, 100000];
 const money = (n: number) => `$${Math.round(n).toLocaleString('es-CO')}`;
 
-/** Montos rápidos: el valor exacto y los redondeos hacia arriba con billetes colombianos. */
+/**
+ * Montos rápidos: el valor exacto, los dos redondeos más cercanos hacia arriba y
+ * los billetes con que suelen pagar ($10.000, $20.000, $50.000, $100.000).
+ */
 export function quickAmounts(total: number): number[] {
   if (total <= 0) return [];
-  const options = new Set<number>([total]);
-  for (const step of [1000, 5000, 10000, 20000, 50000, 100000]) {
-    const up = Math.ceil(total / step) * step;
-    if (up > total) options.add(up);
-  }
-  for (const bill of BILLS) if (bill > total) options.add(bill);
-  return [...options].sort((a, b) => a - b).slice(0, 5);
+  const rounds = [...new Set([1000, 5000, 10000].map(step => Math.ceil(total / step) * step))]
+    .filter(v => v > total)
+    .sort((a, b) => a - b)
+    .slice(0, 2);
+  const bills = BIG_BILLS.filter(bill => bill > total);
+  const extra = total > 100000 ? [Math.ceil(total / 50000) * 50000, Math.ceil(total / 100000) * 100000] : [];
+  return [...new Set([total, ...rounds, ...bills, ...extra])].filter(v => v >= total).sort((a, b) => a - b).slice(0, 6);
 }
 
 export const parseAmount = (raw: string) => Number(raw.replace(/[^\d]/g, '')) || 0;

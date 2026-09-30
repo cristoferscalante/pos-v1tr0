@@ -7,6 +7,28 @@ const openMore = async h => {
 };
 
 export const SCENARIOS = [
+  // ------------------------------------------------------------------ Clip de portada (landing)
+  // Sin portada ni subtítulos: se reproduce en bucle dentro del celular del hero.
+  {
+    id: 'hero',
+    file: 'hero-loop',
+    title: 'Clip de portada',
+    async run(h) {
+      const { page } = h;
+      await h.sleep(600);
+      await h.tap(productCard('Arroz 500 g'), { wait: 450 });
+      await h.tap(productCard('Arroz 500 g'), { wait: 450 });
+      await h.tap(productCard('Aceite 1 L'), { wait: 450 });
+      await h.tap(productCard('Leche 1 L'), { wait: 900 });
+      await h.tap('role=tab[name="Precios por mayor"]', { wait: 1500 });
+      await h.tap('.pos-mobile-bar', { wait: 900 });
+      await h.tap(page.locator('.cash-quick button', { hasText: '$50.000' }), { wait: 1400 });
+      await h.tap('.btn-checkout', { wait: 2600 });
+      await h.tap(page.getByRole('button', { name: 'Nueva Venta' }), { wait: 500 });
+      await h.tap('role=tab[name="Precios al detal"]', { wait: 900 });
+    },
+  },
+
   // ------------------------------------------------------------------ Ingreso
   {
     id: 'ingreso',
