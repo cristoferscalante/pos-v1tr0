@@ -834,7 +834,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <span>${tax.toLocaleString('es-CO')}</span>
             </div>
             <div className="total-row total-main">
-              <span>Total a Cobrar</span>
+              <span>Total de la venta</span>
               <span>${total.toLocaleString('es-CO')}</span>
             </div>
           </div>
@@ -845,7 +845,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
             className="btn-checkout"
           >
             <CheckCircle size={20} />
-            <span>{isCheckingOut ? 'Procesando...' : `Cobrar $${total.toLocaleString('es-CO')}`}</span>
+            <span>{isCheckingOut ? 'Procesando...' : `Vender $${total.toLocaleString('es-CO')}`}</span>
           </button>
         </div>
       </div>

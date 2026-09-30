@@ -71,7 +71,7 @@ export const SCENARIOS = [
       await h.tap(page.locator('.cart-item').first().locator('.qty-btn').nth(1), { wait: 900 });
       await h.say('Elige cómo te pagan: efectivo, tarjeta o transferencia.', { pos: 'top', wait: 1000 });
       await h.tap(page.locator('.payment-btn', { hasText: 'Transferencia' }), { wait: 900 });
-      await h.say('Toca "Cobrar" para registrar la venta.', { pos: 'top', wait: 1000 });
+      await h.say('Toca "Vender" para registrar la venta.', { pos: 'top', wait: 1000 });
       await h.tap('.btn-checkout', { wait: 2200 });
       await h.say('¡Listo! La venta queda guardada al por mayor y puedes imprimir el recibo.', { pos: 'top', wait: 3200 });
       await h.tap(page.getByRole('button', { name: 'Nueva Venta' }), { wait: 900 });
