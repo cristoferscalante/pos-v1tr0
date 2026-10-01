@@ -14,6 +14,12 @@ export const overlayScript = () => {
         display: flex; gap: 10px; align-items: flex-start;
       }
       #__demo-caption.show { opacity: 1; transform: translateY(0); }
+      @media (min-width: 900px) {
+        #__demo-caption { left: 50%; right: auto; width: min(720px, 70vw); margin-left: min(-360px, -35vw); font-size: 21px; padding: 16px 22px; }
+        #__demo-caption .step { min-width: 30px; height: 30px; border-radius: 15px; font-size: 16px; margin-top: 0; }
+        #__demo-title h1 { font-size: 46px !important; }
+        #__demo-title p { font-size: 21px !important; max-width: 640px; }
+      }
       #__demo-caption .step { flex-shrink: 0; min-width: 26px; height: 26px; border-radius: 13px; background: #6366f1;
         font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
       .__demo-tap { position: absolute; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%;
@@ -45,7 +51,8 @@ export const overlayScript = () => {
       stepEl.textContent = step;
       stepEl.style.display = step ? 'flex' : 'none';
       el.style.top = position === 'top' ? '14px' : position === 'middle' ? '42%' : '';
-      el.style.bottom = position === 'bottom' ? '150px' : '';
+      // En el celular la barra de navegación ocupa la parte de abajo; en escritorio no
+      el.style.bottom = position === 'bottom' ? (window.innerWidth >= 900 ? '36px' : '150px') : '';
       el.classList.add('show');
     },
     tap(x, y) {

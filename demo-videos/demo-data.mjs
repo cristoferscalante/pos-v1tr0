@@ -183,6 +183,7 @@ export async function mockApi(page, store) {
       return json(route, [{ id: randomUUID(), email: 'caja1@tiendademo.co', role: 'cashier', is_active: true, tenant_id: TENANT_ID }]);
     }
     if (path.startsWith('/api/v1/auth/notifications')) return json(route, []);
+    if (path === '/api/v1/auth/subscription') return json(route, { plan_name: 'standard', subscription_ends_at: null, subscription_active: true });
     if (path === '/api/v1/purchases/notification-logs') return json(route, []);
 
     if (path.startsWith('/api/v1/products/public/')) {

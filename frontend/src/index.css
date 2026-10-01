@@ -1914,11 +1914,15 @@ body {
   padding: 28px;
   width: 100%;
   max-width: 420px;
+  /* En portátiles de 768-800 px el recibo es más alto que la pantalla */
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
   align-items: center;
 }
+.modal-content > * { flex-shrink: 0; }
 
 /* ============================
    RESPONSIVE

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   ShoppingCart, Tags, ScanBarcode, Camera, Receipt, WifiOff, Globe, ChartColumn,
   Truck, Users, FileCheck, Check, ChevronDown, MessageCircle, ArrowRight, Expand, Play,
-  Banknote, Sparkles, ShieldCheck, Smartphone,
+  Banknote, Sparkles, ShieldCheck, Smartphone, Monitor,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { AutoPlayVideo, Lightbox, type LightboxItem } from '../components/Lightbox';
@@ -84,6 +84,13 @@ const VIDEOS: LightboxItem[] = [
   { type: 'video', src: '/landing/videos/catalogo.mp4', poster: '/landing/videos/catalogo.jpg', title: 'Catálogo en línea', text: 'El cliente arma el pedido y te lo envía por WhatsApp.' },
 ];
 
+const DESKTOP_VIDEOS: LightboxItem[] = [
+  { type: 'video', landscape: true, src: '/landing/videos/escritorio-vender.mp4', poster: '/landing/videos/escritorio-vender.jpg', title: 'Vender', text: 'Catálogo y carrito a la vez: escanea, cambia a por mayor, cobra y calcula las vueltas.' },
+  { type: 'video', landscape: true, src: '/landing/videos/escritorio-inventario.mp4', poster: '/landing/videos/escritorio-inventario.jpg', title: 'Inventario', text: 'La tabla con precios, costo, margen y stock, y cómo crear un producto.' },
+  { type: 'video', landscape: true, src: '/landing/videos/escritorio-panel.mp4', poster: '/landing/videos/escritorio-panel.jpg', title: 'Panel y ventas', text: 'Ganancias del día, detal vs por mayor, la caja y el historial de ventas.' },
+  { type: 'video', landscape: true, src: '/landing/videos/escritorio-catalogo.mp4', poster: '/landing/videos/escritorio-catalogo.jpg', title: 'Catálogo en línea', text: 'Tus clientes arman el pedido desde el computador y te lo envían por WhatsApp.' },
+];
+
 const BUSINESS_TYPES = ['Tiendas', 'Minimercados', 'Veterinarias', 'Droguerías', 'Panaderías', 'Restaurantes', 'Papelerías', 'Ferreterías', 'Distribuidoras', 'Misceláneas', 'Licoreras', 'Cafeterías'];
 
 const FAQ = [
@@ -101,6 +108,7 @@ export function LandingView() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [viewer, setViewer] = useState<Viewer>(null);
   const [showStickyCta, setShowStickyCta] = useState(false);
+  const [videoDevice, setVideoDevice] = useState<'mobile' | 'desktop'>('mobile');
   const waGeneral = whatsappLink('Hola, quiero información sobre V1TR0 POS para mi negocio.');
 
   // Aparición suave de las secciones al hacer scroll
@@ -254,22 +262,50 @@ export function LandingView() {
         <div className="landing-section-head" data-reveal>
           <span className="landing-eyebrow"><Play size={15} /> Videos</span>
           <h2>Míralo en acción</h2>
-          <p className="landing-section-sub">Se reproducen solos. Toca uno para verlo en grande desde el principio.</p>
+          <p className="landing-section-sub">Funciona igual en el celular y en el computador. Se reproducen solos; toca uno para verlo en grande.</p>
         </div>
-        <div className="landing-videos" data-reveal>
-          {VIDEOS.map((v, i) => (
-            <figure key={v.src} className="landing-video">
-              <button type="button" className="landing-video-frame" onClick={() => setViewer({ items: VIDEOS, index: i })} aria-label={`Ver en grande: ${v.title}`}>
-                <AutoPlayVideo src={v.src} poster={v.poster} label={`Video: ${v.title}`} />
-                <span className="landing-video-play"><Expand size={18} /> Ver en grande</span>
-              </button>
-              <figcaption>
-                <strong>{v.title}</strong>
-                <span>{v.text}</span>
-              </figcaption>
-            </figure>
-          ))}
+        <div className="landing-device-toggle" role="tablist" aria-label="Dispositivo" data-reveal>
+          <button type="button" role="tab" aria-selected={videoDevice === 'mobile'} className={videoDevice === 'mobile' ? 'active' : ''} onClick={() => setVideoDevice('mobile')}>
+            <Smartphone size={17} /> En el celular
+          </button>
+          <button type="button" role="tab" aria-selected={videoDevice === 'desktop'} className={videoDevice === 'desktop' ? 'active' : ''} onClick={() => setVideoDevice('desktop')}>
+            <Monitor size={17} /> En el computador
+          </button>
         </div>
+        {videoDevice === 'mobile' ? (
+          <div className="landing-videos" key="mobile">
+            {VIDEOS.map((v, i) => (
+              <figure key={v.src} className="landing-video">
+                <button type="button" className="landing-video-frame" onClick={() => setViewer({ items: VIDEOS, index: i })} aria-label={`Ver en grande: ${v.title}`}>
+                  <AutoPlayVideo src={v.src} poster={v.poster} label={`Video: ${v.title}`} />
+                  <span className="landing-video-play"><Expand size={18} /> Ver en grande</span>
+                </button>
+                <figcaption>
+                  <strong>{v.title}</strong>
+                  <span>{v.text}</span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : (
+          <div className="landing-videos desktop" key="desktop">
+            {DESKTOP_VIDEOS.map((v, i) => (
+              <figure key={v.src} className="landing-video desktop">
+                <button type="button" className="landing-laptop" onClick={() => setViewer({ items: DESKTOP_VIDEOS, index: i })} aria-label={`Ver en grande: ${v.title}`}>
+                  <span className="landing-laptop-screen">
+                    <AutoPlayVideo src={v.src} poster={v.poster} label={`Video en computador: ${v.title}`} />
+                    <span className="landing-video-play"><Expand size={18} /> Ver en grande</span>
+                  </span>
+                  <span className="landing-laptop-base" aria-hidden="true" />
+                </button>
+                <figcaption>
+                  <strong>{v.title}</strong>
+                  <span>{v.text}</span>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ---------- Cómo empezar ---------- */}

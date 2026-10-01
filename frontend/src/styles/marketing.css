@@ -293,6 +293,31 @@
   background: rgba(7, 11, 18, 0.72); border: 1px solid rgba(255, 255, 255, 0.16);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
 }
+.landing-device-toggle {
+  display: flex; width: fit-content; max-width: 100%; margin: 24px 0 0; padding: 5px; gap: 4px; border-radius: 999px;
+  background: var(--bg-card); border: 1px solid var(--border);
+}
+.landing-device-toggle button {
+  display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 16px; border-radius: 999px; border: none;
+  background: none; color: var(--text-secondary); font-size: 14.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.landing-device-toggle button.active { background: linear-gradient(90deg, #6366f1, #4f46e5); color: #fff; box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35); }
+.landing-videos { animation: landing-fade 0.35s ease; }
+
+/* Videos de escritorio en un portátil */
+.landing-video.desktop { flex: 0 0 86%; max-width: 560px; }
+.landing-laptop { display: block; width: 100%; padding: 0; border: none; background: none; cursor: zoom-in; }
+.landing-laptop-screen {
+  position: relative; display: block; padding: 8px; border-radius: 16px 16px 4px 4px; background: #0b0f19;
+  border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+}
+.landing-laptop-screen video { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; background: #000; }
+.landing-laptop-base {
+  display: block; height: 12px; margin: 0 -6%; border-radius: 0 0 14px 14px;
+  background: linear-gradient(180deg, #2a3142, #151a26); border: 1px solid rgba(255, 255, 255, 0.1); border-top: none;
+}
+.landing-laptop-base::before { content: ''; display: block; width: 16%; height: 5px; margin: 0 auto; border-radius: 0 0 6px 6px; background: #0b0f19; }
 .landing-video figcaption { display: flex; flex-direction: column; gap: 4px; padding: 0 4px; }
 .landing-video figcaption strong { font-size: 17px; }
 .landing-video figcaption span { font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
@@ -410,6 +435,10 @@
   display: block; height: min(72dvh, 760px); width: auto; max-width: calc(100vw - 48px); aspect-ratio: 780 / 1688;
   object-fit: cover; border-radius: 28px; background: #000;
 }
+.lightbox-phone.landscape { border-radius: 16px; padding: 6px; }
+.lightbox-phone.landscape img, .lightbox-phone.landscape video {
+  height: auto; width: min(calc(100vw - 48px), 1200px, calc((100dvh - 190px) * 1.6)); max-width: none; aspect-ratio: 16 / 10; border-radius: 10px;
+}
 .lightbox figcaption { text-align: center; color: #e2e8f0; display: flex; flex-direction: column; gap: 3px; max-width: 360px; }
 .lightbox figcaption strong { font-size: 17px; }
 .lightbox figcaption span { font-size: 14px; color: #94a3b8; }
@@ -440,6 +469,10 @@
   .lightbox-nav { width: 52px; height: 52px; }
   .lightbox-nav.prev { left: max(16px, calc(50% - 300px)); }
   .lightbox-nav.next { right: max(16px, calc(50% - 300px)); }
+  /* Video horizontal: flechas a los lados para no tapar la pantalla */
+  .lightbox:has(.landscape) .lightbox-nav.prev { left: 16px; }
+  .lightbox:has(.landscape) .lightbox-nav.next { right: 16px; }
+  .lightbox-phone.landscape video { width: min(calc(100vw - 160px), 1200px, calc((100dvh - 190px) * 1.6)); }
 }
 @media (min-width: 960px) {
   .landing-nav { padding: 14px 32px; }
@@ -467,6 +500,9 @@
   .landing-gallery-item:nth-child(even) { transform: translateY(28px); }
   .landing-videos { justify-content: center; overflow: visible; margin: 36px 0 0; padding: 0; gap: 28px; }
   .landing-video { flex: 0 1 300px; }
+  .landing-device-toggle { margin: 28px auto 0; }
+  .landing-videos.desktop { display: grid; grid-template-columns: 1fr 1fr; gap: 44px 40px; max-width: 1080px; margin: 36px auto 0; }
+  .landing-video.desktop { max-width: none; }
   .landing-final { border-radius: 28px; border: 1px solid var(--border); padding: 64px 32px; }
   .landing-footer { flex-direction: row; align-items: center; justify-content: space-between; padding-bottom: 40px; }
   .landing-sticky-cta { display: none; }

@@ -1,6 +1,7 @@
 // Graba un video vertical (celular) por módulo del POS.
-// Uso:  node record.mjs            -> todos los módulos
-//       node record.mjs vender     -> solo los indicados
+// Uso:  node record.mjs                  -> todos los módulos
+//       node record.mjs vender           -> solo los indicados
+//       node record.mjs --desktop [ids]  -> versión de escritorio (horizontal)
 // Requiere el frontend corriendo (npm run dev en frontend/, puerto 5173).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,20 +12,25 @@ import { createStore, mockApi, USER, ean13 } from './demo-data.mjs';
 import { overlayScript } from './overlay.mjs';
 import { ensureAssets } from './assets.mjs';
 import { SCENARIOS } from './scenarios.mjs';
+import { DESKTOP_SCENARIOS } from './scenarios-desktop.mjs';
 
 const BASE_URL = process.env.POS_URL || 'http://localhost:5173';
 const OUT_DIR = path.resolve('output');
 const RAW_DIR = path.join(OUT_DIR, 'raw');
 const ASSETS_DIR = path.resolve('assets');
-const VIEWPORT = { width: 390, height: 844 };
-const SCALE = 2;
+const args = process.argv.slice(2);
+const DESKTOP = args.includes('--desktop');
+// Celular: 390×844 @2 → 780×1688. Escritorio: 1280×800 @1.25 → 1600×1000 (a @1.5 la captura baja a ~10 fps).
+const VIEWPORT = DESKTOP ? { width: 1280, height: 800 } : { width: 390, height: 844 };
+const SCALE = DESKTOP ? 1.25 : 2;
+const ALL = DESKTOP ? DESKTOP_SCENARIOS : SCENARIOS;
 
 fs.mkdirSync(RAW_DIR, { recursive: true });
 
-const wanted = process.argv.slice(2);
-const scenarios = SCENARIOS.filter(s => wanted.length === 0 || wanted.includes(s.id));
+const wanted = args.filter(a => !a.startsWith('--'));
+const scenarios = ALL.filter(s => wanted.length === 0 || wanted.includes(s.id));
 if (scenarios.length === 0) {
-  console.error('Módulos disponibles:', SCENARIOS.map(s => s.id).join(', '));
+  console.error('Módulos disponibles:', ALL.map(s => s.id).join(', '));
   process.exit(1);
 }
 
@@ -114,8 +120,8 @@ async function recordScenario(scenario) {
   const context = await browser.newContext({
     viewport: VIEWPORT,
     deviceScaleFactor: SCALE,
-    isMobile: true,
-    hasTouch: true,
+    isMobile: !DESKTOP,
+    hasTouch: !DESKTOP,
     locale: 'es-CO',
     timezoneId: 'America/Bogota',
     colorScheme: 'dark',

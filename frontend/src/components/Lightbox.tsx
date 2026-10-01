@@ -8,6 +8,8 @@ export interface LightboxItem {
   poster?: string;
   title: string;
   text?: string;
+  /** Video de escritorio (horizontal); por defecto es vertical de celular */
+  landscape?: boolean;
 }
 
 interface Props {
@@ -76,7 +78,7 @@ export function Lightbox({ items, index, onClose, onIndex }: Props) {
         }}
         style={{ transform: dragX ? `translateX(${dragX}px)` : undefined }}
       >
-        <div className="lightbox-phone" key={item.src}>
+        <div className={`lightbox-phone ${item.landscape ? 'landscape' : ''}`} key={item.src}>
           {item.type === 'video' ? (
             <video src={item.src} poster={item.poster} controls autoPlay playsInline muted />
           ) : (
