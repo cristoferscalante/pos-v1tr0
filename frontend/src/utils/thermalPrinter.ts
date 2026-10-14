@@ -16,7 +16,7 @@ import type { ReceiptBusiness } from './receiptImage';
 import { resolveMediaSrc } from '../api/client';
 
 export type PaperWidth = '58' | '80';
-export type PrintMethod = 'browser' | 'rawbt' | 'bluetooth';
+export type PrintMethod = 'browser' | 'serial' | 'rawbt' | 'bluetooth';
 
 export interface PrinterSettings {
   paper: PaperWidth;
@@ -25,13 +25,16 @@ export interface PrinterSettings {
   plainText: boolean;
   /** Pulso para abrir el cajón monedero conectado a la impresora. */
   openDrawer: boolean;
+  /** Modo básico: solo texto, sin logo, negativo, letra doble ni corte. Para
+   * impresoras integradas que no entienden esos comandos y no imprimen nada. */
+  basic?: boolean;
 }
 
 const SETTINGS_KEY = 'pos_printer_settings';
 // En Android (terminales con impresora integrada) el diálogo del navegador no
-// llega a la ticketera: por defecto se imprime directo con RawBT.
+// llega a la ticketera: por defecto se imprime directo, sin apps (Web Serial).
 const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-const DEFAULT_SETTINGS: PrinterSettings = { paper: '58', method: isAndroid ? 'rawbt' : 'browser', plainText: false, openDrawer: true };
+const DEFAULT_SETTINGS: PrinterSettings = { paper: '58', method: isAndroid ? 'serial' : 'browser', plainText: false, openDrawer: true };
 
 export function loadPrinterSettings(): PrinterSettings {
   try {
@@ -238,6 +241,13 @@ export function buildEscPos(lines: TicketLine[], settings: PrinterSettings, imag
   b.push(ESC, 0x61, 0);                    // izquierda: las líneas ya traen el ancho exacto del cabezal (32/48 col.), así ocupan todo el papel
   const reset = () => b.push(ESC, 0x45, 0, GS, 0x21, 0, GS, 0x42, 0);
   const text = (t: string) => b.push(...encodeText(t, settings.plainText), LF);
+  if (settings.basic) {
+    // Solo inicializar y texto ASCII: lo entiende cualquier ticketera
+    const basic: number[] = [ESC, 0x40];
+    for (const line of lines) if (!line.image) basic.push(...encodeText(line.text.trimEnd(), true), LF);
+    basic.push(LF, LF, LF, LF);
+    return new Uint8Array(basic);
+  }
   lines.forEach((line, idx) => {
     if (line.image) {
       const raster = images[line.image];
@@ -337,6 +347,52 @@ async function printViaBluetooth(data: Uint8Array, forceChoose = false) {
     if (ch.properties.writeWithoutResponse) await ch.writeValueWithoutResponse(part);
     else await ch.writeValue(part);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Impresora integrada / Bluetooth clásico, sin apps (Web Serial)
+// ---------------------------------------------------------------------------
+// Muchas terminales Android (Sunmi y similares) exponen la impresora integrada
+// como un dispositivo Bluetooth clásico ya emparejado ("InnerPrinter"), y las
+// ticketeras Bluetooth comunes también son Bluetooth clásico (perfil SPP).
+// Chrome para Android habla con ellos por Web Serial, sin instalar nada. El
+// permiso queda guardado: se elige una sola vez por equipo.
+const SPP_UUID = '00001101-0000-1000-8000-00805f9b34fb';
+let serialPort: any = null;
+
+export const isSerialSupported = () => typeof navigator !== 'undefined' && !!(navigator as any).serial;
+
+async function getSerialPort(forceChoose: boolean): Promise<any> {
+  if (!isSerialSupported()) throw new Error('Este navegador no permite conectar la impresora directamente. Actualiza Chrome o usa RawBT.');
+  const serial = (navigator as any).serial;
+  if (!forceChoose && !serialPort) {
+    const ports: any[] = await serial.getPorts();   // elegida antes en este equipo
+    serialPort = ports[0] || null;
+  }
+  if (forceChoose || !serialPort) {
+    // Debe llamarse dentro del clic: Chrome muestra la lista de equipos emparejados
+    serialPort = await serial.requestPort({ allowedBluetoothServiceClassIds: [SPP_UUID] });
+  }
+  return serialPort;
+}
+
+async function printViaSerial(data: Uint8Array) {
+  const port = await getSerialPort(false);
+  if (!port.writable) await port.open({ baudRate: 9600 });
+  const writer = port.writable.getWriter();
+  try {
+    // Por partes, para no desbordar el búfer de impresoras lentas
+    for (let i = 0; i < data.length; i += 512) await writer.write(data.slice(i, i + 512));
+  } finally {
+    writer.releaseLock();
+  }
+}
+
+/** Elige (o cambia) la impresora integrada / Bluetooth clásico. Llamar desde un clic. */
+export async function chooseSerialPrinter(): Promise<string> {
+  const port = await getSerialPort(true);
+  const info = port.getInfo?.() || {};
+  return info.bluetoothServiceClassId ? 'Impresora Bluetooth' : 'Impresora';
 }
 
 /** Elige (o cambia) la impresora Bluetooth. Llamar desde un clic. */
@@ -440,9 +496,10 @@ export async function printTicket(lines: TicketLine[], settings: PrinterSettings
   if (settings.method === 'browser') return printViaBrowser(lines, settings.paper);
   // Logo a ~18 mm (144 puntos a 203 ppp), en blanco y negro
   const images: Record<string, RasterImage | null> = {};
-  for (const line of lines) if (line.image && !(line.image in images)) images[line.image] = await rasterizeImage(line.image, 144);
+  if (!settings.basic) for (const line of lines) if (line.image && !(line.image in images)) images[line.image] = await rasterizeImage(line.image, 144);
   const data = buildEscPos(lines, settings, images);
   if (settings.method === 'rawbt') return printViaRawBT(data);
+  if (settings.method === 'serial') return printViaSerial(data);
   return printViaBluetooth(data);
 }
 

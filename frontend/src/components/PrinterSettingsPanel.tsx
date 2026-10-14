@@ -2,17 +2,18 @@ import { useState, type ReactNode } from 'react';
 import { Bluetooth, ChevronDown, Printer, Smartphone, Monitor } from 'lucide-react';
 import { useToast } from './Toast';
 import {
-  bluetoothPrinterName, chooseBluetoothPrinter, isBluetoothSupported, printTestPage, savePrinterSettings,
+  bluetoothPrinterName, chooseBluetoothPrinter, chooseSerialPrinter, isBluetoothSupported, isSerialSupported, printTestPage, savePrinterSettings,
   type PrintMethod, type PrinterSettings,
 } from '../utils/thermalPrinter';
 
 const METHODS: { id: PrintMethod; label: string; hint: string; icon: ReactNode }[] = [
   { id: 'browser', label: 'Navegador', hint: 'Abre el diálogo de impresión. Sirve con cualquier impresora.', icon: <Monitor size={16} /> },
+  { id: 'serial', label: 'Impresora integrada (sin apps)', hint: 'Terminales Android con impresora incorporada y ticketeras Bluetooth emparejadas. Se elige una sola vez.', icon: <Printer size={16} /> },
   { id: 'rawbt', label: 'Directa (RawBT)', hint: 'Android y terminales con impresora integrada (Sunmi, PDA). Requiere la app RawBT.', icon: <Smartphone size={16} /> },
   { id: 'bluetooth', label: 'Bluetooth directo', hint: 'Impresoras Bluetooth BLE desde Chrome. Se elige una vez por sesión.', icon: <Bluetooth size={16} /> },
 ];
 
-export const METHOD_LABELS: Record<PrintMethod, string> = { browser: 'Navegador', rawbt: 'RawBT', bluetooth: 'Bluetooth' };
+export const METHOD_LABELS: Record<PrintMethod, string> = { browser: 'Navegador', serial: 'Integrada', rawbt: 'RawBT', bluetooth: 'Bluetooth' };
 
 interface Props {
   settings: PrinterSettings;
@@ -29,6 +30,17 @@ export function PrinterSettingsPanel({ settings, onChange }: Props) {
     const next = { ...settings, ...patch };
     savePrinterSettings(next);
     onChange(next);
+  };
+
+  const [serialName, setSerialName] = useState<string | null>(null);
+  const chooseSerial = async () => {
+    try {
+      const name = await chooseSerialPrinter();
+      setSerialName(name);
+      success('Impresora elegida. Toca "Imprimir prueba".');
+    } catch (e: any) {
+      if (e?.name !== 'NotFoundError') error(e?.message || 'No se pudo elegir la impresora');
+    }
   };
 
   const choosePrinter = async () => {
@@ -92,6 +104,21 @@ export function PrinterSettingsPanel({ settings, onChange }: Props) {
                 <p className="printer-settings-note">Este navegador no permite Bluetooth. Usa Chrome en Android o la opción RawBT.</p>
               )
             )}
+            {settings.method === 'serial' && (
+              isSerialSupported() ? (
+                <>
+                  <button type="button" className="btn-secondary" onClick={chooseSerial} style={{ minHeight: '40px' }}>
+                    <Printer size={15} /> {serialName ? `${serialName} elegida · Cambiar` : 'Elegir impresora'}
+                  </button>
+                  <p className="printer-settings-note">
+                    En la lista elige la impresora del equipo (suele llamarse <strong>InnerPrinter</strong> o <strong>Printer</strong>).
+                    Si no aparece, revisa en Ajustes → Bluetooth que esté emparejada.
+                  </p>
+                </>
+              ) : (
+                <p className="printer-settings-note">Este navegador no permite conectar la impresora directamente. Actualiza Chrome o usa RawBT.</p>
+              )
+            )}
             {settings.method === 'rawbt' && (
               <p className="printer-settings-note">
                 Instala <a href="https://play.google.com/store/apps/details?id=ru.a402d.rawbtprinter" target="_blank" rel="noreferrer">RawBT</a> y
@@ -104,6 +131,10 @@ export function PrinterSettingsPanel({ settings, onChange }: Props) {
           <label className="printer-check">
             <input type="checkbox" checked={settings.openDrawer} onChange={e => update({ openDrawer: e.target.checked })} />
             Abrir el cajón monedero al imprimir
+          </label>
+          <label className="printer-check">
+            <input type="checkbox" checked={!!settings.basic} onChange={e => update({ basic: e.target.checked })} />
+            Modo básico: solo texto (si la impresora no imprime nada)
           </label>
           <label className="printer-check">
             <input type="checkbox" checked={settings.plainText} onChange={e => update({ plainText: e.target.checked })} />
