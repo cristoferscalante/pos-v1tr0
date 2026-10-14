@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Bluetooth, ChevronDown, Printer, Smartphone, Monitor } from 'lucide-react';
 import { useToast } from './Toast';
 import {
-  bluetoothPrinterName, chooseBluetoothPrinter, chooseSerialPrinter, isBluetoothSupported, isSerialSupported, printTestPage, savePrinterSettings,
+  bluetoothPrinterName, chooseBluetoothPrinter, chooseSerialPrinter, printerErrorMessage, isBluetoothSupported, isSerialSupported, printTestPage, savePrinterSettings,
   type PrintMethod, type PrinterSettings,
 } from '../utils/thermalPrinter';
 
@@ -39,7 +39,8 @@ export function PrinterSettingsPanel({ settings, onChange }: Props) {
       setSerialName(name);
       success('Impresora elegida. Toca "Imprimir prueba".');
     } catch (e: any) {
-      if (e?.name !== 'NotFoundError') error(e?.message || 'No se pudo elegir la impresora');
+      const message = printerErrorMessage(e, 'serial');
+      if (message) error(message);
     }
   };
 
@@ -55,7 +56,7 @@ export function PrinterSettingsPanel({ settings, onChange }: Props) {
 
   const test = async () => {
     try { await printTestPage(settings); setBtName(bluetoothPrinterName()); }
-    catch (e: any) { if (e?.name !== 'NotFoundError') error(e?.message || 'No se pudo imprimir la prueba'); }
+    catch (e: any) { const message = printerErrorMessage(e, settings.method); if (message) error(message); }
   };
 
   return (

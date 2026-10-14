@@ -388,6 +388,18 @@ async function printViaSerial(data: Uint8Array) {
   }
 }
 
+/** Mensaje para el usuario cuando falla la impresión (null = canceló a propósito). */
+export function printerErrorMessage(e: any, method: PrintMethod): string | null {
+  if (e?.name === 'NotFoundError') {
+    // En "integrada", la lista de Chrome sale vacía si el equipo no tiene la
+    // impresora como Bluetooth emparejado; cancelar es lo único que se puede hacer.
+    return method === 'serial'
+      ? 'No se encontró la impresora. Revisa que el Bluetooth esté encendido y la impresora emparejada en Ajustes → Bluetooth. Si no aparece ahí, tu equipo no la expone por Bluetooth: usa "Directa (RawBT)".'
+      : null;
+  }
+  return e?.message || 'No se pudo imprimir';
+}
+
 /** Elige (o cambia) la impresora integrada / Bluetooth clásico. Llamar desde un clic. */
 export async function chooseSerialPrinter(): Promise<string> {
   const port = await getSerialPort(true);

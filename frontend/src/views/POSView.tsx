@@ -16,7 +16,7 @@ import { businessFromUser } from '../utils/receiptImage';
 import { PrinterSettingsPanel } from '../components/PrinterSettingsPanel';
 import { ReceiptPreview } from '../components/ReceiptPreview';
 import { ScannerDiagnostic, type ScanResult } from '../components/ScannerDiagnostic';
-import { clearThermalPrint, loadPrinterSettings, printSaleReceipt } from '../utils/thermalPrinter';
+import { clearThermalPrint, loadPrinterSettings, printSaleReceipt, printerErrorMessage } from '../utils/thermalPrinter';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
 import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
@@ -240,7 +240,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       try {
         await printSaleReceipt(completedSale, businessFromUser(storedUser), printerSettings);
       } catch (e: any) {
-        if (e?.name !== 'NotFoundError') error(e?.message || 'No se pudo imprimir el recibo');
+        const message = printerErrorMessage(e, printerSettings.method);
+        if (message) error(message);
       }
       return;
     }
