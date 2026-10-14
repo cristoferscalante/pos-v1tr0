@@ -4070,3 +4070,9 @@ body {
 .printer-settings-note a { color: var(--primary); font-weight: 700; }
 .printer-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); cursor: pointer; }
 .printer-check input { width: 16px; height: 16px; accent-color: var(--primary); }
+
+/* Campo invisible del lector de códigos (ver utils/useBarcodeScanner) */
+.scan-sink {
+  position: fixed; left: 0; top: 0; width: 1px; height: 1px; padding: 0; border: 0;
+  opacity: 0; pointer-events: none; font-size: 16px; background: transparent; color: transparent;
+}

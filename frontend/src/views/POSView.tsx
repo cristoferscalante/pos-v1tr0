@@ -19,6 +19,7 @@ import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod 
 import { getProductCategory } from '../utils/productCategories';
 import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
 import { findProductByCode } from '../utils/productLookup';
+import { useBarcodeScanner, scanFeedback, type ScanInfo } from '../utils/useBarcodeScanner';
 import { resolveMediaSrc } from '../api/client';
 
 interface POSViewProps {
@@ -110,182 +111,42 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   } | null>(null);
   const [completedSale, setCompletedSale] = useState<LocalSale | null>(null);
 
-  // Global keydown listener for barcode/QR scanner gun (Capture Phase)
-  React.useEffect(() => {
-    let buffer = '';
-    let lastKeyTime = Date.now();
-    let keyTimes: number[] = [];
-    let timeoutId: any;
-
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Si el modal de diagnóstico está abierto, no procesar aquí
-      if (showDiagnostic) return;
-
-      const target = e.target as HTMLElement;
-      const isSearchInput = target === searchRef.current;
-      const isOtherInput = (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') && !isSearchInput;
-
-      // Si está enfocado en otro input, ignorar para permitir la escritura manual lenta
-      if (isOtherInput) {
-        return;
-      }
-
-      const currentTime = Date.now();
-      const elapsed = currentTime - lastKeyTime;
-      lastKeyTime = currentTime;
-
-      // Si pasa demasiado tiempo entre teclas (más de 90ms), asumimos que es escritura manual lenta y reiniciamos
-      if (elapsed > 90) {
-        buffer = '';
-        keyTimes = [];
-      }
-
-      // Si es la tecla Enter o Tab, procesar el buffer acumulado
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        if (buffer.length >= 3) {
-          const barcode = buffer.trim();
-          const match = products.find(p => p.barcode === barcode || p.sku?.toLowerCase() === barcode.toLowerCase());
-          if (match) {
-            addToCart(match);
-            success(`⚡ Escaneado con pistola: ${match.name}`);
-            setIsScanning(false);
-            setSearch('');
-            e.preventDefault();
-            e.stopPropagation();
-          } else {
-            warning(`Código escaneado "${barcode}" no coincide con ningún producto`);
-            setSearch('');
-            e.preventDefault();
-            e.stopPropagation();
-          }
-        }
-        buffer = '';
-        keyTimes = [];
-        clearTimeout(timeoutId);
-        return;
-      }
-
-      // Evitar acumular teclas especiales
-      if (e.key.length === 1) {
-        buffer += e.key;
-        keyTimes.push(elapsed);
-
-        // Si detectamos velocidad de escáner en el input de búsqueda, prevenimos la escritura nativa
-        // para que no ensucie la caja de texto.
-        const isScannerSpeed = keyTimes.length >= 2 && keyTimes.slice(1).every(t => t < 45);
-        if (isScannerSpeed && isSearchInput) {
-          e.preventDefault();
-        }
-
-        // Timeout por si la pistola de código de barras no tiene configurado un sufijo (Enter/Tab)
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          const avgTime = keyTimes.length >= 2
-            ? keyTimes.slice(1).reduce((s, t) => s + t, 0) / (keyTimes.length - 1)
-            : 999;
-
-          if (buffer.length >= 3 && avgTime < 45) {
-            const barcode = buffer.trim();
-            const match = products.find(p => p.barcode === barcode || p.sku?.toLowerCase() === barcode.toLowerCase());
-            if (match) {
-              addToCart(match);
-              success(`⚡ Escaneado con pistola (auto): ${match.name}`);
-              setIsScanning(false);
-              setSearch('');
-            } else {
-              warning(`Código escaneado "${barcode}" no coincide con ningún producto`);
-              setSearch('');
-            }
-          }
-          buffer = '';
-          keyTimes = [];
-        }, 50); // Procesar tras 50ms de silencio a alta velocidad
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown, true);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown, true);
-      clearTimeout(timeoutId);
-    };
-  }, [products, addToCart, success, warning, showDiagnostic]);
-
-  // Diagnostic Modal keydown handler
-  React.useEffect(() => {
-    if (!showDiagnostic) return;
-
-    let localBuffer = '';
-    let times: number[] = [];
-    let lastKey = Date.now();
-    let terminatorKey = 'Ninguno';
-    let timeoutId: any;
-
-    const handleDiagnosticKey = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const now = Date.now();
-      const delay = now - lastKey;
-      lastKey = now;
-
-      if (e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta') {
-        return;
-      }
-
-      if (e.key === 'Enter') {
-        terminatorKey = 'Enter (CR)';
-        finalizeScan();
-        return;
-      }
-
-      if (e.key === 'Tab') {
-        terminatorKey = 'Tab';
-        finalizeScan();
-        return;
-      }
-
-      if (e.key.length === 1) {
-        localBuffer += e.key;
-        times.push(delay);
-
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          finalizeScan();
-        }, 80);
-      }
-    };
-
-    const finalizeScan = () => {
-      clearTimeout(timeoutId);
-      if (localBuffer.length === 0) return;
-
-      const validDelays = times.slice(1);
-      const avg = validDelays.length > 0
-        ? validDelays.reduce((s, d) => s + d, 0) / validDelays.length
-        : 0;
-
-      const code = localBuffer.trim();
-      const match = products.find(p => p.barcode === code || p.sku?.toLowerCase() === code.toLowerCase());
-
+  // Lector de códigos: el integrado de la terminal (PDA) o una pistola USB/Bluetooth.
+  // Ver utils/useBarcodeScanner: lee aunque no haya ningún campo enfocado y sin
+  // abrir el teclado en pantalla. Pita y vibra al leer.
+  const handleScan = useCallback((code: string, info: ScanInfo) => {
+    const match = findProductByCode(products, code);
+    scanFeedback(!!match);
+    if (showDiagnostic) {
       setDiagnosticLogs({
         text: code,
-        keys: times.map((t, idx) => ({ key: localBuffer[idx] || '', time: t })),
-        speed: avg > 0 ? `${avg.toFixed(1)}ms` : 'Instantáneo',
-        terminator: terminatorKey,
-        matchedProduct: match ? match.name : null
+        keys: Array.from(code).map(key => ({ key, time: 0 })),
+        speed: info.avgMs != null ? `${info.avgMs.toFixed(1)}ms` : 'Instantáneo (lector integrado)',
+        terminator: info.terminator === 'Enter' ? 'Enter (CR)' : info.terminator,
+        matchedProduct: match ? match.name : null,
       });
+      return;
+    }
+    // Escanear con el recibo abierto = empezar la siguiente venta
+    setCompletedSale(null);
+    setIsScanning(false);
+    if (match) {
+      addToCart(match);
+      success(`${match.name} agregado`);
+    } else {
+      warning(`Código "${code}" no está registrado`);
+    }
+  }, [products, showDiagnostic, addToCart, success, warning]);
 
-      localBuffer = '';
-      times = [];
-      terminatorKey = 'Ninguno';
-    };
-
-    window.addEventListener('keydown', handleDiagnosticKey, true);
-    return () => {
-      window.removeEventListener('keydown', handleDiagnosticKey, true);
-      clearTimeout(timeoutId);
-    };
-  }, [showDiagnostic, products]);
+  const { sinkRef: scanSinkRef } = useBarcodeScanner({
+    enabled: true,
+    onScan: handleScan,
+    // Teclado físico sin campo enfocado: lo escrito va al buscador
+    onType: text => { setSearch(prev => prev + text); searchRef.current?.focus(); },
+    searchRef,
+    setSearch,
+    isKnownCode: code => !!findProductByCode(products, code),
+  });
 
 
   const updateQty = (productId: string, delta: number) => {
@@ -521,7 +382,8 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       const match = findProductByCode(products, term);
       if (match) {
         addToCart(match);
-        success(`⚡ Escaneado: ${match.name}`);
+        scanFeedback(true);
+        success(`${match.name} agregado`);
         setSearch('');
       } else {
         warning(`Código "${term}" no coincide con ningún producto registrado`);
@@ -545,7 +407,20 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               onKeyDown={handleSearchKey}
               placeholder="Buscar producto, SKU o código..."
               className="search-input"
-              autoFocus
+              autoFocus={typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches}
+              enterKeyHint="search"
+            />
+            {/* Campo invisible que recibe el lector integrado sin abrir el teclado */}
+            <input
+              ref={scanSinkRef}
+              className="scan-sink"
+              inputMode="none"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              tabIndex={-1}
+              aria-hidden="true"
             />
           </div>
           <button 
@@ -582,7 +457,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               animation: 'pulse 1.5s infinite'
             }} />
             <Barcode size={14} />
-            <span className="barcode-badge-text">Pistola Lista</span>
+            <span className="barcode-badge-text">Lector listo</span>
           </button>
           <button
             onClick={() => setIsScanning(true)}
@@ -884,6 +759,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         <QrScannerModal
           onScanSuccess={code => {
             const match = findProductByCode(products, code);
+            scanFeedback(!!match);
             if (match) { addToCart(match); success(`Producto escaneado: ${match.name}`); }
             else warning(`Código "${code}" no encontrado en inventario`);
             setIsScanning(false);
