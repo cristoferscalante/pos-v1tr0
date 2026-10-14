@@ -8,6 +8,10 @@ export interface ReceiptBusiness {
   color?: string;
   lines: string[];      // razón social, NIT, dirección, teléfonos...
   footer: string;
+  // Para el recibo impreso (diseño "Con logo")
+  logoUrl?: string;
+  idLine?: string;          // razón social · NIT
+  contactLines?: string[];  // dirección, teléfonos, correo
 }
 
 const PAYMENT_LABELS: Record<string, string> = { cash: 'Efectivo', card: 'Tarjeta', transfer: 'Transferencia' };
@@ -30,6 +34,13 @@ export function businessFromUser(user: any): ReceiptBusiness {
       [m.business_phone ? `Tel. ${m.business_phone}` : '', m.whatsapp_number ? `WhatsApp ${m.whatsapp_number}` : ''].filter(Boolean).join(' · '),
     ].filter(Boolean),
     footer: m.receipt_footer || '¡Gracias por su compra!',
+    logoUrl: m.logo_url || undefined,
+    idLine: [m.business_legal_name, m.business_nit ? `NIT ${m.business_nit}` : ''].filter(Boolean).join(' · '),
+    contactLines: [
+      [m.business_address, m.business_city].filter(Boolean).join(', '),
+      [m.business_phone ? `Tel. ${m.business_phone}` : '', m.whatsapp_number ? `WA ${m.whatsapp_number}` : ''].filter(Boolean).join(' · '),
+      m.receipt_reply_to_email || '',
+    ].filter(Boolean),
   };
 }
 

@@ -207,6 +207,20 @@ r = client.get(f"/api/v1/products/{product_id}", headers=admin_headers)
 stock_after_edit = r.json().get("stock")
 check("el stock NO fue sobreescrito por la edicion (sigue en 3)", stock_after_edit == 3, str(stock_after_edit))
 
+# --- 9b. Solo el admin cambia el stock (new_stock deja ajuste en el kardex); el cajero no ---
+product_body = {"name": "Producto Smoke", "price": "10000.00", "cost": "6000.00", "tax_rate": "19.00"}
+r = client.put(f"/api/v1/products/{product_id}", json={**product_body, "new_stock": 10}, headers=admin_headers)
+check("admin fija el stock con new_stock=10", r.status_code == 200 and r.json().get("stock") == 10, f"{r.status_code} {r.text[:300]}")
+r = client.get(f"/api/v1/purchases/products/{product_id}/kardex", headers=admin_headers)
+kardex_text = r.text
+check("el ajuste del admin queda en el kardex", r.status_code == 200 and "adjustment_in" in kardex_text, kardex_text[:300])
+r = client.put(f"/api/v1/products/{product_id}", json={**product_body, "new_stock": 50}, headers=cashier_headers)
+check("cajero NO puede cambiar el stock por edicion (403)", r.status_code == 403, f"{r.status_code} {r.text[:200]}")
+r = client.post("/api/v1/purchases/movements/manual", json={"product_id": product_id, "movement_type": "adjustment_in", "quantity": 5}, headers=cashier_headers)
+check("cajero NO puede hacer movimientos manuales de inventario (403)", r.status_code == 403, f"{r.status_code} {r.text[:200]}")
+r = client.post("/api/v1/purchases/movements/manual", json={"product_id": product_id, "movement_type": "adjustment_out", "quantity": 7}, headers=admin_headers)
+check("admin si puede hacer movimientos manuales (10 - 7 = 3)", r.status_code == 201 and r.json().get("stock") == 3, f"{r.status_code} {r.text[:200]}")
+
 # --- 10. HALLAZGO 4.2: cierre de caja no debe mezclar metodos de pago ---
 r = client.post("/api/v1/cash/open", json={"opening_amount": "50000.00"}, headers=admin_headers)
 check("abrir caja", r.status_code == 201, f"{r.status_code} {r.text[:300]}")

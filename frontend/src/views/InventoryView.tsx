@@ -309,6 +309,9 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     startBlankCreate();
   };
 
+  // Los colaboradores (cajeros) no pueden cambiar el stock; solo el admin.
+  const canEditStock = user?.role === 'admin';
+
   const openEdit = (p: LocalProduct) => {
     setEditingProduct(p);
     setForm({ ...p, wholesale_price: wholesalePrice(p), category: getProductCategory(p) });
@@ -525,6 +528,15 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     if (!selectedCategory) { warning('Selecciona una categoría'); return; }
     setIsSaving(true);
     try {
+      // Solo un administrador puede cambiar el stock de un producto existente,
+      // y solo con conexión: el backend lo registra como ajuste en el kardex.
+      const stockChanged = !!editingProduct && canEditStock
+        && Number(form.stock ?? 0) !== Number(editingProduct.stock ?? 0);
+      if (stockChanged && !(isOnline && token)) {
+        warning('Para cambiar el stock necesitas conexión a internet');
+        setIsSaving(false);
+        return;
+      }
       const productData: LocalProduct = {
         id: editingProduct?.id || crypto.randomUUID(),
         name: form.name!,
@@ -533,13 +545,11 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
         price: Number(form.price),
         wholesale_price: Number(form.wholesale_price) || Number(form.price),
         cost: Number(form.cost) || 0,
-        // Al editar un producto existente, el stock NO se toma del formulario:
-        // el backend ya ignora el campo "stock" en PUT /products/{id} (para no
-        // pisar una venta o compra concurrente, ver hallazgo 5.4 del plan de
-        // mejora), así que aquí se conserva el valor que ya tenía el producto en
-        // vez del que estaba en pantalla cuando se abrió el formulario. Para
-        // productos nuevos sí se usa el stock inicial capturado en el formulario.
-        stock: editingProduct ? editingProduct.stock : (Number(form.stock) || 0),
+        // Al editar, "stock" no se toma del formulario: el backend lo ignora en
+        // PUT /products/{id} (para no pisar una venta o compra concurrente, ver
+        // hallazgo 5.4 del plan de mejora). Si el admin cambió el número, se
+        // envía aparte como "new_stock" y el backend lo registra como ajuste.
+        stock: editingProduct ? (stockChanged ? Math.max(0, Number(form.stock) || 0) : editingProduct.stock) : (Number(form.stock) || 0),
         category: selectedCategory,
         image: productImage || undefined,
         tax_rate: form.tax_rate !== undefined ? Number(form.tax_rate) : 19,
@@ -574,7 +584,10 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
       if (isOnline && token) {
         try {
           if (editingProduct) {
-            const updated = await productsApi.update(token, productData.id, productData);
+            const updated = await productsApi.update(token, productData.id, {
+              ...productData,
+              ...(stockChanged ? { new_stock: productData.stock } : {}),
+            });
             await db.products.put({ ...normalizeProduct(updated as LocalProduct), sync_status: 'synced', sync_error: undefined });
           } else {
             const created = await productsApi.create(token, productData as any);
@@ -1093,14 +1106,15 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
                 <div className="form-group">
                   <label className="form-label">{editingProduct ? 'Stock actual' : 'Stock inicial'}</label>
-                  {editingProduct ? (
+                  {editingProduct && !canEditStock ? (
                     <>
                       <input type="number" className="form-input" value={form.stock ?? 0} disabled readOnly title="El stock de un producto existente no se edita aquí, para evitar pisar ventas o compras registradas mientras el formulario estaba abierto." />
                       <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                        Para ajustar el stock de un producto existente usa Suministros → Movimientos manuales (entrada, salida o merma). Así queda un registro de por qué cambió.
+                        Solo un administrador puede cambiar el stock.
                       </p>
                     </>
                   ) : (
+                    <>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <div style={{ display: 'inline-flex', alignItems: 'stretch', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', overflow: 'hidden', background: 'var(--surface-input)' }}>
                         <button type="button" aria-label="Restar una unidad" onClick={() => setForm(f => ({ ...f, stock: Math.max(0, (Number(f.stock) || 0) - 1) }))} style={{ padding: '0 14px', border: 'none', background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
@@ -1113,6 +1127,14 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                       </div>
                       <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>unidades disponibles hoy</span>
                     </div>
+                    {editingProduct && (
+                      <p className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        {Number(form.stock ?? 0) !== Number(editingProduct.stock ?? 0)
+                          ? `Antes: ${editingProduct.stock}. Al guardar queda registrado como ajuste en el kardex.`
+                          : 'Escribe la cantidad que tienes contada; el cambio queda registrado en el kardex.'}
+                      </p>
+                    )}
+                    </>
                   )}
                 </div>
 

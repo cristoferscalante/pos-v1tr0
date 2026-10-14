@@ -47,6 +47,17 @@ def get_current_user(
         )
     return user
 
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Solo administradores del negocio. Se usa en los endpoints que cambian el
+    stock a mano (compras, ajustes, devoluciones): los colaboradores (cajeros)
+    solo mueven inventario vendiendo."""
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acceso denegado: solo un administrador puede modificar el stock",
+        )
+    return current_user
+
 def get_current_tenant_id(
     session: Session = Depends(get_session),
     token: str = Depends(reusable_oauth2),

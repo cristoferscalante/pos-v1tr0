@@ -5,7 +5,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin
 from app.core.db import get_session
 from app.models.notification import NotificationLog
 from app.models.product import Product
@@ -206,7 +206,7 @@ def get_accounts_payable_summary(
 def create_purchase(
     data: PurchaseCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     supplier = session.get(Supplier, data.supplier_id)
     if not supplier or supplier.tenant_id != current_user.tenant_id:
@@ -280,7 +280,7 @@ def update_purchase(
 def cancel_purchase(
     purchase_id: uuid.UUID,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     purchase = session.get(Purchase, purchase_id)
     if not purchase or purchase.tenant_id != current_user.tenant_id:
@@ -411,7 +411,7 @@ def get_purchase(
 def create_manual_inventory_movement(
     data: ManualInventoryMovementCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     product = session.get(Product, data.product_id)
     if not product or product.tenant_id != current_user.tenant_id:
@@ -454,7 +454,7 @@ def create_manual_inventory_movement(
 def create_supplier_return(
     data: SupplierReturnCreate,
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     supplier = session.get(Supplier, data.supplier_id)
     if not supplier or supplier.tenant_id != current_user.tenant_id:

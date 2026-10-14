@@ -32,5 +32,11 @@ class Product(ProductBase, table=True):
 class ProductCreate(ProductBase):
     id: Optional[uuid.UUID] = None
 
+class ProductUpdate(ProductCreate):
+    # Conteo nuevo de stock fijado por un administrador desde el formulario del
+    # producto. Es distinto de "stock" (que PUT ignora a propósito): solo se envía
+    # cuando el admin cambió el número, y genera un movimiento de inventario.
+    new_stock: Optional[float] = Field(default=None, ge=0)
+
 class ProductRead(ProductBase):
     id: uuid.UUID

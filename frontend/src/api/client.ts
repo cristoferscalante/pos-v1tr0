@@ -159,7 +159,8 @@ export const productsApi = {
   create: (token: string, data: Omit<ApiProduct, 'tenant_id'>): Promise<ApiProduct> =>
     request('/api/v1/products/', { method: 'POST', body: JSON.stringify(data) }, token),
 
-  update: (token: string, id: string, data: Partial<ApiProduct>): Promise<ApiProduct> =>
+  // new_stock: conteo nuevo fijado por un admin (el backend lo registra como ajuste).
+  update: (token: string, id: string, data: Partial<ApiProduct> & { new_stock?: number }): Promise<ApiProduct> =>
     request(`/api/v1/products/${id}`, { method: 'PUT', body: JSON.stringify(data) }, token),
 
   delete: (token: string, id: string): Promise<void> =>

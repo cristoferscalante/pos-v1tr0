@@ -5,7 +5,8 @@ import uuid
 
 from app.core.db import get_session
 from app.api.deps import get_current_tenant_id, get_current_user
-from app.models.product import Product, ProductCreate, ProductRead
+from app.models.product import Product, ProductCreate, ProductRead, ProductUpdate
+from app.models.purchase import InventoryMovement
 from app.models.user import User
 
 router = APIRouter()
@@ -75,7 +76,7 @@ def get_product(
 @router.put("/{product_id}", response_model=ProductRead)
 def update_product(
     product_id: uuid.UUID,
-    data: ProductCreate, # Opcional: Se podría usar un esquema ProductUpdate
+    data: ProductUpdate,
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -99,12 +100,32 @@ def update_product(
     # InventoryMovement. Permitir que el formulario de edición de producto
     # sobrescriba el stock aquí puede revertir en silencio el efecto de una venta
     # concurrente (ver hallazgo 5.4 del plan de mejora).
-    FIELDS_NOT_EDITABLE_HERE = {"tenant_id", "stock"}
+    FIELDS_NOT_EDITABLE_HERE = {"tenant_id", "stock", "new_stock", "id"}
     product_data = data.model_dump(exclude_unset=True)
     for key, value in product_data.items():
         if key not in FIELDS_NOT_EDITABLE_HERE:
             setattr(db_product, key, value)
-            
+
+    # El admin puede fijar el stock contado explícitamente con "new_stock". Queda
+    # registrado como ajuste en el kardex (InventoryMovement) igual que un
+    # movimiento manual, para saber quién lo cambió y cuánto.
+    if data.new_stock is not None and float(data.new_stock) != float(db_product.stock or 0):
+        previous_stock = float(db_product.stock or 0)
+        delta = float(data.new_stock) - previous_stock
+        db_product.stock = float(data.new_stock)
+        session.add(InventoryMovement(
+            tenant_id=tenant_id,
+            product_id=db_product.id,
+            user_id=current_user.id,
+            movement_type="adjustment_in" if delta > 0 else "adjustment_out",
+            quantity=delta,
+            previous_stock=previous_stock,
+            new_stock=db_product.stock,
+            reference_type="manual",
+            notes="Ajuste de stock desde la edición del producto",
+        ))
+
+
     session.add(db_product)
     session.commit()
     session.refresh(db_product)

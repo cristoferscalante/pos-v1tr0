@@ -13,6 +13,8 @@ import { ReceiptEmailForm, isValidEmail } from '../components/ReceiptEmailForm';
 import { ReceiptImageActions } from '../components/ReceiptImageActions';
 import { CashChange, parseAmount } from '../components/CashChange';
 import { businessFromUser } from '../utils/receiptImage';
+import { PrinterSettingsPanel } from '../components/PrinterSettingsPanel';
+import { clearThermalPrint, loadPrinterSettings, printSaleReceipt } from '../utils/thermalPrinter';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
 import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
@@ -50,6 +52,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const [priceMode, setPriceMode] = useState<PriceMode>('retail');
   const priceOf = (product: LocalProduct) => unitPrice(product, priceMode);
   const [printMode, setPrintMode] = useState<'receipt' | 'invoice'>('receipt');
+  const [printerSettings, setPrinterSettings] = useState(loadPrinterSettings);
   const [customerDocumentCode, setCustomerDocumentCode] = useState('13');
   const [customerIdentification, setCustomerIdentification] = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -367,8 +370,19 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     }
   };
 
-  const handlePrint = (mode: 'receipt' | 'invoice') => {
+  const handlePrint = async (mode: 'receipt' | 'invoice') => {
     setPrintMode(mode);
+    if (mode === 'receipt' && completedSale) {
+      // Recibo a columnas para ticketera (58/80 mm) por el método elegido en
+      // este dispositivo: navegador, RawBT o Bluetooth directo.
+      try {
+        await printSaleReceipt(completedSale, businessFromUser(storedUser), printerSettings);
+      } catch (e: any) {
+        if (e?.name !== 'NotFoundError') error(e?.message || 'No se pudo imprimir el recibo');
+      }
+      return;
+    }
+    clearThermalPrint();
     requestAnimationFrame(() => window.print());
   };
 
@@ -879,64 +893,10 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         />
       )}
 
-      {/* Printable Area for Thermal Printer (Rendered at root via Portal to avoid parent display:none) */}
-      {completedSale && createPortal(
+      {/* Hoja de factura electrónica para imprimir (portal en el body para evitar el display:none del padre).
+          El recibo de ticketera se imprime aparte con utils/thermalPrinter. */}
+      {completedSale && printMode === 'invoice' && createPortal(
         <div id="print-ticket-area">
-          {printMode === 'receipt' ? (
-            <>
-              <div style={{ textAlign: 'center', textTransform: 'uppercase', marginBottom: '4px' }}>
-                <strong>{businessName}</strong>
-              </div>
-              {bizLines.length > 0 && (
-                <div style={{ textAlign: 'center', fontSize: '10px', lineHeight: 1.35, marginBottom: '8px' }}>
-                  {bizLines.map(line => <div key={line}>{line}</div>)}
-                </div>
-              )}
-              <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
-                Fecha: {new Date(completedSale.created_at).toLocaleString()}<br />
-                Factura N°: {completedSale.sale_number}
-                {completedSale.meta_data?.price_mode === 'wholesale' && (<><br /><strong>VENTA AL POR MAYOR</strong></>)}
-              </div>
-              <div style={{ borderBottom: '1px dashed black', paddingBottom: '6px', marginBottom: '6px' }}>
-                {completedSale.details.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
-                    <span style={{ flex: 1, textAlign: 'left' }}>{item.quantity}x {item.name}</span>
-                    <span>${(item.price * item.quantity).toLocaleString('es-CO')}</span>
-                  </div>
-                ))}
-              </div>
-              <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Subtotal:</span>
-                  <span>${completedSale.subtotal.toLocaleString('es-CO')}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>IVA:</span>
-                  <span>${completedSale.tax.toLocaleString('es-CO')}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '12px', borderTop: '1px dashed black', paddingTop: '4px', marginTop: '4px' }}>
-                  <span>TOTAL COBRADO:</span>
-                  <span>${completedSale.total.toLocaleString('es-CO')}</span>
-                </div>
-                {completedSale.meta_data?.cash_received > 0 && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span>Recibido:</span>
-                      <span>${Number(completedSale.meta_data?.cash_received).toLocaleString('es-CO')}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                      <span>Vueltas:</span>
-                      <span>${Number(completedSale.meta_data?.cash_change || 0).toLocaleString('es-CO')}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-              <div style={{ textAlign: 'center', fontSize: '10px', marginTop: '16px', borderTop: '1px dashed black', paddingTop: '8px' }}>
-                {receiptFooter}<br />
-                {businessName}
-              </div>
-            </>
-          ) : (
             <div className="invoice-print-sheet">
               <div className="invoice-print-header">
                 <div>
@@ -983,7 +943,6 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 Documento preparado para el flujo de facturacion electronica y reporte a la DIAN.
               </div>
             </div>
-          )}
         </div>,
         document.body
       )}
@@ -1071,8 +1030,9 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
                 className="btn-primary w-full"
                 style={{ height: '44px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
               >
-                <Printer size={18} /> Imprimir Recibo (Abrir Caja)
+                <Printer size={18} /> Imprimir Recibo{printerSettings.method !== 'browser' && printerSettings.openDrawer ? ' (Abrir Caja)' : ''}
               </button>
+              <PrinterSettingsPanel settings={printerSettings} onChange={setPrinterSettings} />
               {completedSale.meta_data?.requires_electronic_invoice && (
                 completedSale.meta_data?.factus_public_url && (
                   <a
