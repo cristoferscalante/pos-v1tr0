@@ -1,9 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { execSync } from 'node:child_process'
+
+// Versión visible en la app (prueba del lector, impresora) para confirmar que
+// el equipo cargó la última versión y no una guardada en caché.
+let appVersion = new Date().toISOString().slice(0, 16).replace('T', ' ')
+try { appVersion = `${execSync('git rev-parse --short HEAD').toString().trim()} · ${appVersion}` } catch { /* sin git (Docker) */ }
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [
     react(),
     VitePWA({

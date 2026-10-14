@@ -14,6 +14,8 @@ import { ReceiptImageActions } from '../components/ReceiptImageActions';
 import { CashChange, parseAmount } from '../components/CashChange';
 import { businessFromUser } from '../utils/receiptImage';
 import { PrinterSettingsPanel } from '../components/PrinterSettingsPanel';
+import { ReceiptPreview } from '../components/ReceiptPreview';
+import { ScannerDiagnostic, type ScanResult } from '../components/ScannerDiagnostic';
 import { clearThermalPrint, loadPrinterSettings, printSaleReceipt } from '../utils/thermalPrinter';
 import type { LocalProduct, LocalSale, LocalSaleDetail, CartItem, PaymentMethod } from '../types';
 import { getProductCategory } from '../utils/productCategories';
@@ -67,8 +69,6 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
   const storedUser = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('pos_user') || 'null') : null;
   const businessName = storedUser?.meta_data?.display_name || storedUser?.business_name || 'V1TR0 POS';
   const isElectronicInvoicingAvailable = Boolean(storedUser?.meta_data?.electronic_invoicing_enabled);
-  // Datos del negocio para el ticket (Configuración → Datos del negocio para recibos)
-  const { lines: bizLines, footer: receiptFooter } = businessFromUser(storedUser);
 
   // Categories from products
   const categories = ['all', ...Array.from(new Set(
@@ -102,13 +102,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
 
   // Estados adicionales para diagnóstico y recibo
   const [showDiagnostic, setShowDiagnostic] = useState(false);
-  const [diagnosticLogs, setDiagnosticLogs] = useState<{
-    text: string;
-    keys: { key: string; time: number }[];
-    speed: string;
-    terminator: string;
-    matchedProduct: string | null;
-  } | null>(null);
+  const [diagnosticLogs, setDiagnosticLogs] = useState<ScanResult | null>(null);
   const [completedSale, setCompletedSale] = useState<LocalSale | null>(null);
 
   // Lector de códigos: el integrado de la terminal (PDA) o una pistola USB/Bluetooth.
@@ -120,9 +114,9 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
     if (showDiagnostic) {
       setDiagnosticLogs({
         text: code,
-        keys: Array.from(code).map(key => ({ key, time: 0 })),
-        speed: info.avgMs != null ? `${info.avgMs.toFixed(1)}ms` : 'Instantáneo (lector integrado)',
-        terminator: info.terminator === 'Enter' ? 'Enter (CR)' : info.terminator,
+        mode: info.mode === 'directo' ? 'Código completo de una vez' : 'Tecla por tecla',
+        speed: info.avgMs != null ? `${info.avgMs.toFixed(1)} ms entre teclas` : 'instantáneo',
+        terminator: info.terminator,
         matchedProduct: match ? match.name : null,
       });
       return;
@@ -410,18 +404,22 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               autoFocus={typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches}
               enterKeyHint="search"
             />
-            {/* Campo invisible que recibe el lector integrado sin abrir el teclado */}
-            <input
-              ref={scanSinkRef}
-              className="scan-sink"
-              inputMode="none"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
-              tabIndex={-1}
-              aria-hidden="true"
-            />
+            {/* Campo invisible que recibe el lector integrado sin abrir el teclado
+                (en el body, para que siempre se pueda enfocar) */}
+            {createPortal(
+              <input
+                ref={scanSinkRef}
+                className="scan-sink"
+                inputMode="none"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                tabIndex={-1}
+                aria-hidden="true"
+              />,
+              document.body,
+            )}
           </div>
           <button 
             onClick={() => { setShowDiagnostic(true); setDiagnosticLogs(null); }}
@@ -833,64 +831,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               </h3>
             </div>
             <div className="modal-body" style={{ padding: '20px' }}>
-              <div className="ticket-virtual">
-                <div className="ticket-header">
-                  <h4 className="ticket-title">{businessName}</h4>
-                  {bizLines.map(line => <p key={line} className="ticket-biz-line">{line}</p>)}
-                  <p className="ticket-subtitle">{completedSale.meta_data?.requires_electronic_invoice ? 'Venta con facturacion electronica' : 'Ticket de Venta'}{completedSale.meta_data?.price_mode === 'wholesale' ? ' · Por mayor' : ''}</p>
-                </div>
-                <div className="ticket-meta">
-                  <strong>Factura N°:</strong> {completedSale.sale_number}<br />
-                  <strong>Fecha:</strong> {new Date(completedSale.created_at).toLocaleString()}<br />
-                  <strong>Método:</strong> {completedSale.payment_method === 'cash' ? 'Efectivo' : completedSale.payment_method === 'card' ? 'Tarjeta' : 'Transferencia'}
-                  {completedSale.meta_data?.requires_electronic_invoice && (
-                    <>
-                      <br /><strong>DIAN:</strong> {completedSale.meta_data?.dian_status || 'Pendiente'}
-                      <br /><strong>Factus:</strong> {completedSale.meta_data?.factus_status || 'Pendiente'}
-                      <br /><strong>Número FE:</strong> {completedSale.meta_data?.factus_bill_number || 'Pendiente de generar'}
-                      <br /><strong>CUFE:</strong> {completedSale.meta_data?.cufe || 'Pendiente de generar'}
-                    </>
-                  )}
-                </div>
-                <div className="ticket-items">
-                  {completedSale.details.map((item, idx) => (
-                    <div key={idx} className="ticket-item-row">
-                      <span className="ticket-item-name">{item.quantity}x {item.name}</span>
-                      <span>${(item.price * item.quantity).toLocaleString('es-CO')}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="ticket-totals">
-                  <div className="ticket-total-row">
-                    <span>Subtotal:</span>
-                    <span>${completedSale.subtotal.toLocaleString('es-CO')}</span>
-                  </div>
-                  <div className="ticket-total-row">
-                    <span>IVA:</span>
-                    <span>${completedSale.tax.toLocaleString('es-CO')}</span>
-                  </div>
-                  <div className="ticket-total-row main">
-                    <span>TOTAL:</span>
-                    <span>${completedSale.total.toLocaleString('es-CO')}</span>
-                  </div>
-                  {completedSale.meta_data?.cash_received > 0 && (
-                    <>
-                      <div className="ticket-total-row">
-                        <span>Recibido:</span>
-                        <span>${Number(completedSale.meta_data?.cash_received).toLocaleString('es-CO')}</span>
-                      </div>
-                      <div className="ticket-total-row ticket-change">
-                        <span>Vueltas:</span>
-                        <span>${Number(completedSale.meta_data?.cash_change || 0).toLocaleString('es-CO')}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="ticket-footer">
-                  {receiptFooter}<br />
-                  {businessName}
-                </div>
-              </div>
+              <ReceiptPreview sale={completedSale} biz={businessFromUser(storedUser)} paper={printerSettings.paper} />
               <ReceiptImageActions sale={completedSale} />
               <ReceiptEmailForm
                 key={completedSale.id}
@@ -943,110 +884,14 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         </div>
       )}
 
-      {/* Modal de Diagnóstico de Pistola Lector */}
+      {/* Prueba del lector de códigos */}
       {showDiagnostic && (
-        <div className="modal-backdrop animate-fade" onClick={() => setShowDiagnostic(false)}>
-          <div className="modal-content glass animate-slide-up" style={{ maxWidth: '440px' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Barcode size={18} /> Diagnóstico de Pistola
-              </h3>
-              <button onClick={() => setShowDiagnostic(false)} className="modal-close" style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body" style={{ padding: '20px', textAlign: 'center' }}>
-              {!diagnosticLogs ? (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', padding: '30px 0' }}>
-                  <div style={{
-                    width: '64px',
-                    height: '64px',
-                    borderRadius: '50%',
-                    background: 'rgba(16,185,129,0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#10b881',
-                    boxShadow: '0 0 16px rgba(16,185,129,0.15)',
-                    animation: 'pulse 1.8s infinite'
-                  }}>
-                    <Barcode size={32} />
-                  </div>
-                  <div>
-                    <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: 'var(--text-primary)' }}>Esperando Lectura de Pistola...</h4>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', maxWidth: '300px', margin: 0, lineHeight: 1.4 }}>
-                      Apunta tu lector de código de barras físico a cualquier código y presiona el gatillo.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
-                  <div style={{ 
-                    background: 'rgba(16,185,129,0.06)', 
-                    border: '1px solid rgba(16,185,129,0.15)', 
-                    borderRadius: '8px', 
-                    padding: '16px',
-                    textAlign: 'center'
-                  }}>
-                    <span style={{ fontSize: '10px', color: '#10b881', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px' }}>Texto Capturado</span>
-                    <h2 style={{ fontFamily: 'monospace', fontSize: '26px', margin: '4px 0 0 0', color: '#10b881', letterSpacing: '0.5px' }}>{diagnosticLogs.text}</h2>
-                  </div>
-
-                  <div className="glass" style={{ padding: '14px', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '8px', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Caracteres leídos:</span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{diagnosticLogs.keys.length} caracteres</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Velocidad promedio:</span>
-                      <strong style={{ color: '#10b881' }}>{diagnosticLogs.speed} (Velocidad Escáner)</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>Sufijo detectado:</span>
-                      <strong style={{ color: 'var(--text-primary)' }}>{diagnosticLogs.terminator}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', paddingTop: '8px', borderTop: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text-muted)' }}>En catálogo local:</span>
-                      <strong style={{ color: diagnosticLogs.matchedProduct ? '#10b881' : '#ef4444' }}>
-                        {diagnosticLogs.matchedProduct ? `✅ "${diagnosticLogs.matchedProduct}"` : '❌ No registrado'}
-                      </strong>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    fontSize: '12px',
-                    lineHeight: '1.4',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    color: 'var(--text-secondary)'
-                  }}>
-                    {diagnosticLogs.terminator === 'Ninguno' ? (
-                      <p style={{ margin: 0 }}>
-                        💡 <strong>Aviso de Sufijo:</strong> Tu lector funciona pero <strong>no envía la tecla Enter</strong>. El POS ahora lo soporta automáticamente por tiempo, pero te aconsejamos programar la pistola para que envíe <em>"Enter / Carriage Return (CR)"</em> leyendo su manual.
-                      </p>
-                    ) : (
-                      <p style={{ margin: 0 }}>
-                        ✔️ <strong>Configuración Óptima:</strong> Tu lector está configurado perfectamente con el sufijo Enter. Es 100% compatible y responderá de inmediato.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="modal-actions" style={{ padding: '0 20px 20px 20px' }}>
-              {diagnosticLogs && (
-                <button onClick={() => setDiagnosticLogs(null)} className="btn-secondary" style={{ flex: 1 }}>
-                  Volver a Escanear
-                </button>
-              )}
-              <button onClick={() => setShowDiagnostic(false)} className="btn-primary" style={{ flex: 1 }}>
-                Cerrar Diagnóstico
-              </button>
-            </div>
-          </div>
-        </div>
+        <ScannerDiagnostic
+          result={diagnosticLogs}
+          onClose={() => setShowDiagnostic(false)}
+          onReset={() => setDiagnosticLogs(null)}
+          onTestScan={code => handleScan(code, { mode: 'directo', avgMs: null, terminator: 'Ninguno' })}
+        />
       )}
     </div>
   );

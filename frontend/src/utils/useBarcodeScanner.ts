@@ -147,7 +147,8 @@ export function useBarcodeScanner({ enabled, onScan, onType, searchRef, setSearc
       const b = bursts.get(el) || { startValue: '', times: [], bulk: false };
       // Varios caracteres en un solo evento = el lector insertó el código de golpe
       // (se excluye pegar con el portapapeles en el buscador).
-      if ((ie.data?.length || 0) >= MIN_LENGTH && ie.inputType !== 'insertFromPaste') b.bulk = true;
+      if ((ie.data?.length || 0) >= MIN_LENGTH && (el === sink || ie.inputType !== 'insertFromPaste')) b.bulk = true;
+      if (el === sink && ie.inputType === 'insertFromPaste') b.bulk = true;
       b.times.push(performance.now());
       bursts.set(el, b);
       window.clearTimeout(timers.get(el));
@@ -171,6 +172,48 @@ export function useBarcodeScanner({ enabled, onScan, onType, searchRef, setSearc
       el.addEventListener('keydown', onKeyDown, true);
     }
 
+    // Respaldo: si el campo invisible no tiene el foco (p. ej. el sistema se lo
+    // quitó) y el lector manda teclas, se juntan aquí sin depender de un campo.
+    let keyBuffer = '';
+    let keyTimes: number[] = [];
+    let keyTimer: number | undefined;
+    const flushKeys = (terminator: ScanInfo['terminator']) => {
+      window.clearTimeout(keyTimer);
+      const code = cleanScannedCode(keyBuffer);
+      const times = keyTimes;
+      keyBuffer = '';
+      keyTimes = [];
+      const burst: Burst = { startValue: '', times, bulk: false };
+      if (code.length >= MIN_LENGTH && isMachine(burst)) {
+        cb.current.onScan(code, info(burst, terminator));
+        return true;
+      }
+      return false;
+    };
+    const onWindowKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as Element | null;
+      if (isEditable(target)) return; // los campos se manejan arriba
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        if (keyBuffer && flushKeys(e.key)) { e.preventDefault(); e.stopPropagation(); }
+        return;
+      }
+      if (e.key.length !== 1 || e.ctrlKey || e.metaKey || e.altKey) return;
+      keyBuffer += e.key;
+      keyTimes.push(performance.now());
+      window.clearTimeout(keyTimer);
+      keyTimer = window.setTimeout(() => flushKeys('Ninguno'), SILENCE_MS);
+    };
+    // Lectores configurados para "pegar" (portapapeles) sin campo enfocado
+    const onWindowPaste = (e: ClipboardEvent) => {
+      if (isEditable(e.target as Element | null)) return;
+      const code = cleanScannedCode(e.clipboardData?.getData('text') || '');
+      if (code.length < MIN_LENGTH) return;
+      e.preventDefault();
+      cb.current.onScan(code, { mode: 'directo', avgMs: null, terminator: 'Ninguno' });
+    };
+    window.addEventListener('keydown', onWindowKeyDown, true);
+    window.addEventListener('paste', onWindowPaste, true);
+
     // Recuperar el foco del campo invisible al tocar fuera de un campo de texto
     const refocus = () => window.setTimeout(focusSink, 0);
     document.addEventListener('pointerup', refocus, true);
@@ -184,6 +227,9 @@ export function useBarcodeScanner({ enabled, onScan, onType, searchRef, setSearc
         el.removeEventListener('input', onInput);
         el.removeEventListener('keydown', onKeyDown, true);
       }
+      window.removeEventListener('keydown', onWindowKeyDown, true);
+      window.removeEventListener('paste', onWindowPaste, true);
+      window.clearTimeout(keyTimer);
       document.removeEventListener('pointerup', refocus, true);
       document.removeEventListener('focusout', refocus, true);
       window.removeEventListener('focus', refocus);

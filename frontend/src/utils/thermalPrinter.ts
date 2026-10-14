@@ -28,7 +28,10 @@ export interface PrinterSettings {
 }
 
 const SETTINGS_KEY = 'pos_printer_settings';
-const DEFAULT_SETTINGS: PrinterSettings = { paper: '58', method: 'browser', plainText: false, openDrawer: true };
+// En Android (terminales con impresora integrada) el diálogo del navegador no
+// llega a la ticketera: por defecto se imprime directo con RawBT.
+const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+const DEFAULT_SETTINGS: PrinterSettings = { paper: '58', method: isAndroid ? 'rawbt' : 'browser', plainText: false, openDrawer: true };
 
 export function loadPrinterSettings(): PrinterSettings {
   try {

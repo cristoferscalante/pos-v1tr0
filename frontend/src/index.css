@@ -4076,3 +4076,33 @@ body {
   position: fixed; left: 0; top: 0; width: 1px; height: 1px; padding: 0; border: 0;
   opacity: 0; pointer-events: none; font-size: 16px; background: transparent; color: transparent;
 }
+
+/* Vista previa del recibo: mismas líneas que el impreso (ver utils/thermalPrinter) */
+.receipt-preview { container-type: inline-size; background: #fff; color: #000; border-radius: 6px; padding: 14px 12px; box-shadow: var(--shadow-sm); }
+.receipt-preview-inner {
+  font-family: 'Roboto Mono', 'Droid Sans Mono', 'DejaVu Sans Mono', Consolas, 'Courier New', monospace;
+  font-size: 11px; font-size: calc(100cqw / var(--cols) / 0.62); line-height: 1.3; font-weight: 500;
+}
+.receipt-preview .rp-line { white-space: pre; overflow: hidden; }
+.receipt-preview .rp-line.b { font-weight: 800; }
+.receipt-preview .rp-line.big { line-height: 2; }
+.receipt-preview .rp-line.big span { display: inline-block; transform: scaleY(1.5); }
+.receipt-preview .rp-line.inv { background: #000; color: #fff; border-radius: 3px; margin: 3px 0; }
+.receipt-preview .rp-box { border: 1.5px solid #000; border-radius: 5px; padding: 3px 0; margin: 4px 0; }
+.receipt-preview .rp-logo { display: flex; justify-content: center; margin-bottom: 6px; }
+.receipt-preview .rp-logo img { max-width: 72px; max-height: 72px; object-fit: contain; filter: grayscale(1) contrast(1.6); }
+
+/* Prueba del lector de códigos */
+.scanner-diag { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.scanner-diag-wait { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.scanner-diag-result { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: var(--r-md); text-align: center; font-size: 13px; }
+.scanner-diag-result.ok { background: var(--success-bg); color: var(--success); }
+.scanner-diag-result.missing { background: var(--warning-bg); color: var(--warning); }
+.scanner-diag-result small { color: var(--text-secondary); }
+.scanner-diag-code { font-family: monospace; font-size: 22px; color: var(--text-primary); word-break: break-all; }
+.scanner-diag-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); }
+.scanner-diag-log {
+  display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; padding: 10px; border-radius: var(--r-sm);
+  background: var(--surface-soft); border: 1px solid var(--border); font-family: monospace; font-size: 11px; color: var(--text-secondary);
+}
+.scanner-diag-version { font-size: 11px; color: var(--text-secondary); text-align: right; }

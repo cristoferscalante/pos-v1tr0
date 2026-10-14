@@ -114,6 +114,7 @@ export function PrinterSettingsPanel({ settings, onChange }: Props) {
           <button type="button" className="btn-secondary" onClick={test} style={{ minHeight: '40px' }}>
             <Printer size={15} /> Imprimir prueba
           </button>
+          <small className="printer-settings-note">Versión {__APP_VERSION__}</small>
         </div>
       )}
     </div>
