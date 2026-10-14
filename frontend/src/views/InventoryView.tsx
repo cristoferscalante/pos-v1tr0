@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Package, Plus, Pencil, Trash2, Search, X, Save,
   TrendingUp, AlertTriangle, ChevronUp, ChevronDown, Barcode,
@@ -9,6 +10,7 @@ import { authApi, productsApi, mediaApi, resolveMediaSrc } from '../api/client';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { wholesalePrice, marginPct as calcMarginPct, normalizeProduct } from '../utils/pricing';
 import { findProductByCode } from '../utils/productLookup';
+import { useBarcodeScanner, scanFeedback } from '../utils/useBarcodeScanner';
 import { useToast, useConfirm } from '../components/Toast';
 import { getBusinessTypeIcon } from '../components/BusinessTypeSelect';
 import { CategoryPicker } from '../components/CategoryPicker';
@@ -91,7 +93,7 @@ function clearProductDraft() {
 }
 
 export function InventoryView({ products, token, isOnline, onProductsChange, user, onUserUpdate }: InventoryViewProps) {
-  const { success, error, warning } = useToast();
+  const { success, error, warning, info } = useToast();
   const { confirm } = useConfirm();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -159,94 +161,6 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     return () => clearTimeout(handler);
   }, [form.barcode, editingProduct, token, isOnline]);
 
-
-  // Global keydown listener when modal is open to capture barcode scanner gun
-  useEffect(() => {
-    if (!showForm) return;
-
-    let buffer = '';
-    let lastKeyTime = Date.now();
-    let keyTimes: number[] = [];
-    let timeoutId: any;
-
-    const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-
-      // If focused on the barcode input itself, let the native input handle character insertion.
-      // We only intercept Enter/Tab to prevent form submit or unexpected behavior.
-      const isBarcodeField = target.tagName === 'INPUT' &&
-        (target as HTMLInputElement).placeholder === 'Escanear o escribir';
-
-      if (isBarcodeField) {
-        if (e.key === 'Enter' || e.key === 'Tab') {
-          e.preventDefault();
-          target.blur();
-          success(`⚡ Código escaneado: ${(target as HTMLInputElement).value || buffer}`);
-        }
-        return;
-      }
-
-      // If focused on another input (like Name, Price), we want to intercept rapid scanner typing
-      const isOtherInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-
-      const currentTime = Date.now();
-      const elapsed = currentTime - lastKeyTime;
-      lastKeyTime = currentTime;
-
-      // Reset buffer if delay is too long
-      if (elapsed > 90) {
-        buffer = '';
-        keyTimes = [];
-      }
-
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        if (buffer.length >= 3) {
-          const code = buffer.trim();
-          setForm(f => ({ ...f, barcode: code }));
-          success(`⚡ Código de barras capturado: ${code}`);
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        buffer = '';
-        keyTimes = [];
-        clearTimeout(timeoutId);
-        return;
-      }
-
-      if (e.key.length === 1) {
-        buffer += e.key;
-        keyTimes.push(elapsed);
-
-        // Si detectamos velocidad de escáner en otro input, prevenimos la escritura nativa para que no lo ensucie
-        const isScannerSpeed = keyTimes.length >= 2 && keyTimes.slice(1).every(t => t < 45);
-        if (isScannerSpeed && isOtherInput) {
-          e.preventDefault();
-        }
-
-        // Timeout por si la pistola no envía Enter/Tab
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          const avgTime = keyTimes.length >= 2
-            ? keyTimes.slice(1).reduce((s, t) => s + t, 0) / (keyTimes.length - 1)
-            : 999;
-
-          if (buffer.length >= 3 && avgTime < 45) {
-            const code = buffer.trim();
-            setForm(f => ({ ...f, barcode: code }));
-            success(`⚡ Código de barras capturado: ${code}`);
-          }
-          buffer = '';
-          keyTimes = [];
-        }, 50);
-      }
-    };
-
-    window.addEventListener('keydown', handleGlobalKeyDown, true);
-    return () => {
-      window.removeEventListener('keydown', handleGlobalKeyDown, true);
-      clearTimeout(timeoutId);
-    };
-  }, [showForm, success]);
 
   // Filter + Sort
   const filtered = products
@@ -324,6 +238,39 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
     setDraftRestored(false);
     setShowForm(true);
   };
+
+  // Lector de códigos de la terminal o pistola (ver utils/useBarcodeScanner):
+  // - en la lista: abre el producto leído, o empieza a crearlo con ese código;
+  // - con el formulario abierto: llena el código de barras.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const handleScan = (code: string) => {
+    setScannerTarget(null);
+    if (showForm) {
+      scanFeedback(true);
+      setForm(f => ({ ...f, barcode: code }));
+      success(`Código de barras: ${code}`);
+      return;
+    }
+    const match = findProductByCode(products, code);
+    scanFeedback(!!match);
+    if (match) {
+      openEdit(match);
+      return;
+    }
+    setEditingProduct(null);
+    startBlankCreate();
+    setForm(f => ({ ...f, barcode: code }));
+    setShowForm(true);
+    info(`Código ${code} nuevo: completa los datos para crear el producto`);
+  };
+  const { sinkRef: scanSinkRef } = useBarcodeScanner({
+    enabled: true,
+    onScan: handleScan,
+    onType: text => { setSearch(prev => prev + text); searchRef.current?.focus(); },
+    searchRef,
+    setSearch,
+    isKnownCode: code => !!findProductByCode(products, code),
+  });
 
   const goNext = () => {
     if (step === 1) {
@@ -702,6 +649,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
           <Search className="search-icon" />
           <input
             type="text"
+            ref={searchRef}
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por nombre, SKU o código..."
@@ -1307,6 +1255,20 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
 
           </div>
         </div>
+      )}
+      {createPortal(
+        <input
+          ref={scanSinkRef}
+          className="scan-sink"
+          inputMode="none"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+          tabIndex={-1}
+          aria-hidden="true"
+        />,
+        document.body,
       )}
       {scannerTarget && (
         <QrScannerModal
