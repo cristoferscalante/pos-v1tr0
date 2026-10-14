@@ -22,6 +22,7 @@ import { getProductCategory } from '../utils/productCategories';
 import { unitPrice, PRICE_MODE_LABELS, type PriceMode } from '../utils/pricing';
 import { findProductByCode } from '../utils/productLookup';
 import { useBarcodeScanner, scanFeedback, type ScanInfo } from '../utils/useBarcodeScanner';
+import { setAppBusy } from '../utils/appUpdate';
 import { resolveMediaSrc } from '../api/client';
 
 interface POSViewProps {
@@ -131,6 +132,12 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
       warning(`Código "${code}" no está registrado`);
     }
   }, [products, showDiagnostic, addToCart, success, warning]);
+
+  // Con una venta en curso no se recarga por versión nueva (ver utils/appUpdate)
+  React.useEffect(() => {
+    setAppBusy(cart.length > 0 || isCheckingOut || !!completedSale);
+    return () => setAppBusy(false);
+  }, [cart.length, isCheckingOut, completedSale]);
 
   const { sinkRef: scanSinkRef } = useBarcodeScanner({
     enabled: true,

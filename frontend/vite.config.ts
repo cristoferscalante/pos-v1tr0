@@ -5,7 +5,11 @@ import { execSync } from 'node:child_process'
 
 // Versión visible en la app (prueba del lector, impresora) para confirmar que
 // el equipo cargó la última versión y no una guardada en caché.
-let appVersion = new Date().toISOString().slice(0, 16).replace('T', ' ')
+// Fecha y hora de Colombia, que es lo que ve el negocio
+const parts = Object.fromEntries(new Intl.DateTimeFormat('es-CO', {
+  timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+}).formatToParts(new Date()).map(p => [p.type, p.value]))
+let appVersion = `${parts.day}/${parts.month}/${parts.year} ${parts.hour}:${parts.minute}`
 try { appVersion = `${execSync('git rev-parse --short HEAD').toString().trim()} · ${appVersion}` } catch { /* sin git (Docker) */ }
 
 // https://vite.dev/config/

@@ -170,6 +170,7 @@ export function Sidebar({
             <div>
               <p className="sidebar-user-email">{user?.email}</p>
               <p className="sidebar-user-role">{roleLabel}</p>
+              <p className="app-version">Versión {__APP_VERSION__}</p>
             </div>
           </div>
           <button onClick={onLogout} className="sidebar-logout" title="Cerrar sesión">
@@ -188,6 +189,7 @@ export function Sidebar({
               <div className="more-sheet-user-info">
                 <p className="more-sheet-name">{user?.meta_data?.display_name || user?.business_name || 'Mi Negocio'}</p>
                 <p className="more-sheet-email">{user?.email} · {roleLabel}</p>
+                <p className="app-version">Versión {__APP_VERSION__}</p>
               </div>
               <button type="button" className="sheet-close" onClick={() => setMoreOpen(false)} aria-label="Cerrar">
                 <X size={20} />
