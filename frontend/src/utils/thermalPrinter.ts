@@ -14,6 +14,7 @@
 import type { LocalSale } from '../types';
 import type { ReceiptBusiness } from './receiptImage';
 import { resolveMediaSrc } from '../api/client';
+import { formatDate } from './dates';
 
 export type PaperWidth = '58' | '80';
 export type PrintMethod = 'browser' | 'serial' | 'rawbt' | 'bluetooth';
@@ -127,10 +128,9 @@ export function buildTicketLines(sale: LocalSale, biz: ReceiptBusiness, paper: P
   // Datos de la venta
   const title = meta.requires_electronic_invoice ? 'FACTURA' : 'RECIBO';
   leftRight(`${title} ${sale.sale_number}`, PAYMENT_LABELS[sale.payment_method] || sale.payment_method, w).forEach(l => push(l, { bold: true }));
-  const created = new Date(sale.created_at);
   leftRight(
-    created.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit' }),
-    created.toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' }),
+    formatDate(sale.created_at, { day: '2-digit', month: '2-digit', year: '2-digit' }),
+    formatDate(sale.created_at, { hour: 'numeric', minute: '2-digit' }),
     w,
   ).forEach(l => push(l));
   if (meta.price_mode === 'wholesale') push(center('*** VENTA AL POR MAYOR ***', w), { bold: true });

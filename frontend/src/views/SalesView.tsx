@@ -12,6 +12,7 @@ import { ReceiptImageActions } from '../components/ReceiptImageActions';
 import { salesApi } from '../api/client';
 import type { SelectOption } from '../components/CustomSelect';
 import type { LocalSale } from '../types';
+import { formatDate, parseServerDate } from '../utils/dates';
 
 interface SalesViewProps {
   token: string | null;
@@ -110,7 +111,7 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
               })),
             })),
           ];
-          merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+          merged.sort((a, b) => parseServerDate(b.created_at).getTime() - parseServerDate(a.created_at).getTime());
           setSales(merged);
           return;
         } catch (err: any) {
@@ -145,13 +146,10 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
   const totalTax = filtered.reduce((s, sale) => s + Number(sale.tax), 0);
   const pendingCount = filtered.filter(s => s.sync_status === 'pending').length;
 
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleString('es-CO', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
-  };
+  const formatSaleDate = (iso: string) => formatDate(iso, {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
 
   const handleDeletePendingSale = async (sale: LocalSale) => {
     if (sale.sync_status !== 'pending') return;
@@ -282,7 +280,7 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
               >
                 <div className="sale-main-info">
                   <span className="sale-number">{sale.sale_number}</span>
-                  <span className="sale-date">{formatDate(sale.created_at)}</span>
+                  <span className="sale-date">{formatSaleDate(sale.created_at)}</span>
                 </div>
                 <div className="sale-right-info">
                   <span className={`payment-pill ${sale.payment_method}`}>

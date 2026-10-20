@@ -2,6 +2,7 @@
 // (WhatsApp, etc.). Se dibuja en un canvas en el propio celular: funciona sin
 // conexión y no depende de librerías externas.
 import type { LocalSale } from '../types';
+import { formatDate } from './dates';
 
 export interface ReceiptBusiness {
   name: string;
@@ -65,7 +66,7 @@ export async function renderReceiptImage(sale: LocalSale, biz: ReceiptBusiness):
   try { await document.fonts?.ready; } catch { /* fuentes del sistema */ }
   const color = biz.color || '#4f46e5';
   const wholesale = sale.meta_data?.price_mode === 'wholesale';
-  const date = new Date(sale.created_at).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
+  const date = formatDate(sale.created_at);
 
   // Se dibuja dos veces: la primera solo mide el alto total
   const draw = (ctx: CanvasRenderingContext2D, paint: boolean): number => {

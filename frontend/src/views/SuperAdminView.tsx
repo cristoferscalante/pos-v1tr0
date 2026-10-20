@@ -9,6 +9,7 @@ import {
 import { superadminApi } from '../api/client';
 import { useToast } from '../components/Toast';
 import type { Tenant } from '../types';
+import { parseServerDate } from '../utils/dates';
 
 interface SuperAdminViewProps {
   token: string | null;
@@ -27,15 +28,15 @@ const FOLIO_PACK_PRICE = 170000;
 // ── Helpers ───────────────────────────────────────────────────
 function fmt(iso?: string | null) {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
+  return parseServerDate(iso).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function daysLeft(iso?: string | null) {
   if (!iso) return 0;
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
+  return Math.ceil((parseServerDate(iso).getTime() - Date.now()) / 86400000);
 }
 function isExpired(iso?: string | null) {
   if (!iso) return false;
-  return new Date(iso) < new Date();
+  return parseServerDate(iso) < new Date();
 }
 function cop(n: number) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
@@ -49,7 +50,7 @@ function addDays(n: number) {
 }
 function timeAgo(iso?: string | null) {
   if (!iso) return 'Nunca';
-  const diff = Date.now() - new Date(iso).getTime();
+  const diff = Date.now() - parseServerDate(iso).getTime();
   const d = Math.floor(diff / 86400000);
   if (d === 0) return 'Hoy';
   if (d === 1) return 'Ayer';

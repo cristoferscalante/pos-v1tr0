@@ -12,6 +12,7 @@ import { compressImageToDataUrl } from '../utils/imageUpload';
 import { BusinessReceiptSettings } from '../components/BusinessReceiptSettings';
 import { PasswordInput } from '../components/PasswordInput';
 import '../styles/branding-upload.css';
+import { formatDate } from '../utils/dates';
 
 interface SettingsViewProps {
   user: AuthUser | null;
@@ -884,7 +885,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                           </div>
                           <div style={{ textAlign: 'right' }}>
                             <p style={{ margin: 0, fontSize: '12px', fontWeight: 700, color: log.status === 'sent' ? 'var(--success)' : 'var(--warning)' }}>{log.status}</p>
-                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(log.created_at).toLocaleString('es-CO')}</p>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>{formatDate(log.created_at)}</p>
                           </div>
                         </div>
                         {log.error_message && <p style={{ margin: '8px 0 0 0', fontSize: '11px', color: 'var(--warning)' }}>{log.error_message}</p>}
@@ -1098,7 +1099,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
           </div>
           <div style={{ textAlign: 'center', fontSize: '10px', marginBottom: '10px' }}>
             *** TICKET DE PRUEBA ***<br />
-            Fecha: {new Date().toLocaleString()}
+            Fecha: {formatDate(new Date())}
           </div>
           <div style={{ borderBottom: '1px dashed black', paddingBottom: '6px', marginBottom: '6px', textAlign: 'center', fontSize: '11px' }}>
             SI ESTÁS LEYENDO ESTO,<br />

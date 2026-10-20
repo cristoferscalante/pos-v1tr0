@@ -24,6 +24,7 @@ import { findProductByCode } from '../utils/productLookup';
 import { useBarcodeScanner, scanFeedback, type ScanInfo } from '../utils/useBarcodeScanner';
 import { setAppBusy } from '../utils/appUpdate';
 import { resolveMediaSrc } from '../api/client';
+import { formatDate } from '../utils/dates';
 
 interface POSViewProps {
   products: LocalProduct[];
@@ -789,7 +790,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               </div>
               <div className="invoice-print-meta-grid">
                 <div><strong>Numero:</strong> {completedSale.sale_number}</div>
-                <div><strong>Fecha:</strong> {new Date(completedSale.created_at).toLocaleString()}</div>
+                <div><strong>Fecha:</strong> {formatDate(completedSale.created_at)}</div>
                 <div><strong>Metodo:</strong> {completedSale.payment_method === 'cash' ? 'Efectivo' : completedSale.payment_method === 'card' ? 'Tarjeta' : 'Transferencia'}</div>
                 <div><strong>Precio:</strong> {completedSale.meta_data?.price_mode === 'wholesale' ? 'Por mayor' : 'Detal'}</div>
                 <div><strong>Estado DIAN:</strong> {completedSale.meta_data?.dian_status || 'Pendiente'}</div>

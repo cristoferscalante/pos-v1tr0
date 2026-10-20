@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, require_admin
 from app.core.db import get_session
+from app.core.timeutils import local_now
 from app.models.notification import NotificationLog
 from app.models.product import Product
 from app.models.purchase import InventoryMovement, ManualInventoryMovementCreate, Purchase, PurchaseCreate, PurchaseDetail, PurchaseDetailRead, PurchasePayment, PurchasePaymentCreate, PurchasePaymentRead, PurchaseReadDetailed, PurchaseUpdate, SupplierReturnCreate
@@ -182,7 +183,7 @@ def get_accounts_payable_summary(
 
     overdue = []
     upcoming = []
-    today = datetime.utcnow().date()
+    today = local_now().date()  # vencimientos según el día en Colombia
     total_balance = Decimal("0")
 
     for purchase in purchases:

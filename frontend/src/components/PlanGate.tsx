@@ -2,11 +2,12 @@ import { Check, Clock, LogOut, MessageCircle, RefreshCw } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { PUBLIC_PLANS, SALES_WHATSAPP_DISPLAY, formatCOP, whatsappLink } from '../utils/plans';
 import type { AuthUser } from '../types';
+import { parseServerDate } from '../utils/dates';
 
 /** Días que le quedan al plan (null = sin vencimiento). */
 export function daysLeft(user: AuthUser | null): number | null {
   if (!user?.subscription_ends_at) return null;
-  return Math.ceil((new Date(user.subscription_ends_at).getTime() - Date.now()) / 86400000);
+  return Math.ceil((parseServerDate(user.subscription_ends_at).getTime() - Date.now()) / 86400000);
 }
 
 /**

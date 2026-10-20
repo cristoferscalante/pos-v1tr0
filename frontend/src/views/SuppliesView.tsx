@@ -6,6 +6,7 @@ import { useToast, useConfirm } from '../components/Toast';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { findProductByCode } from '../utils/productLookup';
 import type { ApiProduct, InventoryMovement, Purchase, Supplier } from '../types';
+import { formatDate } from '../utils/dates';
 
 
 interface SuppliesViewProps {
@@ -395,7 +396,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                     {accountsPayable.overdue.map(item => (
                       <div key={item.id} className="top-product-item">
                         <span className="top-rank"><Wallet size={14} /></span>
-                        <div className="top-product-info"><p className="top-product-name">{item.supplier_name || item.invoice_number || item.id}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vence: {item.due_date ? new Date(item.due_date).toLocaleDateString('es-CO') : '—'}</div></div>
+                        <div className="top-product-info"><p className="top-product-name">{item.supplier_name || item.invoice_number || item.id}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vence: {item.due_date ? formatDate(item.due_date, { dateStyle: 'short' }) : '—'}</div></div>
                         <div className="top-product-stats"><span className="top-revenue">${Number(item.balance_due).toLocaleString('es-CO')}</span></div>
                       </div>
                     ))}
@@ -409,7 +410,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                     {accountsPayable.upcoming.map(item => (
                       <div key={item.id} className="top-product-item">
                         <span className="top-rank"><Wallet size={14} /></span>
-                        <div className="top-product-info"><p className="top-product-name">{item.supplier_name || item.invoice_number || item.id}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vence: {item.due_date ? new Date(item.due_date).toLocaleDateString('es-CO') : '—'}</div></div>
+                        <div className="top-product-info"><p className="top-product-name">{item.supplier_name || item.invoice_number || item.id}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Vence: {item.due_date ? formatDate(item.due_date, { dateStyle: 'short' }) : '—'}</div></div>
                         <div className="top-product-stats"><span className="top-revenue">${Number(item.balance_due).toLocaleString('es-CO')}</span></div>
                       </div>
                     ))}
@@ -518,7 +519,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                       <span className="top-rank"><ShoppingBag size={14} /></span>
                       <div className="top-product-info">
                         <p className="top-product-name">{purchase.invoice_number || 'Sin factura'} {purchase.status === 'cancelled' ? '(Anulada)' : ''}</p>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{purchase.supplier_name || 'Proveedor'} | Saldo: ${Number(purchase.balance_due || 0).toLocaleString('es-CO')} {purchase.due_date ? `| Vence: ${new Date(purchase.due_date).toLocaleDateString('es-CO')}` : ''}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{purchase.supplier_name || 'Proveedor'} | Saldo: ${Number(purchase.balance_due || 0).toLocaleString('es-CO')} {purchase.due_date ? `| Vence: ${formatDate(purchase.due_date, { dateStyle: 'short' })}` : ''}</div>
                       </div>
                       <div className="top-product-stats">
                         <span className="top-revenue">${Number(purchase.total).toLocaleString('es-CO')}</span>
@@ -567,7 +568,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                   <div key={item.id} className="top-product-item">
                     <span className="top-rank"><History size={14} /></span>
                     <div className="top-product-info"><p className="top-product-name">{item.movement_type}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Antes: {item.previous_stock} | Después: {item.new_stock}</div></div>
-                    <div className="top-product-stats"><span className="top-qty">{item.quantity > 0 ? '+' : ''}{item.quantity}</span><span className="top-revenue">{new Date(item.created_at).toLocaleDateString('es-CO')}</span></div>
+                    <div className="top-product-stats"><span className="top-qty">{item.quantity > 0 ? '+' : ''}{item.quantity}</span><span className="top-revenue">{formatDate(item.created_at, { dateStyle: 'short' })}</span></div>
                   </div>
                 ))}
               </div>
@@ -610,7 +611,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
                         {(selectedPurchaseDetail.payments || []).map(payment => (
                           <div key={payment.id} className="top-product-item">
                             <span className="top-rank"><Wallet size={14} /></span>
-                            <div className="top-product-info"><p className="top-product-name">{payment.payment_method}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(payment.created_at).toLocaleString('es-CO')}</div></div>
+                            <div className="top-product-info"><p className="top-product-name">{payment.payment_method}</p><div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{formatDate(payment.created_at)}</div></div>
                             <div className="top-product-stats"><span className="top-revenue">${Number(payment.amount).toLocaleString('es-CO')}</span></div>
                           </div>
                         ))}

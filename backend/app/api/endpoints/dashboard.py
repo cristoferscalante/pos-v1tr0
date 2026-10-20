@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.core.db import get_session
+from app.core.timeutils import local_day_start, local_now, local_to_utc, utc_to_local
 from app.api.deps import get_current_user
 from app.models.cash_session import CashSession
 from app.models.user import User
@@ -33,10 +34,11 @@ def get_dashboard_summary(
     - Productos con stock bajo (< 5 unidades)
     - Ventas por método de pago
     """
-    now = datetime.utcnow()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_start = today_start - timedelta(days=today_start.weekday())
-    month_start = today_start.replace(day=1)
+    # Límites calculados en hora de Colombia y pasados a UTC para comparar con la base
+    local_today = local_day_start(local_now())
+    today_start = local_to_utc(local_today)
+    week_start = local_to_utc(local_today - timedelta(days=local_today.weekday()))
+    month_start = local_to_utc(local_today.replace(day=1))
 
     # Consultar todas las ventas del tenant (mes actual para optimizar)
     all_sales = session.exec(
@@ -184,13 +186,13 @@ def get_sales_chart(
     Retorna datos de ventas agrupados por día para el gráfico.
     Por defecto devuelve los últimos 7 días.
     """
-    now = datetime.utcnow()
-    start_date = (now - timedelta(days=days - 1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    # start_date es la medianoche de Colombia; la consulta usa su equivalente UTC
+    start_date = local_day_start(local_now() - timedelta(days=days - 1))
 
     sales = session.exec(
         select(Sale).where(
             Sale.tenant_id == tenant_id,
-            Sale.created_at >= start_date
+            Sale.created_at >= local_to_utc(start_date)
         )
     ).all()
 
@@ -206,7 +208,7 @@ def get_sales_chart(
         }
 
     for sale in sales:
-        day_key = str(sale.created_at.date())
+        day_key = str(utc_to_local(sale.created_at).date())
         if day_key in chart_data:
             chart_data[day_key]["count"] += 1
             chart_data[day_key]["revenue"] += float(sale.total)
@@ -229,8 +231,7 @@ def get_top_products(
     """
     Retorna los productos más vendidos (por cantidad) del mes actual.
     """
-    now = datetime.utcnow()
-    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    month_start = local_to_utc(local_day_start(local_now()).replace(day=1))
 
     # Ventas del mes para este tenant
     sales_ids = [

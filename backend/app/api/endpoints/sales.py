@@ -7,6 +7,7 @@ from datetime import datetime
 import uuid
 
 from app.core.db import get_session
+from app.core.timeutils import to_naive_utc
 from app.api.deps import get_current_tenant_id, get_current_user
 from app.models.cash_session import CashSession
 from app.models.sale import Sale, SaleDetail, SaleReadWithDetails, SaleDetailRead
@@ -215,7 +216,8 @@ def sync_offline_sales(
                 tenant_id=tenant_id,
                 user_id=current_user.id,
                 cash_session_id=open_cash_session.id if open_cash_session else None,
-                created_at=sale_data.created_at,
+                # El celular manda ISO con zona (…Z); la base guarda UTC sin zona
+                created_at=to_naive_utc(sale_data.created_at),
                 meta_data=sale_meta,
             )
             session.add(new_sale)
