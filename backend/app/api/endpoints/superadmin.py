@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from app.core.db import get_session
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.tenant import Tenant, TenantRead
+from app.models.tenant import Tenant, TenantRead, tenant_read_without_secrets
 from app.models.product import Product
 from app.models.sale import Sale
 from pydantic import BaseModel
@@ -123,7 +123,7 @@ def list_tenants(
             folios_remaining=tenant.folios_remaining,
             folios_total=tenant.folios_total,
             is_active=tenant.is_active,
-            meta_data=tenant.meta_data if isinstance(tenant.meta_data, dict) else None,
+            meta_data=tenant_read_without_secrets(tenant).meta_data,
             owner_email=owner.email if owner else None,
             owner_id=str(owner.id) if owner else None,
             product_count=product_count or 0,
@@ -157,7 +157,7 @@ def update_tenant_plan(
     session.add(tenant)
     session.commit()
     session.refresh(tenant)
-    return tenant
+    return tenant_read_without_secrets(tenant)
 
 
 @router.post("/tenants/{tenant_id}/recharge", response_model=TenantRead)
@@ -178,7 +178,7 @@ def recharge_folios(
     session.add(tenant)
     session.commit()
     session.refresh(tenant)
-    return tenant
+    return tenant_read_without_secrets(tenant)
 
 
 @router.delete("/tenants/{tenant_id}", status_code=204)

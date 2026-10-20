@@ -1,7 +1,7 @@
 from typing import List, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from pydantic import BaseModel, EmailStr, TypeAdapter
+from pydantic import BaseModel, EmailStr, Field, TypeAdapter
 from decimal import Decimal
 from datetime import datetime
 import uuid
@@ -24,7 +24,9 @@ router = APIRouter()
 # Esquemas de validación de entrada para sincronización batch
 class SaleDetailSync(BaseModel):
     product_id: uuid.UUID
-    quantity: float
+    # Siempre positiva: una cantidad negativa sumaba stock y dejaba ventas con
+    # total negativo (las devoluciones van por su propio flujo de inventario).
+    quantity: float = Field(gt=0)
     price: Decimal
     total: Decimal
     name: str | None = None

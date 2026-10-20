@@ -34,3 +34,20 @@ class TenantCreate(TenantBase):
 
 class TenantRead(TenantBase):
     id: uuid.UUID
+
+
+# Claves de tenant.meta_data que son credenciales del proveedor de facturación.
+# Nunca salen del servidor: el front solo necesita saber si ya están configuradas.
+TENANT_SECRET_META_FIELDS = ("factus_client_secret", "factus_password")
+SECRET_MASK = "********"
+
+
+def tenant_read_without_secrets(tenant: "Tenant") -> TenantRead:
+    """TenantRead con los secretos de facturación enmascarados (sin tocar la fila)."""
+    data = TenantRead.model_validate(tenant)
+    meta = dict(tenant.meta_data or {}) if isinstance(tenant.meta_data, dict) else {}
+    for key in TENANT_SECRET_META_FIELDS:
+        if meta.get(key):
+            meta[key] = SECRET_MASK
+    data.meta_data = meta
+    return data

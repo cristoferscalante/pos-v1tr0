@@ -29,7 +29,12 @@ app = FastAPI(
     title="POS Multi-Tenant API",
     description="Backend API para el Sistema POS Multi-Tenant",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    # En producción no se publica la documentación interactiva ni el esquema:
+    # le entregaba a cualquiera el mapa completo de endpoints.
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 # Configuración de CORS para permitir la conexión desde el Frontend en React

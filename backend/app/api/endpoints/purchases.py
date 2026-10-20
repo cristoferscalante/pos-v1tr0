@@ -366,7 +366,10 @@ def list_inventory_movements(
 @router.get("/notification-logs")
 def list_notification_logs(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    # Solo administradores: la bitácora incluye eventos de todas las cuentas del
+    # negocio (antes un cajero podía leerla, incluido el enlace de recuperación
+    # de contraseña del administrador).
+    current_user: User = Depends(require_admin),
 ):
     return session.exec(
         select(NotificationLog)

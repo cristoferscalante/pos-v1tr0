@@ -1,12 +1,13 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 import uuid
 
 from app.core.db import get_session, slugify
+from app.core.rate_limit import check_rate_limit, client_ip
 from app.core.security import verify_password, get_password_hash, create_access_token
-from app.models.tenant import Tenant, TenantRead
+from app.models.tenant import SECRET_MASK, Tenant, TenantRead, tenant_read_without_secrets
 from app.models.user import User, UserCreate, UserRead
 from pydantic import BaseModel, EmailStr, TypeAdapter
 from app.api.deps import get_current_user
@@ -20,6 +21,18 @@ router = APIRouter()
 # Rutas propias del frontend (landing, ingreso): un catálogo con estos enlaces
 # quedaría inaccesible, así que no se permiten como slug de negocio.
 RESERVED_SLUGS = {"login", "registro", "register", "planes", "admin", "api", "app", "assets", "landing"}
+
+MIN_PASSWORD_LENGTH = 8
+
+
+def _require_password_length(password: str) -> None:
+    # Antes el registro y la creación de colaboradores aceptaban cualquier
+    # contraseña (incluso de 1 carácter); solo el cambio/recuperación pedía 8.
+    if len(password or "") < MIN_PASSWORD_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"La contraseña debe tener al menos {MIN_PASSWORD_LENGTH} caracteres",
+        )
 
 
 # Campos de tenant.meta_data que SÍ es seguro devolver en la respuesta de
@@ -105,7 +118,9 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-def register_tenant(data: TenantRegister, session: Session = Depends(get_session)):
+def register_tenant(data: TenantRegister, request: Request, session: Session = Depends(get_session)):
+    check_rate_limit(f"register:{client_ip(request)}", max_hits=5, window_seconds=3600)
+    _require_password_length(data.password)
     # 1. Verificar si el email ya existe
     existing_user = session.exec(select(User).where(User.email == data.email)).first()
     if existing_user:
@@ -177,7 +192,11 @@ def register_tenant(data: TenantRegister, session: Session = Depends(get_session
     }
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    # Por IP (frena barridos) y por correo (frena fuerza bruta a una cuenta
+    # aunque el atacante rote de IP).
+    check_rate_limit(f"login-ip:{client_ip(request)}", max_hits=20, window_seconds=300)
+    check_rate_limit(f"login-user:{form_data.username.strip().lower()}", max_hits=10, window_seconds=900)
     # Buscar el usuario por email
     user = session.exec(select(User).where(User.email == form_data.username)).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
@@ -234,7 +253,9 @@ def get_subscription(
 
 
 @router.post("/forgot-password")
-def forgot_password(data: ForgotPasswordRequest, session: Session = Depends(get_session)):
+def forgot_password(data: ForgotPasswordRequest, request: Request, session: Session = Depends(get_session)):
+    check_rate_limit(f"forgot-ip:{client_ip(request)}", max_hits=10, window_seconds=3600)
+    check_rate_limit(f"forgot-user:{str(data.email).lower()}", max_hits=3, window_seconds=3600)
     user = session.exec(select(User).where(User.email == data.email)).first()
     if user and user.is_active:
         try:
@@ -249,7 +270,8 @@ def forgot_password(data: ForgotPasswordRequest, session: Session = Depends(get_
 
 
 @router.post("/reset-password")
-def reset_password(data: ResetPasswordRequest, session: Session = Depends(get_session)):
+def reset_password(data: ResetPasswordRequest, request: Request, session: Session = Depends(get_session)):
+    check_rate_limit(f"reset-ip:{client_ip(request)}", max_hits=20, window_seconds=3600)
     if len(data.new_password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -336,7 +358,7 @@ def get_tenant(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Negocio no encontrado"
         )
-    return tenant
+    return tenant_read_without_secrets(tenant)
 
 @router.put("/tenant", response_model=TenantRead)
 def update_tenant(
@@ -458,11 +480,13 @@ def update_tenant(
         # llega un valor no vacío: así el formulario puede dejar de prellenarlos
         # (ver hallazgo medio 6.x del plan) sin que "guardar" con el campo en
         # blanco borre el secreto ya configurado. Un valor no vacío sí lo cambia.
-        if data.factus_client_secret is not None and data.factus_client_secret.strip():
+        # El GET devuelve los secretos enmascarados; si el front reenvía la máscara
+        # se ignora para no sobrescribir el secreto real con "********".
+        if data.factus_client_secret is not None and data.factus_client_secret.strip() not in ("", SECRET_MASK):
             meta["factus_client_secret"] = data.factus_client_secret.strip()
         if data.factus_username is not None:
             meta["factus_username"] = data.factus_username.strip()
-        if data.factus_password is not None and data.factus_password.strip():
+        if data.factus_password is not None and data.factus_password.strip() not in ("", SECRET_MASK):
             meta["factus_password"] = data.factus_password.strip()
         if data.factus_numbering_range_id is not None:
             meta["factus_numbering_range_id"] = data.factus_numbering_range_id
@@ -471,7 +495,7 @@ def update_tenant(
     session.add(tenant)
     session.commit()
     session.refresh(tenant)
-    return tenant
+    return tenant_read_without_secrets(tenant)
 
 @router.get("/collaborators", response_model=List[UserRead])
 def list_collaborators(
@@ -499,6 +523,7 @@ def create_collaborator(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Operación permitida únicamente para administradores"
         )
+    _require_password_length(data.password)
     existing_user = session.exec(select(User).where(User.email == data.email)).first()
     if existing_user:
         raise HTTPException(

@@ -84,7 +84,9 @@ def send_password_reset_email(session: Session, user: User) -> tuple[bool, str]:
                     subject=subject,
                     status="sent" if success else "failed",
                     error_message=None if success else message,
-                    payload=_json_safe({"reset_url": reset_url}),
+                    # NUNCA guardar aquí el enlace/token: quien lea la bitácora
+                    # podría usarlo para cambiar la contraseña de la cuenta.
+                    payload=_json_safe({"expires_minutes": settings.PASSWORD_RESET_EXPIRE_MINUTES}),
                 )
             )
             session.commit()
