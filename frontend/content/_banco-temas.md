@@ -5,7 +5,7 @@ Orden sugerido: 1 tema de pilares distintos cada día. Keywords = hipótesis; re
 Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver skill `blog-pos`).
 
 ## Inventario
-- [ ] Cómo hacer un inventario de una tienda de barrio paso a paso | cómo hacer un inventario de una tienda | tienda de barrio
+- [x] Cómo hacer un inventario de una tienda de barrio paso a paso | cómo hacer un inventario de una tienda | tienda de barrio → como-hacer-un-inventario-de-una-tienda (2026-11-22)
 - [ ] Control de inventario en Excel o en app: qué conviene | control de inventario en Excel | comparativa
 - [ ] Cómo evitar que se pierda mercancía en tu negocio | pérdida de mercancía | todos
 - [ ] Productos vencidos: cómo controlarlos en una droguería o minimercado | control de productos vencidos | droguería
@@ -24,7 +24,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 - [ ] Gastos del negocio: cómo separarlos de los de la casa | separar gastos personales y del negocio | todos
 
 ## Ventas, precios y márgenes
-- [ ] Cómo calcular el precio de venta de un producto | cómo calcular precio de venta | todos
+- [x] Cómo calcular el precio de venta de un producto | cómo calcular precio de venta | todos → como-calcular-el-precio-de-venta-de-un-producto (2026-11-22)
 - [ ] Margen de ganancia de una tienda de barrio en Colombia | margen de ganancia tienda | tienda de barrio
 - [ ] Vender al por mayor y al detal en el mismo negocio | vender al por mayor y al detal | distribuidora
 - [ ] Cómo saber qué productos dejan más ganancia | productos que más ganancia dejan | todos
@@ -32,14 +32,14 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 - [ ] Cómo vender más en una tienda de barrio | cómo vender más en una tienda | tienda de barrio
 
 ## Facturación electrónica DIAN
-- [ ] Facturación electrónica para tiendas: quién está obligado | facturación electrónica tienda | todos
+- [x] Facturación electrónica para tiendas: quién está obligado | facturación electrónica tienda | todos → facturacion-electronica-para-tiendas-quien-esta-obligado (2026-11-22)
 - [ ] Factura electrónica o documento equivalente POS: diferencias | documento equivalente POS | todos
 - [ ] Cómo emitir una factura electrónica desde el celular | factura electrónica desde el celular | todos
 - [ ] Régimen simple y facturación electrónica: lo básico | régimen simple facturación | todos
 - [ ] Errores comunes al empezar con la facturación electrónica | errores facturación electrónica | todos
 
 ## Vender más: catálogo, pedidos y clientes
-- [ ] Catálogo en línea para tu tienda: cómo recibir pedidos por WhatsApp | catálogo en línea pedidos WhatsApp | todos
+- [x] Catálogo en línea para tu tienda: cómo recibir pedidos por WhatsApp | catálogo en línea pedidos WhatsApp | todos → catalogo-en-linea-pedidos-whatsapp (2026-11-22)
 - [ ] Domicilios en una tienda de barrio: cómo organizarlos | domicilios tienda de barrio | tienda de barrio
 - [ ] Recibos digitales: por qué tus clientes los prefieren | recibo digital | todos
 - [ ] Cómo fidelizar a los clientes de tu negocio | fidelizar clientes negocio | todos
