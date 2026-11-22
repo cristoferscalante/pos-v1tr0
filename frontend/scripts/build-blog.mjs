@@ -12,6 +12,42 @@ import fs from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
 import { marked } from 'marked'
+import sharp from 'sharp'
+
+/**
+ * Optimización automática de portadas: por cada imagen de content se generan versiones de
+ * 480, 800 y 1200 px en AVIF y WebP (dist/blog/img/opt/), recortadas a 1200×630, para que cada
+ * dispositivo descargue solo el tamaño que necesita. La imagen original queda para Open Graph.
+ */
+const ANCHOS = [480, 800, 1200]
+const IMG = new Map()
+async function optimizarPortada(cover) {
+  if (!cover || cover.startsWith('http') || IMG.has(cover)) return
+  const origen = path.join(ROOT, 'public', cover.replace(/^\//, ''))
+  if (!fs.existsSync(origen)) return
+  const base = path.basename(cover).replace(/\.[a-z0-9]+$/i, '')
+  const salida = path.join(ROOT, 'dist', 'blog', 'img', 'opt')
+  fs.mkdirSync(salida, { recursive: true })
+  const srcset = { avif: [], webp: [] }
+  for (const w of ANCHOS) {
+    const h = Math.round((w * 630) / 1200)
+    const img = sharp(origen).resize(w, h, { fit: 'cover', position: 'centre' })
+    await img.clone().avif({ quality: 55, effort: 4 }).toFile(path.join(salida, `${base}-${w}.avif`))
+    await img.clone().webp({ quality: 80 }).toFile(path.join(salida, `${base}-${w}.webp`))
+    srcset.avif.push(`/blog/img/opt/${base}-${w}.avif ${w}w`)
+    srcset.webp.push(`/blog/img/opt/${base}-${w}.webp ${w}w`)
+  }
+  IMG.set(cover, { avif: srcset.avif.join(', '), webp: srcset.webp.join(', '), fallback: `/blog/img/opt/${base}-800.webp` })
+}
+
+/** <picture> responsivo con AVIF, WebP y tamaño fijo (sin saltos de diseño al cargar). */
+function picture(cover, alt, { cls = '', sizes = '100vw', lazy = true } = {}) {
+  const o = IMG.get(cover)
+  const attrs = `alt="${esc(alt)}" width="1200" height="630"${cls ? ` class="${cls}"` : ''} decoding="async" ${lazy ? 'loading="lazy"' : 'fetchpriority="high"'}`
+  if (!o) return `<img src="${esc(cover)}" ${attrs}>`
+  return `<picture><source type="image/avif" srcset="${o.avif}" sizes="${sizes}"><source type="image/webp" srcset="${o.webp}" sizes="${sizes}">` +
+    `<img src="${o.fallback}" ${attrs}></picture>`
+}
 
 const SITE = 'https://pos.v1tr0.com'
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..')
@@ -87,7 +123,7 @@ main{max-width:760px;margin:0 auto;padding:28px 20px 40px}
 .migas{font-size:14px;color:var(--muted)}.migas a{color:var(--muted)}
 h1{font-size:clamp(30px,5vw,42px);line-height:1.15;margin:14px 0 12px;color:#fff;letter-spacing:-.01em}
 .meta{color:var(--muted);font-size:14px;display:flex;flex-wrap:wrap;gap:6px 14px}
-.portada{display:block;width:100%;aspect-ratio:1200/630;border-radius:16px;margin:22px 0;border:1px solid var(--line)}
+.portada{display:block;width:100%;height:auto;object-fit:cover;aspect-ratio:1200/630;border-radius:16px;margin:22px 0;border:1px solid var(--line)}
 .corta{background:linear-gradient(135deg,rgba(99,102,241,.16),rgba(34,211,238,.08));border:1px solid rgba(99,102,241,.45);border-radius:14px;padding:16px 20px;margin:8px 0 26px}
 .corta b{display:block;color:var(--cyan);font-size:13px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
 .corta p{margin:0}
@@ -104,7 +140,7 @@ th{background:var(--card);color:#fff;text-align:left}th,td{padding:10px 12px;bor
 .rel{margin-top:40px}.rel h2{font-size:22px;color:#fff}
 .lista{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;text-decoration:none;color:var(--txt);display:flex;flex-direction:column}
-.card img{aspect-ratio:1200/630;object-fit:cover;width:100%}.card div{padding:14px 16px}
+.card img{display:block;aspect-ratio:1200/630;object-fit:cover;width:100%;height:auto}.card div{padding:14px 16px}
 .card h3{margin:6px 0;color:#fff;font-size:19px;line-height:1.3}.card p{margin:0;color:var(--muted);font-size:15px;line-height:1.5}
 .card small{color:var(--cyan);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
 .wide{max-width:1080px}
@@ -128,7 +164,7 @@ const head = ({ title, desc, url, image, type = 'website', extra = '', robots = 
 const foot = `<footer><div class="in"><span>© ${new Date().getFullYear()} V1TR0 · Punto de venta para negocios en Colombia</span>
 <a href="/">Inicio</a><a href="/blog/">Blog</a><a href="/registro">Crear cuenta</a><a href="${TELEGRAM}" rel="noopener">Telegram @V1tr0</a></div></footer></body></html>`
 
-const card = (p) => `<a class="card" href="/blog/${p.slug}/"><img src="${esc(p.cover)}" alt="" loading="lazy" width="1200" height="630">
+const card = (p) => `<a class="card" href="/blog/${p.slug}/">${picture(p.cover, p.title, { sizes: '(max-width: 700px) 100vw, 360px' })}
 <div><small>${esc(p.category || 'Negocio')}</small><h3>${esc(p.title)}</h3><p>${esc(p.description)}</p></div></a>`
 
 function paginaPost(p, todos) {
@@ -154,7 +190,7 @@ function paginaPost(p, todos) {
 <main><nav class="migas"><a href="/">Inicio</a> › <a href="/blog/">Blog</a> › ${esc(p.category || 'Artículo')}</nav>
 <article><h1>${esc(p.title)}</h1>
 <div class="meta"><span>Por ${esc(p.author || 'Equipo V1TR0')}</span><span>${fecha(p.date)}</span><span>${p.minutos} min de lectura</span>${p.updated !== p.date ? `<span>Actualizado: ${fecha(p.updated)}</span>` : ''}</div>
-<img class="portada" src="${esc(p.cover)}" alt="${esc(p.title)}" width="1200" height="630">
+${picture(p.cover, p.title, { cls: 'portada', sizes: '(max-width: 800px) 100vw, 720px', lazy: false })}
 ${p.resumen ? `<div class="corta"><b>Respuesta corta</b><p>${esc(p.resumen)}</p></div>` : ''}
 ${marked.parse(p.content)}
 ${faqs.length ? `<section class="faq"><h2 id="preguntas-frecuentes">Preguntas frecuentes</h2>${faqs.map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join('')}</section>` : ''}
@@ -181,6 +217,7 @@ function escribir(rel, contenido) {
 }
 
 const posts = leer()
+for (const p of posts) await optimizarPortada(p.cover)
 const publicos = posts.filter((p) => p.draft !== true)
 for (const p of posts) escribir(`blog/${p.slug}/index.html`, paginaPost(p, publicos.length ? publicos : posts))
 escribir('blog/index.html', paginaIndice(publicos))
