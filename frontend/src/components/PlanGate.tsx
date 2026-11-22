@@ -1,6 +1,6 @@
-import { Check, Clock, LogOut, MessageCircle, RefreshCw } from 'lucide-react';
+import { Check, Clock, LogOut, RefreshCw, Send } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
-import { PUBLIC_PLANS, SALES_WHATSAPP_DISPLAY, formatCOP, whatsappLink } from '../utils/plans';
+import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, formatCOP, contactLink } from '../utils/plans';
 import type { AuthUser } from '../types';
 import { parseServerDate } from '../utils/dates';
 
@@ -29,7 +29,7 @@ interface ExpiredProps {
   onLogout: () => void;
 }
 
-/** Pantalla "Compra tu plan": precios y contacto por WhatsApp. La activación es manual. */
+/** Pantalla "Compra tu plan": precios y contacto por Telegram. La activación es manual. */
 export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: ExpiredProps) {
   const wasTrial = (user.plan_name || 'free') === 'free';
   const isCashier = user.role === 'cashier';
@@ -60,8 +60,8 @@ export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: Expir
                 {plan.features.slice(0, 4).map(f => <li key={f}><Check size={15} /> {f}</li>)}
               </ul>
               {!isCashier && (
-                <a href={whatsappLink(message(plan.name))} target="_blank" rel="noreferrer" className={`${plan.highlight ? 'btn-primary' : 'btn-secondary'} plan-gate-cta`}>
-                  <MessageCircle size={17} /> Quiero el plan {plan.name}
+                <a href={contactLink(message(plan.name))} target="_blank" rel="noreferrer" className={`${plan.highlight ? 'btn-primary' : 'btn-secondary'} plan-gate-cta`}>
+                  <Send size={17} /> Quiero el plan {plan.name}
                 </a>
               )}
             </article>
@@ -69,8 +69,8 @@ export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: Expir
         </div>
 
         {!isCashier && (
-          <a href={whatsappLink(message())} target="_blank" rel="noreferrer" className="plan-gate-wa">
-            <MessageCircle size={20} /> Escríbenos al WhatsApp {SALES_WHATSAPP_DISPLAY}
+          <a href={contactLink(message())} target="_blank" rel="noreferrer" className="plan-gate-wa">
+            <Send size={20} /> Escríbenos por Telegram al {SALES_CONTACT_DISPLAY}
           </a>
         )}
         <p className="plan-gate-note">Cuando confirmemos tu pago activamos tu plan y la app se desbloquea sola.</p>
@@ -100,7 +100,7 @@ export function PlanReminder({ user }: { user: AuthUser | null }) {
     <div className="plan-reminder" role="status">
       <Clock size={16} />
       <span>{text}</span>
-      <a href={whatsappLink(`Hola, soy de "${user.business_name}" (${user.email}) y quiero ${trial ? 'activar' : 'renovar'} mi plan de V1TR0 POS.`)} target="_blank" rel="noreferrer">
+      <a href={contactLink(`Hola, soy de "${user.business_name}" (${user.email}) y quiero ${trial ? 'activar' : 'renovar'} mi plan de V1TR0 POS.`)} target="_blank" rel="noreferrer">
         {trial ? 'Comprar plan' : 'Renovar'}
       </a>
     </div>

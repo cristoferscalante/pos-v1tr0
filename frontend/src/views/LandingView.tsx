@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   ShoppingCart, Tags, ScanBarcode, Camera, Receipt, WifiOff, Globe, ChartColumn,
-  Truck, Users, FileCheck, Check, ChevronDown, MessageCircle, ArrowRight, Expand, Play,
+  Truck, Users, FileCheck, Check, ChevronDown, Send, ArrowRight, Expand, Play,
   Banknote, Sparkles, ShieldCheck, Smartphone, Monitor,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { AutoPlayVideo, Lightbox, type LightboxItem } from '../components/Lightbox';
-import { PUBLIC_PLANS, SALES_WHATSAPP_DISPLAY, TRIAL_DAYS, annualSavings, formatCOP, whatsappLink } from '../utils/plans';
+import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, TRIAL_DAYS, annualSavings, formatCOP, contactLink } from '../utils/plans';
 
 const shot = (name: string) => `/landing/${name}.jpg`;
 
@@ -95,8 +95,8 @@ const BUSINESS_TYPES = ['Tiendas', 'Minimercados', 'Veterinarias', 'Droguerías'
 
 const FAQ = [
   { q: '¿Necesito tarjeta para la prueba gratis?', a: `No. Te registras con tu correo y usas todo el sistema durante ${TRIAL_DAYS} días sin pagar nada.` },
-  { q: '¿Qué pasa cuando termina la prueba?', a: 'La app te muestra los planes. Nos escribes por WhatsApp, pagas y activamos tu plan. Todo lo que registraste se conserva.' },
-  { q: '¿Cómo pago el plan?', a: `Escríbenos al WhatsApp ${SALES_WHATSAPP_DISPLAY}: te damos los medios de pago y activamos tu cuenta apenas se confirme el pago.` },
+  { q: '¿Qué pasa cuando termina la prueba?', a: 'La app te muestra los planes. Nos escribes por Telegram, pagas y activamos tu plan. Todo lo que registraste se conserva.' },
+  { q: '¿Cómo pago el plan?', a: `Escríbenos por Telegram al ${SALES_CONTACT_DISPLAY}: te damos los medios de pago y activamos tu cuenta apenas se confirme el pago.` },
   { q: '¿Funciona si se va el internet?', a: 'Sí. Puedes seguir vendiendo; las ventas quedan guardadas en el celular y se envían solas cuando vuelve la conexión.' },
   { q: '¿Sirve para mi tipo de negocio?', a: 'Tiendas, minimercados, veterinarias, droguerías, restaurantes, papelerías, ferreterías y cualquier negocio que venda productos.' },
   { q: '¿Tengo que instalar algo?', a: 'No. Abres la página en el navegador del celular o del computador. Si quieres, la agregas a la pantalla de inicio como una app.' },
@@ -109,7 +109,7 @@ export function LandingView() {
   const [viewer, setViewer] = useState<Viewer>(null);
   const [showStickyCta, setShowStickyCta] = useState(false);
   const [videoDevice, setVideoDevice] = useState<'mobile' | 'desktop'>('mobile');
-  const waGeneral = whatsappLink('Hola, quiero información sobre V1TR0 POS para mi negocio.');
+  const waGeneral = contactLink('Hola, quiero información sobre V1TR0 POS para mi negocio.');
 
   // Aparición suave de las secciones al hacer scroll
   useEffect(() => {
@@ -164,7 +164,7 @@ export function LandingView() {
           <ul className="landing-trust">
             <li><Check size={16} /> Listo en 2 minutos</li>
             <li><Check size={16} /> Celular, tablet o computador</li>
-            <li><Check size={16} /> Soporte por WhatsApp</li>
+            <li><Check size={16} /> Soporte por Telegram</li>
           </ul>
         </div>
 
@@ -317,7 +317,7 @@ export function LandingView() {
         <ol className="landing-steps" data-reveal>
           <li><strong>Crea tu cuenta</strong><span>Con el nombre de tu negocio y tu correo. Sin tarjeta.</span></li>
           <li><strong>Pruébalo {TRIAL_DAYS} días gratis</strong><span>Sube tus productos y haz ventas reales.</span></li>
-          <li><strong>Activa tu plan</strong><span>Escríbenos por WhatsApp, pagas y sigues con tus datos intactos.</span></li>
+          <li><strong>Activa tu plan</strong><span>Escríbenos por Telegram, pagas y sigues con tus datos intactos.</span></li>
         </ol>
       </section>
 
@@ -326,7 +326,7 @@ export function LandingView() {
         <div className="landing-section-head" data-reveal>
           <span className="landing-eyebrow">Planes</span>
           <h2>Simples, sin letra pequeña: mes a mes o anual</h2>
-          <p className="landing-section-sub">Paga cada mes o ahorra pagando el año. Activamos tu plan por WhatsApp, sin cobros escondidos.</p>
+          <p className="landing-section-sub">Paga cada mes o ahorra pagando el año. Activamos tu plan por Telegram, sin cobros escondidos.</p>
         </div>
         <div className="landing-plans" data-reveal>
           {PUBLIC_PLANS.map(plan => (
@@ -349,12 +349,12 @@ export function LandingView() {
                 <a href="/registro" className="btn-secondary landing-plan-cta">Empezar gratis</a>
               ) : (
                 <a
-                  href={whatsappLink(`Hola, quiero el plan ${plan.name} de V1TR0 POS (${plan.monthlyPrice ? `${formatCOP(plan.monthlyPrice)} al mes o ${formatCOP(plan.price)} al año` : `${formatCOP(plan.price)} ${plan.period}`}).`)}
+                  href={contactLink(`Hola, quiero el plan ${plan.name} de V1TR0 POS (${plan.monthlyPrice ? `${formatCOP(plan.monthlyPrice)} al mes o ${formatCOP(plan.price)} al año` : `${formatCOP(plan.price)} ${plan.period}`}).`)}
                   target="_blank"
                   rel="noreferrer"
                   className={`${plan.highlight ? 'btn-primary' : 'btn-secondary'} landing-plan-cta`}
                 >
-                  <MessageCircle size={17} /> Quiero este plan
+                  <Send size={17} /> Quiero este plan
                 </a>
               )}
             </article>
@@ -387,7 +387,7 @@ export function LandingView() {
         <div className="landing-cta">
           <a href="/registro" className="btn-primary landing-cta-main">Crear mi cuenta gratis <ArrowRight size={18} /></a>
           <a href={waGeneral} target="_blank" rel="noreferrer" className="btn-secondary landing-cta-wa">
-            <MessageCircle size={18} /> WhatsApp {SALES_WHATSAPP_DISPLAY}
+            <Send size={18} /> Telegram {SALES_CONTACT_DISPLAY}
           </a>
         </div>
       </section>
@@ -398,14 +398,14 @@ export function LandingView() {
         <a href="/login">Ingresar</a>
       </footer>
 
-      <a href={waGeneral} target="_blank" rel="noreferrer" className="landing-wa-fab" aria-label="Escríbenos por WhatsApp">
-        <MessageCircle size={24} />
+      <a href={waGeneral} target="_blank" rel="noreferrer" className="landing-wa-fab" aria-label="Escríbenos por Telegram">
+        <Send size={24} />
       </a>
 
       <div className={`landing-sticky-cta ${showStickyCta ? 'show' : ''}`} aria-hidden={!showStickyCta}>
         <a href="/registro" className="btn-primary" tabIndex={showStickyCta ? 0 : -1}>Prueba gratis {TRIAL_DAYS} días <ArrowRight size={17} /></a>
-        <a href={waGeneral} target="_blank" rel="noreferrer" className="landing-sticky-wa" aria-label="WhatsApp" tabIndex={showStickyCta ? 0 : -1}>
-          <MessageCircle size={20} />
+        <a href={waGeneral} target="_blank" rel="noreferrer" className="landing-sticky-wa" aria-label="Telegram" tabIndex={showStickyCta ? 0 : -1}>
+          <Send size={20} />
         </a>
       </div>
 

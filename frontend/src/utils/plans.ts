@@ -1,9 +1,10 @@
 // Planes y contacto comercial de V1TR0 POS (landing y aviso de plan vencido).
-// La activación es manual: el cliente escribe por WhatsApp, paga, y el
+// La activación es manual: el cliente escribe por Telegram, paga, y el
 // superadmin le asigna el plan desde "Administración POS".
 
-export const SALES_WHATSAPP = '573107811719';
-export const SALES_WHATSAPP_DISPLAY = '310 781 1719';
+/** Canal comercial: Telegram (no se usa WhatsApp para contacto). */
+export const SALES_TELEGRAM_URL = 'https://t.me/+573228836494';
+export const SALES_CONTACT_DISPLAY = '+57 322 883 6494';
 export const TRIAL_DAYS = 7;
 
 export interface PublicPlan {
@@ -68,6 +69,10 @@ export const formatCOP = (value: number) =>
 export const annualSavings = (plan: PublicPlan) =>
   plan.monthlyPrice ? plan.monthlyPrice * 12 - plan.price : 0;
 
-export function whatsappLink(message: string) {
-  return `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(message)}`;
+/**
+ * Enlace al chat de Telegram. Telegram no permite precargar el mensaje en un
+ * chat por número; el parámetro se conserva para no cambiar las llamadas.
+ */
+export function contactLink(_message?: string) {
+  return SALES_TELEGRAM_URL;
 }

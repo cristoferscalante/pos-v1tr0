@@ -361,7 +361,7 @@ function AppInner() {
       });
       if (manual) {
         if (sub.subscription_active) success('¡Tu plan está activo! Gracias por confiar en V1TR0 POS');
-        else info('Todavía no vemos tu plan activo. Si ya pagaste, escríbenos por WhatsApp.');
+        else info('Todavía no vemos tu plan activo. Si ya pagaste, escríbenos por Telegram.');
       }
     } catch { /* sin conexión: se usa el último estado guardado */ }
     finally { if (manual) setCheckingPlan(false); }
