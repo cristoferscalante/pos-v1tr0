@@ -1,0 +1,64 @@
+# Banco de temas — blog de V1TR0 POS
+
+Formato: `- [ ] Título tentativo | keyword principal | tipo de negocio / intención`. Al publicar: `- [x] … → slug (AAAA-MM-DD)`.
+Orden sugerido: 1 tema de pilares distintos cada día. Keywords = hipótesis; revisar con Search Console a las 4-6 semanas.
+Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver skill `blog-pos`).
+
+## Inventario
+- [ ] Cómo hacer un inventario de una tienda de barrio paso a paso | cómo hacer un inventario de una tienda | tienda de barrio
+- [ ] Control de inventario en Excel o en app: qué conviene | control de inventario en Excel | comparativa
+- [ ] Cómo evitar que se pierda mercancía en tu negocio | pérdida de mercancía | todos
+- [ ] Productos vencidos: cómo controlarlos en una droguería o minimercado | control de productos vencidos | droguería
+- [ ] Stock mínimo: cuánto pedir y cuándo | stock mínimo | todos
+- [ ] Inventario de una ferretería: cómo organizar miles de referencias | inventario ferretería | ferretería
+- [ ] Cómo hacer pedidos a proveedores sin quedarte sin mercancía | pedidos a proveedores | todos
+- [ ] Inventario con código de barras desde el celular | inventario con código de barras | todos
+
+## Caja y dinero
+- [x] Cómo cuadrar la caja de un negocio al final del día | cómo cuadrar caja | todos → como-cuadrar-la-caja-de-un-negocio (2026-11-22)
+- [ ] Por qué no te cuadra la caja: 7 causas y cómo evitarlas | descuadre de caja | todos
+- [ ] Cómo recibir pagos con Nequi en tu tienda sin errores | recibir pagos Nequi tienda | tienda de barrio
+- [ ] Base de caja: cuánto dejar y cómo controlarla | base de caja | todos
+- [ ] Cómo controlar a los cajeros sin desconfiar de ellos | control de cajeros | minimercado
+- [ ] Cuentas por pagar a proveedores: cómo llevarlas al día | cuentas por pagar proveedores | todos
+- [ ] Gastos del negocio: cómo separarlos de los de la casa | separar gastos personales y del negocio | todos
+
+## Ventas, precios y márgenes
+- [ ] Cómo calcular el precio de venta de un producto | cómo calcular precio de venta | todos
+- [ ] Margen de ganancia de una tienda de barrio en Colombia | margen de ganancia tienda | tienda de barrio
+- [ ] Vender al por mayor y al detal en el mismo negocio | vender al por mayor y al detal | distribuidora
+- [ ] Cómo saber qué productos dejan más ganancia | productos que más ganancia dejan | todos
+- [ ] Promociones que sí funcionan en una tienda pequeña | promociones para tiendas | todos
+- [ ] Cómo vender más en una tienda de barrio | cómo vender más en una tienda | tienda de barrio
+
+## Facturación electrónica DIAN
+- [ ] Facturación electrónica para tiendas: quién está obligado | facturación electrónica tienda | todos
+- [ ] Factura electrónica o documento equivalente POS: diferencias | documento equivalente POS | todos
+- [ ] Cómo emitir una factura electrónica desde el celular | factura electrónica desde el celular | todos
+- [ ] Régimen simple y facturación electrónica: lo básico | régimen simple facturación | todos
+- [ ] Errores comunes al empezar con la facturación electrónica | errores facturación electrónica | todos
+
+## Vender más: catálogo, pedidos y clientes
+- [ ] Catálogo en línea para tu tienda: cómo recibir pedidos por WhatsApp | catálogo en línea pedidos WhatsApp | todos
+- [ ] Domicilios en una tienda de barrio: cómo organizarlos | domicilios tienda de barrio | tienda de barrio
+- [ ] Recibos digitales: por qué tus clientes los prefieren | recibo digital | todos
+- [ ] Cómo fidelizar a los clientes de tu negocio | fidelizar clientes negocio | todos
+
+## Guías por tipo de negocio
+- [ ] Cómo administrar una droguería pequeña | administrar droguería | droguería
+- [ ] Cómo administrar una panadería: producción, ventas y caja | administrar panadería | panadería
+- [ ] Cómo administrar una papelería en temporada escolar | administrar papelería | papelería
+- [ ] Cómo administrar una tienda de mascotas | administrar tienda de mascotas | mascotas
+- [ ] Cómo administrar un minimercado con varios cajeros | administrar minimercado | minimercado
+- [ ] Cómo montar una tienda de barrio en Colombia: lo que necesitas | cómo montar una tienda de barrio | emprendedor
+- [ ] Cómo administrar una licorera | administrar licorera | licorera
+- [ ] Cómo administrar un almacén de ropa pequeño | administrar almacén de ropa | ropa
+
+## Comparativas y elección de herramientas
+- [ ] Cuaderno o app: cómo llevar las cuentas de tu negocio | llevar cuentas del negocio | todos
+- [ ] Caja registradora o POS en el celular | caja registradora vs POS | comparativa
+- [ ] Qué es un sistema POS y para qué sirve en un negocio pequeño | qué es un sistema POS | informativa
+- [ ] Cómo elegir un software POS para tu negocio en Colombia | software POS Colombia | comercial
+- [ ] POS que funciona sin internet: por qué importa | POS sin internet | comercial
+- [ ] Impresora térmica de 58 mm para tu negocio: guía de compra | impresora térmica 58 mm | comercial
+- [ ] Cuánto cuesta un sistema POS en Colombia | cuánto cuesta un sistema POS | comercial

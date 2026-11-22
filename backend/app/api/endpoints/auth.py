@@ -20,7 +20,7 @@ router = APIRouter()
 
 # Rutas propias del frontend (landing, ingreso): un catálogo con estos enlaces
 # quedaría inaccesible, así que no se permiten como slug de negocio.
-RESERVED_SLUGS = {"login", "registro", "register", "planes", "admin", "api", "app", "assets", "landing"}
+RESERVED_SLUGS = {"login", "registro", "register", "planes", "admin", "api", "app", "assets", "landing", "blog"}
 
 MIN_PASSWORD_LENGTH = 8
 

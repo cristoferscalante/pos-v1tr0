@@ -23,6 +23,9 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // El blog, el sitemap, robots y llms.txt son HTML/texto estático generado por
+        // scripts/build-blog.mjs: el service worker no debe responderlos con la SPA.
+        navigateFallbackDenylist: [/^\/blog/, /^\/sitemap\.xml$/, /^\/robots\.txt$/, /^\/llms\.txt$/, /^\/api-proxy\//],
       },
       manifest: {
         name: 'V1TR0 POS',

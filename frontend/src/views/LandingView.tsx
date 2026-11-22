@@ -395,6 +395,7 @@ export function LandingView() {
       <footer className="landing-footer">
         <BrandLogo size={28} />
         <span>© {new Date().getFullYear()} V1TR0 · Punto de venta para negocios en Colombia</span>
+        <a href="/blog/">Blog: guías para tu negocio</a>
         <a href="/login">Ingresar</a>
       </footer>
 
