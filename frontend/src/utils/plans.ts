@@ -3,8 +3,8 @@
 // superadmin le asigna el plan desde "Administración POS".
 
 /** Canal comercial: Telegram (no se usa WhatsApp para contacto). */
-export const SALES_TELEGRAM_URL = 'https://t.me/+573228836494';
-export const SALES_CONTACT_DISPLAY = '+57 322 883 6494';
+export const SALES_TELEGRAM_URL = 'https://t.me/V1tr0';
+export const SALES_CONTACT_DISPLAY = '@V1tr0';
 export const TRIAL_DAYS = 7;
 
 export interface PublicPlan {
