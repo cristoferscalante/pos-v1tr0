@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Barcode, X } from 'lucide-react';
+import { Barcode, Camera, X } from 'lucide-react';
 
 export interface ScanResult {
   text: string;
@@ -15,6 +15,8 @@ interface Props {
   onReset: () => void;
   /** Código leído en el campo de prueba visible. */
   onTestScan: (code: string) => void;
+  /** Abrir el lector con la cámara (cuando el lector integrado no enciende). */
+  onUseCamera?: () => void;
 }
 
 const describe = (el: EventTarget | null) => {
@@ -30,7 +32,7 @@ const describe = (el: EventTarget | null) => {
  * evento que llega del dispositivo (teclas, texto insertado, pegado) para ver
  * cómo envía el lector integrado de la terminal y por qué no se reconoce.
  */
-export function ScannerDiagnostic({ result, onClose, onReset, onTestScan }: Props) {
+export function ScannerDiagnostic({ result, onClose, onReset, onTestScan, onUseCamera }: Props) {
   const [events, setEvents] = useState<string[]>([]);
   const testTimer = useRef<number | undefined>(undefined);
   const submitTest = (input: HTMLInputElement) => {
@@ -103,6 +105,38 @@ export function ScannerDiagnostic({ result, onClose, onReset, onTestScan }: Prop
               testTimer.current = window.setTimeout(() => submitTest(input), 300);
             }}
           />
+
+          {!result && (
+            <details className="scanner-diag-help">
+              <summary>¿El botón no enciende la luz del lector?</summary>
+              <p>
+                La luz la enciende Android, no esta app: si no prende, el lector está apagado en el equipo.
+                En terminales como la <strong>H10</strong>:
+              </p>
+              <ol>
+                <li>
+                  Busca en el menú de apps o en <em>Ajustes</em> una app llamada <strong>Scanner</strong>,
+                  <strong> ScanSetting</strong>, <strong>Escáner</strong>, <strong>Barcode</strong> o <strong>扫描</strong>.
+                </li>
+                <li>Activa el lector (<em>Open scanner</em> / <em>Habilitar</em>).</li>
+                <li>
+                  En modo de salida elige <strong>teclado</strong> (<em>Keyboard</em>, <em>Keystroke</em>, <em>Input box</em>)
+                  y como sufijo <strong>Enter</strong>.
+                </li>
+                <li>
+                  Revisa qué botón dispara: suelen ser los botones laterales (a veces naranja/amarillos), no el de volumen.
+                  Pruébalo primero en la app del lector; si ahí prende, vuelve aquí.
+                </li>
+              </ol>
+              <p>Si el equipo no trae esa app o no tiene ventana de lector arriba, usa la cámara.</p>
+            </details>
+          )}
+
+          {onUseCamera && (
+            <button type="button" className="btn-secondary scanner-diag-camera" onClick={onUseCamera}>
+              <Camera size={18} /> Escanear con la cámara
+            </button>
+          )}
 
           <div className="scanner-diag-log" aria-live="polite">
             <span className="scanner-diag-label">Lo que envía el dispositivo</span>

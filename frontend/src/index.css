@@ -4105,6 +4105,11 @@ body {
   display: flex; flex-direction: column; gap: 2px; max-height: 180px; overflow-y: auto; padding: 10px; border-radius: var(--r-sm);
   background: var(--surface-soft); border: 1px solid var(--border); font-family: monospace; font-size: 11px; color: var(--text-secondary);
 }
+.scanner-diag-help { font-size: 13px; line-height: 1.5; color: var(--text-secondary); padding: 10px 12px; border-radius: var(--r-sm); background: var(--surface-soft); border: 1px solid var(--border); }
+.scanner-diag-help summary { cursor: pointer; font-weight: 600; color: var(--text-primary); }
+.scanner-diag-help p { margin: 8px 0 0; }
+.scanner-diag-help ol { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.scanner-diag-camera { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .scanner-diag-version { font-size: 11px; color: var(--text-secondary); text-align: right; }
 
 .app-version { margin: 2px 0 0; font-size: 10.5px; color: var(--text-secondary); opacity: 0.8; }

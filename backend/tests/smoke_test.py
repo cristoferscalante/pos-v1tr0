@@ -439,6 +439,45 @@ with _Session(_engine) as s:
 r = client.get("/api/v1/auth/subscription", headers=trial_headers)
 check("al activarlo el superadmin, la app lo ve vigente sin reingresar", r.json().get("subscription_active") is True and r.json().get("plan_name") == "standard", r.text[:200])
 
+# --- 11c. Factura electronica SIN proveedor configurado: no se simula nada ---
+# Antes se generaba un CUFE local y un QR con la URL de la DIAN (parecia una
+# factura valida sin haberse transmitido). Ahora debe quedar como recibo:
+# dian_status=error, sin CUFE/QR y sin gastar folio.
+r = client.post("/api/v1/auth/register", json={
+    "business_name": "Negocio Sin Factus", "business_type": "retail",
+    "email": "sinfactus@smoketest.com", "password": "sinfactus12345",
+})
+check("registro tenant sin Factus", r.status_code == 201, f"{r.status_code} {r.text[:200]}")
+r = client.post("/api/v1/auth/login", data={"username": "sinfactus@smoketest.com", "password": "sinfactus12345"})
+nf_headers = {"Authorization": f"Bearer {r.json().get('access_token')}"}
+nf_product = str(uuid.uuid4())
+r = client.post("/api/v1/products/", json={
+    "id": nf_product, "name": "Producto FE", "sku": "SKU-FE", "price": "10000.00",
+    "cost": "6000.00", "stock": 5, "tax_rate": "19.00",
+}, headers=nf_headers)
+check("crear producto (tenant sin Factus)", r.status_code == 201, f"{r.status_code} {r.text[:200]}")
+with _Session(_engine) as s:
+    t = s.exec(_select(_Tenant).where(_Tenant.name == "Negocio Sin Factus")).first()
+    t.has_electronic_billing = True; t.folios_remaining = 10
+    s.add(t); s.commit()
+nf_sale = str(uuid.uuid4())
+r = client.post("/api/v1/sales/sync", json={"sales": [{
+    "id": nf_sale, "sale_number": "POS-FE-1", "subtotal": "8403.36", "tax": "1596.64",
+    "total": "10000.00", "payment_method": "cash",
+    "created_at": datetime.now(timezone.utc).isoformat(),
+    "meta_data": {"requires_electronic_invoice": True},
+    "details": [{"product_id": nf_product, "quantity": 1, "price": "10000.00", "total": "10000.00", "name": "Producto FE"}],
+}]}, headers=nf_headers)
+check("sync venta con FE pedida y sin Factus", r.status_code == 200 and not r.json().get("errors"), f"{r.status_code} {r.text[:300]}")
+r = client.get(f"/api/v1/sales/{nf_sale}", headers=nf_headers)
+nf_meta = (r.json() or {}).get("meta_data") or {}
+check("sin Factus: dian_status=error con mensaje", nf_meta.get("dian_status") == "error" and bool(nf_meta.get("dian_error")), str(nf_meta)[:300])
+check("sin Factus: NO se genera CUFE ni QR de la DIAN", not nf_meta.get("cufe") and not nf_meta.get("qr_url"), str(nf_meta)[:300])
+with _Session(_engine) as s:
+    t = s.exec(_select(_Tenant).where(_Tenant.name == "Negocio Sin Factus")).first()
+    folios_left = t.folios_remaining
+check("sin Factus: no se descuenta folio (sigue en 10)", folios_left == 10, str(folios_left))
+
 # --- 12. HALLAZGO 5.10: guard-rail de JWT_SECRET inseguro en produccion ---
 import subprocess
 guard_db_path = os.path.join(BACKEND_DIR, "tests", "_smoke_test_guard.db")

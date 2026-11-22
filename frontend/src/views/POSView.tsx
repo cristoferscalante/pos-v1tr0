@@ -784,9 +784,13 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               <div className="invoice-print-header">
                 <div>
                   <div className="invoice-print-title">{businessName}</div>
-                  <div className="invoice-print-subtitle">Factura electronica de venta</div>
+                  <div className="invoice-print-subtitle">
+                    {completedSale.meta_data?.factus_bill_number
+                      ? 'Factura electronica de venta'
+                      : 'Recibo de venta (factura electronica no emitida)'}
+                  </div>
                 </div>
-                <div className="invoice-print-badge">FE</div>
+                {completedSale.meta_data?.factus_bill_number && <div className="invoice-print-badge">FE</div>}
               </div>
               <div className="invoice-print-meta-grid">
                 <div><strong>Numero:</strong> {completedSale.sale_number}</div>
@@ -900,6 +904,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
           onClose={() => setShowDiagnostic(false)}
           onReset={() => setDiagnosticLogs(null)}
           onTestScan={code => handleScan(code, { mode: 'directo', avgMs: null, terminator: 'Ninguno' })}
+          onUseCamera={() => { setShowDiagnostic(false); setIsScanning(true); }}
         />
       )}
     </div>

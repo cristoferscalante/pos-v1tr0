@@ -362,6 +362,11 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
                   {sale.meta_data?.requires_electronic_invoice && (
                     <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12px' }}>
                       <div><strong>Estado FE:</strong> {sale.meta_data?.factus_status || sale.meta_data?.dian_status || 'Pendiente'}</div>
+                      {sale.meta_data?.dian_status === 'error' && sale.meta_data?.dian_error && (
+                        <div style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(239,68,68,0.12)', color: 'var(--danger, #ef4444)', fontWeight: 600 }}>
+                          ⚠ {sale.meta_data.dian_error}
+                        </div>
+                      )}
                       {sale.meta_data?.dian_is_simulated && (
                         <div style={{ padding: '8px 10px', borderRadius: '8px', background: 'rgba(239,68,68,0.12)', color: 'var(--danger, #ef4444)', fontWeight: 600 }}>
                           ⚠ No transmitido a la DIAN: este documento se generó localmente y NO es una factura electrónica válida. {sale.meta_data?.dian_warning || 'Configura Factus en Configuración para emitir facturación electrónica real.'}

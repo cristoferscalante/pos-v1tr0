@@ -14,7 +14,6 @@ from app.models.sale import Sale, SaleDetail, SaleReadWithDetails, SaleDetailRea
 from app.models.product import Product
 from app.models.tenant import Tenant
 from app.models.user import User
-from app.services.dian import DianService
 from app.services.factus import FactusService
 from app.services.notifications import notify_low_stock, notify_sale_created
 from app.services.receipts import send_sale_receipt
@@ -266,14 +265,31 @@ def sync_offline_sales(
                                 session.add(new_sale)
                                 session.commit()
                                 session.refresh(new_sale)
+
+                                # Descontar 1 folio del tenant (solo si se emitió por Factus)
+                                tenant.folios_remaining -= 1
+                                session.add(tenant)
+                                session.commit()
+                                session.refresh(tenant)
                             else:
-                                DianService.transmit_to_dian(new_sale, session)
-                            
-                            # Descontar 1 folio del tenant
-                            tenant.folios_remaining -= 1
-                            session.add(tenant)
-                            session.commit()
-                            session.refresh(tenant)
+                                # Sin proveedor tecnológico configurado NO se emite nada.
+                                # Antes se generaba un CUFE local y un QR con la URL de
+                                # la DIAN (DianService, ya eliminado): parecía una factura
+                                # electrónica válida sin haberse transmitido nunca, lo que
+                                # es un riesgo tributario para el negocio. Ahora la venta
+                                # queda como recibo, sin CUFE ni QR y sin gastar folio.
+                                current_metadata = dict(new_sale.meta_data or {})
+                                current_metadata.update({
+                                    "dian_status": "error",
+                                    "dian_error": (
+                                        "Factura electrónica NO emitida: falta configurar el proveedor "
+                                        "tecnológico (Factus) en Configuración. Esta venta queda como recibo."
+                                    ),
+                                })
+                                new_sale.meta_data = current_metadata
+                                session.add(new_sale)
+                                session.commit()
+                                session.refresh(new_sale)
                 except Exception as dian_error:
                     print(f"Error en transmisión DIAN para venta {new_sale.id}: {dian_error}")
 

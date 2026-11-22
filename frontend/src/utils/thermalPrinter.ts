@@ -126,7 +126,10 @@ export function buildTicketLines(sale: LocalSale, biz: ReceiptBusiness, paper: P
   (biz.contactLines || []).forEach(line => wrapParts(line, w).forEach(l => push(center(l, w), { boxed: true })));
 
   // Datos de la venta
-  const title = meta.requires_electronic_invoice ? 'FACTURA' : 'RECIBO';
+  // Solo se titula FACTURA si el proveedor (Factus) devolvió un número real;
+  // si no, es un recibo (no se debe presentar como factura electrónica).
+  const isRealInvoice = Boolean(meta.requires_electronic_invoice && meta.factus_bill_number);
+  const title = isRealInvoice ? 'FACTURA' : 'RECIBO';
   leftRight(`${title} ${sale.sale_number}`, PAYMENT_LABELS[sale.payment_method] || sale.payment_method, w).forEach(l => push(l, { bold: true }));
   leftRight(
     formatDate(sale.created_at, { day: '2-digit', month: '2-digit', year: '2-digit' }),
@@ -161,7 +164,10 @@ export function buildTicketLines(sale: LocalSale, biz: ReceiptBusiness, paper: P
     leftRight('Vueltas', money(meta.cash_change || 0), w).forEach(l => push(l, { bold: true }));
   }
 
-  if (meta.requires_electronic_invoice) {
+  if (meta.requires_electronic_invoice && meta.dian_status === 'error') {
+    sep();
+    wrapText('Factura electronica NO emitida. Documento sin validez ante la DIAN.', w).forEach(l => push(l.padEnd(w)));
+  } else if (meta.requires_electronic_invoice) {
     sep();
     leftRight('Numero FE', clean(meta.factus_bill_number || 'Pendiente'), w).forEach(l => push(l));
     leftRight('Estado DIAN', clean(meta.dian_status || 'Pendiente'), w).forEach(l => push(l));
