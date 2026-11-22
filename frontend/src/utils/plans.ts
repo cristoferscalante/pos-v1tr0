@@ -2,14 +2,16 @@
 // La activación es manual: el cliente escribe por WhatsApp, paga, y el
 // superadmin le asigna el plan desde "Administración POS".
 
-export const SALES_WHATSAPP = '573228836494';
-export const SALES_WHATSAPP_DISPLAY = '322 883 6494';
+export const SALES_WHATSAPP = '573107811719';
+export const SALES_WHATSAPP_DISPLAY = '310 781 1719';
 export const TRIAL_DAYS = 7;
 
 export interface PublicPlan {
   key: 'free' | 'standard' | 'premium';
   name: string;
-  price: number;          // COP; 0 = gratis
+  price: number;          // COP por año; 0 = gratis
+  /** Precio si se paga mes a mes (COP). El anual sale más barato. */
+  monthlyPrice?: number;
   period: string;
   highlight?: boolean;
   features: string[];
@@ -31,6 +33,7 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     key: 'standard',
     name: 'Estándar',
     price: 400000,
+    monthlyPrice: 39900,
     period: 'al año',
     highlight: true,
     features: [
@@ -47,11 +50,12 @@ export const PUBLIC_PLANS: PublicPlan[] = [
     key: 'premium',
     name: 'Premium',
     price: 570000,
+    monthlyPrice: 54900,
     period: 'al año',
     features: [
       'Todo lo del plan Estándar',
       'Facturación electrónica DIAN',
-      '100 facturas electrónicas incluidas',
+      '100 facturas al año (8 por mes en el plan mensual)',
       'Recarga de 100 facturas por $170.000',
     ],
   },
@@ -59,6 +63,10 @@ export const PUBLIC_PLANS: PublicPlan[] = [
 
 export const formatCOP = (value: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value);
+
+/** Cuánto se ahorra pagando el año completo frente a 12 meses. */
+export const annualSavings = (plan: PublicPlan) =>
+  plan.monthlyPrice ? plan.monthlyPrice * 12 - plan.price : 0;
 
 export function whatsappLink(message: string) {
   return `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(message)}`;

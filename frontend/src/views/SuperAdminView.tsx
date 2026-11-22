@@ -17,10 +17,12 @@ interface SuperAdminViewProps {
 
 // ── Planes ────────────────────────────────────────────────────
 const PLANES = [
-  { key: 'free',     label: 'Gratis — 7 días',        color: '#9ca3af', bg: 'rgba(156,163,175,0.12)', dias: 7,  precio: 0,      folios: 0,   incluye_facturacion: false },
-  // Estándar y Premium se pagan por año (365 días)
-  { key: 'standard', label: 'Estándar — $400.000 COP / año', color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 365, precio: 400000, folios: 0,   incluye_facturacion: false },
-  { key: 'premium',  label: 'Premium — $570.000 COP / año',  color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 365, precio: 570000, folios: 100, incluye_facturacion: true  },
+  // id = opción del panel; key = plan_name que se guarda en el negocio
+  { id: 'free',         key: 'free',     label: 'Gratis — 7 días',                       color: '#9ca3af', bg: 'rgba(156,163,175,0.12)', dias: 7,   precio: 0,      folios: 0,   incluye_facturacion: false },
+  { id: 'standard_mes', key: 'standard', label: 'Estándar mensual — $39.900 COP / mes',  color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 30,  precio: 39900,  folios: 0,   incluye_facturacion: false },
+  { id: 'standard',     key: 'standard', label: 'Estándar anual — $400.000 COP / año',   color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 365, precio: 400000, folios: 0,   incluye_facturacion: false },
+  { id: 'premium_mes',  key: 'premium',  label: 'Premium mensual — $54.900 COP / mes',   color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 30,  precio: 54900,  folios: 8,   incluye_facturacion: true  },
+  { id: 'premium',      key: 'premium',  label: 'Premium anual — $570.000 COP / año',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 365, precio: 570000, folios: 100, incluye_facturacion: true  },
 ];
 const FOLIO_PACK_SIZE  = 100;
 const FOLIO_PACK_PRICE = 170000;
@@ -68,7 +70,7 @@ interface EditModalProps {
 
 function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
   const { success, error } = useToast();
-  const [planKey, setPlanKey] = useState(tenant.plan_name);
+  const [planId, setPlanId] = useState(tenant.plan_name);
   const [hasElectronic, setHasElectronic] = useState(tenant.has_electronic_billing);
   const [foliosRemaining, setFoliosRemaining] = useState(tenant.folios_remaining);
   const [foliosTotal, setFoliosTotal] = useState(tenant.folios_total);
@@ -76,22 +78,23 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
   const [foliosExtra, setFoliosExtra] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  const plan = PLANES.find(p => p.key === planKey) || PLANES[0];
+  const plan = PLANES.find(p => p.id === planId) || PLANES[0];
   const nuevaFecha = addDays(plan.dias);
   const foliosFinal = foliosRemaining + foliosExtra;
 
-  const handlePlanChange = (key: string) => {
-    const p = PLANES.find(pl => pl.key === key) || PLANES[0];
-    setPlanKey(key);
+  const handlePlanChange = (id: string) => {
+    const p = PLANES.find(pl => pl.id === id) || PLANES[0];
+    setPlanId(id);
     if (p.incluye_facturacion) setHasElectronic(true);
-    if (p.folios > 0 && foliosRemaining === 0) { setFoliosRemaining(p.folios); setFoliosTotal(p.folios); }
+    // Mensual recarga hasta 8 folios; anual hasta 100 (no se descuentan los que ya tenga de más)
+    if (p.folios > 0 && foliosRemaining < p.folios) { setFoliosRemaining(p.folios); setFoliosTotal(p.folios); }
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await superadminApi.updatePlan(token, tenant.id, {
-        plan_name: planKey,
+        plan_name: plan.key,
         subscription_ends_at: nuevaFecha,
         has_electronic_billing: hasElectronic,
         folios_remaining: foliosFinal,
@@ -118,10 +121,10 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
           <div>
             <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '8px', fontWeight: 600 }}>Plan</label>
             {PLANES.map(p => (
-              <label key={p.key} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '8px', cursor: 'pointer', border: `2px solid ${planKey === p.key ? p.color : 'var(--border)'}`, background: planKey === p.key ? p.bg : 'var(--bg-elevated)', marginBottom: '6px', transition: 'all 0.15s' }}>
-                <input type="radio" name="plan" value={p.key} checked={planKey === p.key} onChange={() => handlePlanChange(p.key)} style={{ accentColor: p.color }} />
+              <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '8px', cursor: 'pointer', border: `2px solid ${planId === p.id ? p.color : 'var(--border)'}`, background: planId === p.id ? p.bg : 'var(--bg-elevated)', marginBottom: '6px', transition: 'all 0.15s' }}>
+                <input type="radio" name="plan" value={p.id} checked={planId === p.id} onChange={() => handlePlanChange(p.id)} style={{ accentColor: p.color }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.87rem', color: planKey === p.key ? p.color : 'var(--text)' }}>{p.label}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.87rem', color: planId === p.id ? p.color : 'var(--text)' }}>{p.label}</div>
                   <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{durationLabel(p.dias)} · {p.incluye_facturacion ? `${p.folios} folios DIAN` : 'sin DIAN'}</div>
                 </div>
               </label>
@@ -527,10 +530,10 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
           {PLANES.map(p => (
-            <div key={p.key} style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.color}40`, background: p.bg }}>
-              <div style={{ fontWeight: 700, color: p.color, fontSize: '0.82rem', marginBottom: '3px' }}>{p.key.toUpperCase()}</div>
+            <div key={p.id} style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.color}40`, background: p.bg }}>
+              <div style={{ fontWeight: 700, color: p.color, fontSize: '0.82rem', marginBottom: '3px' }}>{p.key.toUpperCase()}{p.dias === 30 ? ' · MENSUAL' : p.dias === 365 ? ' · ANUAL' : ''}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <div>{p.precio > 0 ? `${cop(p.precio)} / año` : 'Gratis'} · {durationLabel(p.dias)}</div>
+                <div>{p.precio > 0 ? `${cop(p.precio)} / ${p.dias === 30 ? 'mes' : 'año'}` : 'Gratis'} · {durationLabel(p.dias)}</div>
                 <div>{p.incluye_facturacion ? `✅ ${p.folios} folios DIAN` : '❌ Sin DIAN'}</div>
               </div>
             </div>

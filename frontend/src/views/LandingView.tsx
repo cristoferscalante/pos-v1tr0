@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { AutoPlayVideo, Lightbox, type LightboxItem } from '../components/Lightbox';
-import { PUBLIC_PLANS, SALES_WHATSAPP_DISPLAY, TRIAL_DAYS, formatCOP, whatsappLink } from '../utils/plans';
+import { PUBLIC_PLANS, SALES_WHATSAPP_DISPLAY, TRIAL_DAYS, annualSavings, formatCOP, whatsappLink } from '../utils/plans';
 
 const shot = (name: string) => `/landing/${name}.jpg`;
 
@@ -325,8 +325,8 @@ export function LandingView() {
       <section id="planes" className="landing-section">
         <div className="landing-section-head" data-reveal>
           <span className="landing-eyebrow">Planes</span>
-          <h2>Simples, sin letra pequeña, pago anual</h2>
-          <p className="landing-section-sub">Activamos tu plan por WhatsApp. Sin cobros escondidos.</p>
+          <h2>Simples, sin letra pequeña: mes a mes o anual</h2>
+          <p className="landing-section-sub">Paga cada mes o ahorra pagando el año. Activamos tu plan por WhatsApp, sin cobros escondidos.</p>
         </div>
         <div className="landing-plans" data-reveal>
           {PUBLIC_PLANS.map(plan => (
@@ -334,10 +334,14 @@ export function LandingView() {
               {plan.highlight && <span className="landing-plan-tag">Más elegido</span>}
               <h3>{plan.name}</h3>
               <div className="landing-plan-price">
-                <strong>{plan.price ? formatCOP(plan.price) : 'Gratis'}</strong>
-                <span>{plan.period}</span>
+                <strong>{plan.monthlyPrice ? formatCOP(plan.monthlyPrice) : plan.price ? formatCOP(plan.price) : 'Gratis'}</strong>
+                <span>{plan.monthlyPrice ? 'al mes' : plan.period}</span>
               </div>
-              {plan.price > 0 && <p className="landing-plan-month">Equivale a {formatCOP(Math.round(plan.price / 12))} al mes</p>}
+              {plan.monthlyPrice ? (
+                <p className="landing-plan-month">
+                  o {formatCOP(plan.price)} al año (ahorras {formatCOP(annualSavings(plan))})
+                </p>
+              ) : plan.price > 0 && <p className="landing-plan-month">Equivale a {formatCOP(Math.round(plan.price / 12))} al mes</p>}
               <ul>
                 {plan.features.map(f => <li key={f}><Check size={16} /> {f}</li>)}
               </ul>
@@ -345,7 +349,7 @@ export function LandingView() {
                 <a href="/registro" className="btn-secondary landing-plan-cta">Empezar gratis</a>
               ) : (
                 <a
-                  href={whatsappLink(`Hola, quiero el plan ${plan.name} de V1TR0 POS (${formatCOP(plan.price)} ${plan.period}).`)}
+                  href={whatsappLink(`Hola, quiero el plan ${plan.name} de V1TR0 POS (${plan.monthlyPrice ? `${formatCOP(plan.monthlyPrice)} al mes o ${formatCOP(plan.price)} al año` : `${formatCOP(plan.price)} ${plan.period}`}).`)}
                   target="_blank"
                   rel="noreferrer"
                   className={`${plan.highlight ? 'btn-primary' : 'btn-secondary'} landing-plan-cta`}

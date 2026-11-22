@@ -54,7 +54,7 @@ export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: Expir
             <article key={plan.key} className={`plan-gate-plan ${plan.highlight ? 'featured' : ''}`}>
               <div className="plan-gate-plan-head">
                 <h2>{plan.name}</h2>
-                <div><strong>{formatCOP(plan.price)}</strong> <span>{plan.period}</span></div>
+                <div>{plan.monthlyPrice ? <><strong>{formatCOP(plan.monthlyPrice)}</strong> <span>al mes · o {formatCOP(plan.price)} al año</span></> : <><strong>{formatCOP(plan.price)}</strong> <span>{plan.period}</span></>}</div>
               </div>
               <ul>
                 {plan.features.slice(0, 4).map(f => <li key={f}><Check size={15} /> {f}</li>)}
