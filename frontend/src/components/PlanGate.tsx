@@ -1,6 +1,6 @@
 import { Check, Clock, LogOut, RefreshCw, Send } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
-import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, formatCOP, contactLink } from '../utils/plans';
+import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, SALES_EMAIL, formatCOP, contactLink, emailLink } from '../utils/plans';
 import type { AuthUser } from '../types';
 import { parseServerDate } from '../utils/dates';
 
@@ -72,6 +72,11 @@ export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: Expir
           <a href={contactLink(message())} target="_blank" rel="noreferrer" className="plan-gate-wa">
             <Send size={20} /> Escríbenos por Telegram al {SALES_CONTACT_DISPLAY}
           </a>
+        )}
+        {!isCashier && (
+          <p className="plan-gate-note">
+            ¿Prefieres correo? <a href={emailLink('Activar mi plan de V1TR0 POS', message())}>{SALES_EMAIL}</a>
+          </p>
         )}
         <p className="plan-gate-note">Cuando confirmemos tu pago activamos tu plan y la app se desbloquea sola.</p>
 

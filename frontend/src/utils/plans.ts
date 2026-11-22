@@ -70,9 +70,18 @@ export const annualSavings = (plan: PublicPlan) =>
   plan.monthlyPrice ? plan.monthlyPrice * 12 - plan.price : 0;
 
 /**
- * Enlace al chat de Telegram. Telegram no permite precargar el mensaje en un
- * chat por número; el parámetro se conserva para no cambiar las llamadas.
+ * Enlace al chat de Telegram con el mensaje ya escrito: con el usuario @V1tr0,
+ * Telegram precarga el borrador con `?text=` (core.telegram.org/api/links).
+ * La persona solo tiene que tocar "Enviar".
  */
-export function contactLink(_message?: string) {
-  return SALES_TELEGRAM_URL;
+export function contactLink(message?: string) {
+  return message ? `${SALES_TELEGRAM_URL}?text=${encodeURIComponent(message)}` : SALES_TELEGRAM_URL;
+}
+
+/** Correo comercial: el mismo de todas las webs de V1TR0. */
+export const SALES_EMAIL = 'buzon@v1tr0.com';
+
+/** Enlace de correo con asunto y mensaje listos. */
+export function emailLink(subject: string, message?: string) {
+  return `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(subject)}${message ? `&body=${encodeURIComponent(message)}` : ''}`;
 }

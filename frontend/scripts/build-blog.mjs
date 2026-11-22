@@ -55,6 +55,10 @@ const SRC = path.join(ROOT, 'content', 'blog')
 const DIST = path.join(ROOT, 'dist')
 const DRAFTS = process.env.BLOG_DRAFTS === '1'
 const TELEGRAM = 'https://t.me/V1tr0'
+const CORREO = 'buzon@v1tr0.com'
+/** Telegram con el mensaje ya escrito (t.me/<usuario>?text=) y correo con asunto listo. */
+const tg = (texto) => `${TELEGRAM}?text=${encodeURIComponent(texto)}`
+const correo = (asunto, cuerpo = '') => `mailto:${CORREO}?subject=${encodeURIComponent(asunto)}${cuerpo ? `&body=${encodeURIComponent(cuerpo)}` : ''}`
 const ORG = {
   '@type': 'Organization', name: 'V1TR0', url: 'https://v1tr0.com',
   logo: { '@type': 'ImageObject', url: `${SITE}/icon-512.png` },
@@ -162,7 +166,7 @@ const head = ({ title, desc, url, image, type = 'website', extra = '', robots = 
 <nav><a class="x" href="/blog/">Blog</a><a class="x" href="/#planes">Planes</a><a class="btn" href="/registro">Prueba gratis</a></nav></div></header>`
 
 const foot = `<footer><div class="in"><span>© ${new Date().getFullYear()} V1TR0 · Punto de venta para negocios en Colombia</span>
-<a href="/">Inicio</a><a href="/blog/">Blog</a><a href="/registro">Crear cuenta</a><a href="${TELEGRAM}" rel="noopener">Telegram @V1tr0</a></div></footer></body></html>`
+<a href="/">Inicio</a><a href="/blog/">Blog</a><a href="/registro">Crear cuenta</a><a href="${tg('Hola, quiero información sobre V1TR0 POS para mi negocio.')}" rel="noopener">Telegram @V1tr0</a><a href="${correo('Información sobre V1TR0 POS')}">${CORREO}</a></div></footer></body></html>`
 
 const card = (p) => `<a class="card" href="/blog/${p.slug}/">${picture(p.cover, p.title, { sizes: '(max-width: 700px) 100vw, 360px' })}
 <div><small>${esc(p.category || 'Negocio')}</small><h3>${esc(p.title)}</h3><p>${esc(p.description)}</p></div></a>`
@@ -196,7 +200,8 @@ ${marked.parse(p.content)}
 ${faqs.length ? `<section class="faq"><h2 id="preguntas-frecuentes">Preguntas frecuentes</h2>${faqs.map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`).join('')}</section>` : ''}
 </article>
 <section class="cta"><h2>Prueba V1TR0 POS gratis 7 días</h2><p>Vende, controla tu inventario y conoce tus ganancias desde el celular. Sin tarjeta y sin instalar nada.</p>
-<div class="bs"><a class="btn" href="/registro">Crear mi cuenta gratis</a><a class="btn tg" href="${TELEGRAM}" rel="noopener">Escríbenos por Telegram</a></div></section>
+<div class="bs"><a class="btn" href="/registro">Crear mi cuenta gratis</a><a class="btn tg" href="${tg(`Hola, leí «${p.title}» en el blog de V1TR0 POS y quiero saber cómo me ayuda en mi negocio.`)}" rel="noopener">Escríbenos por Telegram</a></div>
+<p style="margin:14px 0 0;font-size:15px;color:#d1d5db">¿Prefieres correo? <a href="${correo(`Me interesa V1TR0 POS: ${p.title}`, `Hola, leí «${p.title}» y quiero información de V1TR0 POS.`)}">${CORREO}</a></p></section>
 ${relacionados.length ? `<section class="rel"><h2>Sigue leyendo</h2><div class="lista">${relacionados.map(card).join('')}</div></section>` : ''}
 </main>` + foot
 }
@@ -243,7 +248,7 @@ escribir('llms.txt', `# V1TR0 POS
 - Para quién: tiendas de barrio, minimercados, droguerías, papelerías, ferreterías, panaderías, tiendas de mascotas y negocios que venden al detal y por mayor.
 - Funciones: ventas al detal y por mayor, inventario con fotos y escáner con la cámara, alertas de bajo stock, caja con apertura y cierre, recibos impresos (58 mm), por correo o como imagen, catálogo en línea con pedidos, compras, proveedores y cuentas por pagar, panel de ventas y ganancias, usuarios cajeros, funciona sin internet.
 - Precios: plan Estándar $39.900 COP al mes o $400.000 al año. Plan Premium $54.900 COP al mes o $570.000 al año, con facturación electrónica DIAN (100 facturas al año; 8 por mes en el plan mensual). Prueba gratis 7 días sin tarjeta.
-- Contacto: Telegram @V1tr0 (${TELEGRAM})
+- Contacto: Telegram @V1tr0 (${TELEGRAM}) · correo ${CORREO}
 
 ## Guías del blog
 ${publicos.map((p) => `- [${p.title}](${p.url}): ${p.resumen || p.description}`).join('\n')}

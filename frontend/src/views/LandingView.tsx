@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { AutoPlayVideo, Lightbox, type LightboxItem } from '../components/Lightbox';
-import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, TRIAL_DAYS, annualSavings, formatCOP, contactLink } from '../utils/plans';
+import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, SALES_EMAIL, TRIAL_DAYS, annualSavings, formatCOP, contactLink, emailLink } from '../utils/plans';
 
 const shot = (name: string) => `/landing/${name}.jpg`;
 
@@ -395,6 +395,8 @@ export function LandingView() {
       <footer className="landing-footer">
         <BrandLogo size={28} />
         <span>© {new Date().getFullYear()} V1TR0 · Punto de venta para negocios en Colombia</span>
+        <a href={waGeneral} target="_blank" rel="noreferrer">Telegram {SALES_CONTACT_DISPLAY}</a>
+        <a href={emailLink('Información sobre V1TR0 POS', 'Hola, quiero información sobre V1TR0 POS para mi negocio.')}>{SALES_EMAIL}</a>
         <a href="/blog/">Blog: guías para tu negocio</a>
         <a href="/login">Ingresar</a>
       </footer>
