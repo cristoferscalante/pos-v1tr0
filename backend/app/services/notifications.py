@@ -21,51 +21,70 @@ DEFAULT_NOTIFICATION_RULES = {
 
 
 def _format_currency(value: Any) -> str:
+    """Pesos colombianos: $ 1.234.567 (sin decimales, punto de miles)."""
     try:
         amount = float(value or 0)
     except (TypeError, ValueError):
         amount = 0.0
-    return f"${amount:,.2f}"
+    return "$ " + f"{amount:,.0f}".replace(",", ".")
 
 
 def _info_row(label: str, value: str) -> str:
     return (
         "<tr>"
-        f"<td style=\"padding:10px 0;color:#6b7280;font-size:13px;\">{label}</td>"
-        f"<td style=\"padding:10px 0;color:#111827;font-size:13px;font-weight:600;text-align:right;\">{value}</td>"
+        f"<td style=\"padding:11px 0;border-bottom:1px solid #E5E7EB;color:#6B7280;font-size:13px;\">{label}</td>"
+        f"<td style=\"padding:11px 0;border-bottom:1px solid #E5E7EB;color:#111827;font-size:14px;font-weight:700;text-align:right;\">{value}</td>"
         "</tr>"
     )
 
 
 def _email_shell(title: str, subtitle: str, body_html: str, footer: str) -> str:
-    return f"""
-<!doctype html>
+    """Plantilla de correo de V1TR0 POS: fondo #070b12, degradado índigo #6366f1 -> cian #22d3ee.
+
+    Logo PNG alojado en pos.v1tr0.com (los correos no muestran SVG). Tablas y estilos en línea.
+    """
+    sitio = settings.FRONTEND_URL.rstrip("/") if settings.FRONTEND_URL.startswith("https://") else "https://pos.v1tr0.com"
+    return f"""<!doctype html>
 <html lang="es">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light only" />
     <title>{title}</title>
   </head>
-  <body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f3f4f6;padding:32px 16px;">
+  <body style="margin:0;padding:0;background:#EEF0F6;font-family:Arial,Helvetica,sans-serif;color:#111827;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">{subtitle}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EEF0F6;padding:28px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 18px 40px rgba(15,23,42,0.10);">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:580px;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(7,11,18,0.14);">
             <tr>
-              <td style="padding:28px 32px 18px 32px;background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);color:#ffffff;">
-                <div style="font-size:12px;letter-spacing:0.12em;text-transform:uppercase;opacity:0.85;">V1TR0 POS</div>
-                <div style="font-size:28px;line-height:1.15;font-weight:700;margin-top:10px;">{title}</div>
-                <div style="font-size:14px;line-height:1.5;opacity:0.92;margin-top:10px;">{subtitle}</div>
+              <td style="padding:24px 30px;background:#070b12;background-image:linear-gradient(135deg,#0d1117 0%,#070b12 70%);">
+                <a href="{sitio}" style="text-decoration:none;"><img src="{sitio}/email/pos-logo.png" width="182" alt="V1TR0 POS" style="display:block;border:0;width:182px;height:auto;" /></a>
+              </td>
+            </tr>
+            <tr><td style="height:4px;line-height:4px;font-size:0;background:#6366f1;background-image:linear-gradient(90deg,#6366f1,#22d3ee);">&nbsp;</td></tr>
+            <tr>
+              <td style="padding:28px 30px 6px 30px;">
+                <div style="font-size:24px;line-height:1.25;font-weight:700;color:#0d1117;">{title}</div>
+                <div style="font-size:15px;line-height:1.55;color:#4B5563;margin-top:8px;">{subtitle}</div>
               </td>
             </tr>
             <tr>
-              <td style="padding:28px 32px;">
+              <td style="padding:18px 30px 24px 30px;">
                 {body_html}
               </td>
             </tr>
             <tr>
-              <td style="padding:18px 32px 28px 32px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.6;">
+              <td style="padding:0 30px 24px 30px;color:#6B7280;font-size:12px;line-height:1.6;">
+                <div style="height:1px;background:#E5E7EB;margin-bottom:14px;"></div>
                 {footer}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 30px;background:#070b12;color:#9CA3AF;font-size:12px;line-height:1.6;">
+                ¿Necesitas ayuda? <a href="https://t.me/V1tr0" style="color:#22d3ee;font-weight:bold;text-decoration:none;">Telegram @V1tr0</a> · <a href="mailto:buzon@v1tr0.com" style="color:#22d3ee;text-decoration:none;">buzon@v1tr0.com</a><br />
+                <a href="{sitio}" style="color:#ffffff;font-weight:bold;text-decoration:none;">pos.v1tr0.com</a>
               </td>
             </tr>
           </table>

@@ -206,7 +206,7 @@ def render_receipt(session: Session, tenant: Tenant, sale: Sale) -> tuple[str, s
     </div>
   </td></tr>
 </table>
-<div style="font-size:11px;color:#9ca3af;margin-top:12px;">Enviado por {name} con V1TR0 POS</div>
+<div style="font-size:11px;color:#9ca3af;margin-top:12px;">Enviado por {name} con <a href="https://pos.v1tr0.com" style="color:#6366f1;text-decoration:none;font-weight:bold;">V1TR0 POS</a></div>
 </td></tr></table>
 </body></html>"""
 

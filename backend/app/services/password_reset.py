@@ -44,9 +44,9 @@ def create_password_reset_token(session: Session, user: User) -> str:
 def send_password_reset_email(session: Session, user: User) -> tuple[bool, str]:
     token = create_password_reset_token(session, user)
     reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/login?reset_token={token}"
-    subject = f"[{settings.APP_NAME}] Recuperacion de contrasena"
+    subject = f"Recupera tu contraseña · {settings.APP_NAME}"
     text = (
-        "Recibimos una solicitud para restablecer tu contrasena.\n"
+        "Recibimos una solicitud para restablecer tu contraseña.\n"
         f"Usa este enlace: {reset_url}\n"
         f"El enlace vence en {settings.PASSWORD_RESET_EXPIRE_MINUTES} minutos."
     )
@@ -58,7 +58,7 @@ def send_password_reset_email(session: Session, user: User) -> tuple[bool, str]:
         f"{_info_row('Cuenta', user.email)}"
         f"{_info_row('Validez', f'{settings.PASSWORD_RESET_EXPIRE_MINUTES} minutos')}"
         "</table>"
-        f"<div style=\"margin:24px 0;\"><a href=\"{reset_url}\" style=\"display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:700;\">Restablecer contraseña</a></div>"
+        f"<div style=\"margin:24px 0;\"><a href=\"{reset_url}\" style=\"display:inline-block;background:#6366f1;background-image:linear-gradient(135deg,#6366f1,#22d3ee);color:#ffffff;text-decoration:none;padding:13px 24px;border-radius:12px;font-size:15px;font-weight:700;\">Restablecer contraseña</a></div>"
         f"<div style=\"font-size:12px;color:#6b7280;line-height:1.6;word-break:break-all;\">Si el botón no funciona, copia y pega este enlace en tu navegador:<br />{reset_url}</div>"
     )
     html = _email_shell(
