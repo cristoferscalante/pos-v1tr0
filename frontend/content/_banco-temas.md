@@ -7,7 +7,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 ## Inventario
 - [x] Cómo hacer un inventario de una tienda de barrio paso a paso | cómo hacer un inventario de una tienda | tienda de barrio → como-hacer-un-inventario-de-una-tienda (2026-11-22)
 - [ ] Control de inventario en Excel o en app: qué conviene | control de inventario en Excel | comparativa
-- [ ] Cómo evitar que se pierda mercancía en tu negocio | pérdida de mercancía | todos
+- [x] Cómo evitar que se pierda mercancía en tu negocio | pérdida de mercancía | todos → como-evitar-que-se-pierda-mercancia-en-tu-negocio (2026-11-23)
 - [ ] Productos vencidos: cómo controlarlos en una droguería o minimercado | control de productos vencidos | droguería
 - [ ] Stock mínimo: cuánto pedir y cuándo | stock mínimo | todos
 - [ ] Inventario de una ferretería: cómo organizar miles de referencias | inventario ferretería | ferretería
@@ -17,7 +17,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 ## Caja y dinero
 - [x] Cómo cuadrar la caja de un negocio al final del día | cómo cuadrar caja | todos → como-cuadrar-la-caja-de-un-negocio (2026-11-22)
 - [ ] Por qué no te cuadra la caja: 7 causas y cómo evitarlas | descuadre de caja | todos
-- [ ] Cómo recibir pagos con Nequi en tu tienda sin errores | recibir pagos Nequi tienda | tienda de barrio
+- [x] Cómo recibir pagos con Nequi en tu tienda sin errores | recibir pagos Nequi tienda | tienda de barrio → como-recibir-pagos-con-nequi-en-tu-tienda (2026-11-23)
 - [ ] Base de caja: cuánto dejar y cómo controlarla | base de caja | todos
 - [ ] Cómo controlar a los cajeros sin desconfiar de ellos | control de cajeros | minimercado
 - [ ] Cuentas por pagar a proveedores: cómo llevarlas al día | cuentas por pagar proveedores | todos
@@ -33,7 +33,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 
 ## Facturación electrónica DIAN
 - [x] Facturación electrónica para tiendas: quién está obligado | facturación electrónica tienda | todos → facturacion-electronica-para-tiendas-quien-esta-obligado (2026-11-22)
-- [ ] Factura electrónica o documento equivalente POS: diferencias | documento equivalente POS | todos
+- [x] Factura electrónica o documento equivalente POS: diferencias | documento equivalente POS | todos → factura-electronica-o-documento-equivalente-pos-diferencias (2026-11-23)
 - [ ] Cómo emitir una factura electrónica desde el celular | factura electrónica desde el celular | todos
 - [ ] Régimen simple y facturación electrónica: lo básico | régimen simple facturación | todos
 - [ ] Errores comunes al empezar con la facturación electrónica | errores facturación electrónica | todos
@@ -59,6 +59,6 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 - [ ] Caja registradora o POS en el celular | caja registradora vs POS | comparativa
 - [ ] Qué es un sistema POS y para qué sirve en un negocio pequeño | qué es un sistema POS | informativa
 - [ ] Cómo elegir un software POS para tu negocio en Colombia | software POS Colombia | comercial
-- [ ] POS que funciona sin internet: por qué importa | POS sin internet | comercial
+- [x] POS que funciona sin internet: por qué importa | POS sin internet | comercial → pos-que-funciona-sin-internet-por-que-importa (2026-11-23)
 - [ ] Impresora térmica de 58 mm para tu negocio: guía de compra | impresora térmica 58 mm | comercial
 - [ ] Cuánto cuesta un sistema POS en Colombia | cuánto cuesta un sistema POS | comercial
