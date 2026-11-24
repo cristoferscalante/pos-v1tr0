@@ -25,7 +25,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 
 ## Ventas, precios y márgenes
 - [x] Cómo calcular el precio de venta de un producto | cómo calcular precio de venta | todos → como-calcular-el-precio-de-venta-de-un-producto (2026-11-22)
-- [ ] Margen de ganancia de una tienda de barrio en Colombia | margen de ganancia tienda | tienda de barrio
+- [x] Margen de ganancia de una tienda de barrio en Colombia | margen de ganancia tienda | tienda de barrio → margen-de-ganancia-de-una-tienda-de-barrio-en-colombia (2026-11-24)
 - [ ] Vender al por mayor y al detal en el mismo negocio | vender al por mayor y al detal | distribuidora
 - [ ] Cómo saber qué productos dejan más ganancia | productos que más ganancia dejan | todos
 - [ ] Promociones que sí funcionan en una tienda pequeña | promociones para tiendas | todos
@@ -50,7 +50,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 - [ ] Cómo administrar una papelería en temporada escolar | administrar papelería | papelería
 - [ ] Cómo administrar una tienda de mascotas | administrar tienda de mascotas | mascotas
 - [ ] Cómo administrar un minimercado con varios cajeros | administrar minimercado | minimercado
-- [ ] Cómo montar una tienda de barrio en Colombia: lo que necesitas | cómo montar una tienda de barrio | emprendedor
+- [x] Cómo montar una tienda de barrio en Colombia: lo que necesitas | cómo montar una tienda de barrio | emprendedor → como-montar-una-tienda-de-barrio-en-colombia (2026-11-24)
 - [ ] Cómo administrar una licorera | administrar licorera | licorera
 - [ ] Cómo administrar un almacén de ropa pequeño | administrar almacén de ropa | ropa
 
@@ -58,7 +58,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 - [ ] Cuaderno o app: cómo llevar las cuentas de tu negocio | llevar cuentas del negocio | todos
 - [ ] Caja registradora o POS en el celular | caja registradora vs POS | comparativa
 - [ ] Qué es un sistema POS y para qué sirve en un negocio pequeño | qué es un sistema POS | informativa
-- [ ] Cómo elegir un software POS para tu negocio en Colombia | software POS Colombia | comercial
+- [x] Cómo elegir un software POS para tu negocio en Colombia | software POS Colombia | comercial → como-elegir-un-software-pos-para-tu-negocio-en-colombia (2026-11-24)
 - [x] POS que funciona sin internet: por qué importa | POS sin internet | comercial → pos-que-funciona-sin-internet-por-que-importa (2026-11-23)
 - [ ] Impresora térmica de 58 mm para tu negocio: guía de compra | impresora térmica 58 mm | comercial
-- [ ] Cuánto cuesta un sistema POS en Colombia | cuánto cuesta un sistema POS | comercial
+- [x] Cuánto cuesta un sistema POS en Colombia | cuánto cuesta un sistema POS | comercial → cuanto-cuesta-un-sistema-pos-en-colombia (2026-11-24)
