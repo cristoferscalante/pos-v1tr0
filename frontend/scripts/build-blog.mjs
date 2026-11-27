@@ -60,8 +60,10 @@ const CORREO = 'buzon@v1tr0.com'
 const tg = (texto) => `${TELEGRAM}?text=${encodeURIComponent(texto)}`
 const correo = (asunto, cuerpo = '') => `mailto:${CORREO}?subject=${encodeURIComponent(asunto)}${cuerpo ? `&body=${encodeURIComponent(cuerpo)}` : ''}`
 const ORG = {
-  '@type': 'Organization', name: 'V1TR0', url: 'https://v1tr0.com',
+  '@type': 'Organization', name: 'V1TR0', legalName: 'V1TR0 SAS', url: 'https://v1tr0.com',
   logo: { '@type': 'ImageObject', url: `${SITE}/icon-512.png` },
+  address: { '@type': 'PostalAddress', streetAddress: 'Av. 3 # 18-21 Sur', addressLocality: 'Pitalito', addressRegion: 'Huila', postalCode: '417020', addressCountry: 'CO' },
+  areaServed: ['Pitalito', 'Neiva', 'Garzón', 'San Agustín', 'La Plata', 'Huila', 'Colombia'],
   sameAs: ['https://v1tr0.com', TELEGRAM],
 }
 const APP = {
@@ -228,26 +230,77 @@ for (const p of posts) escribir(`blog/${p.slug}/index.html`, paginaPost(p, publi
 escribir('blog/index.html', paginaIndice(publicos))
 
 const hoy = new Date().toISOString().slice(0, 10)
+const ultimaFecha = publicos[0]?.updated || publicos[0]?.date || hoy
 escribir('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-<url><loc>${SITE}/</loc><lastmod>${hoy}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
-<url><loc>${SITE}/blog/</loc><lastmod>${publicos[0]?.date || hoy}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>
-${publicos.map((p) => `<url><loc>${p.url}</loc><lastmod>${p.updated}</lastmod><priority>0.7</priority></url>`).join('\n')}
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+<url><loc>${SITE}/</loc><lastmod>${ultimaFecha}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>
+<url><loc>${SITE}/blog/</loc><lastmod>${ultimaFecha}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>
+${publicos.map((p) => {
+  const imgUrl = p.cover ? (p.cover.startsWith('http') ? p.cover : `${SITE}${p.cover}`) : ''
+  const imgTag = imgUrl ? `<image:image><image:loc>${esc(imgUrl)}</image:loc></image:image>` : ''
+  return `<url><loc>${p.url}</loc><lastmod>${p.updated}</lastmod><priority>0.8</priority>${imgTag}</url>`
+}).join('\n')}
 </urlset>\n`)
-escribir('robots.txt', `User-agent: *\nAllow: /\nDisallow: /api-proxy/\nDisallow: /login\nDisallow: /registro\n\nSitemap: ${SITE}/sitemap.xml\n`)
+
+const AI_AGENTS = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-User', 'Claude-SearchBot', 'Google-Extended', 'PerplexityBot', 'Perplexity-User', 'Applebot', 'Applebot-Extended']
+const robotsRules = ['User-agent: *', 'Allow: /', 'Disallow: /api-proxy/', 'Disallow: /login', '']
+  .concat(AI_AGENTS.flatMap((ua) => [`User-agent: ${ua}`, 'Allow: /', 'Disallow: /api-proxy/', 'Disallow: /login', '']))
+  .concat([`Sitemap: ${SITE}/sitemap.xml`, ''])
+  .join('\n')
+escribir('robots.txt', robotsRules)
+
 escribir('blog/feed.xml', `<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"><channel><title>Blog de V1TR0 POS</title><link>${SITE}/blog/</link><description>Guías para negocios en Colombia</description><language>es-co</language>
-${publicos.slice(0, 50).map((p) => `<item><title>${esc(p.title)}</title><link>${p.url}</link><guid>${p.url}</guid><pubDate>${new Date(iso(p.date)).toUTCString()}</pubDate><description>${esc(p.description)}</description></item>`).join('\n')}
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Blog de V1TR0 POS — Guías para tiendas y negocios en Colombia</title><link>${SITE}/blog/</link><atom:link href="${SITE}/blog/feed.xml" rel="self" type="application/rss+xml" /><description>Guías prácticas de inventario, caja, precios y facturación electrónica DIAN para comercios en Pitalito, el Huila y toda Colombia.</description><language>es-co</language>
+${publicos.slice(0, 50).map((p) => `<item><title>${esc(p.title)}</title><link>${p.url}</link><guid isPermaLink="true">${p.url}</guid><pubDate>${new Date(iso(p.date)).toUTCString()}</pubDate><category>${esc(p.category || 'Negocio')}</category><description>${esc(p.description)}</description></item>`).join('\n')}
 </channel></rss>\n`)
+
+escribir('pricing.md', `# Planes y Precios — V1TR0 POS (${SITE})
+
+> Punto de venta (POS) en la nube con modo sin internet para tiendas de barrio, minimercados, droguerías, ferreterías, papelerías y distribuidoras en Pitalito, el Huila y toda Colombia. Desarrollado por V1TR0 (${ORG.url}). Todos los precios están en pesos colombianos (COP).
+
+## Prueba gratuita
+- **Duración:** 7 días gratis con acceso completo
+- **Requisitos:** sin tarjeta de crédito y sin contratos de permanencia
+- **Registro:** ${SITE}/registro
+
+## Plan Estándar
+- **Precio mensual:** $39.900 COP / mes
+- **Precio anual:** $400.000 COP / año (ahorro de 2 meses)
+- **Incluye:**
+  - Ventas al detal y al por mayor desde celular, tableta o computador
+  - Funciona sin internet y sincroniza al recuperar la conexión
+  - Control de inventario con fotos, escáner de código de barras con la cámara y alertas de bajo stock
+  - Apertura, cierre y cuadre de caja por turnos y medios de pago (efectivo, Nequi, Bre-B, tarjeta)
+  - Usuarios cajeros con permisos controlados
+  - Recibos impresos en impresora térmica de 58 mm, por correo o como imagen para WhatsApp
+  - Catálogo en línea con recepción de pedidos por WhatsApp
+  - Módulo de compras, proveedores y cuentas por pagar
+  - Panel de ventas y ganancias reales
+
+## Plan Premium (con Facturación Electrónica DIAN)
+- **Precio mensual:** $54.900 COP / mes (incluye 8 facturas electrónicas DIAN al mes)
+- **Precio anual:** $570.000 COP / año (incluye 100 facturas electrónicas DIAN al año)
+- **Recarga adicional de facturas:** paquete de 100 facturas electrónicas DIAN por $170.000 COP
+- **Incluye:** todas las funciones del Plan Estándar + emisión directa de factura electrónica validada ante la DIAN desde el celular o computador.
+
+## Contacto y soporte
+- **Telegram:** @V1tr0 (${TELEGRAM})
+- **Correo:** ${CORREO}
+- **Sede:** Pitalito, Huila, Colombia (cobertura en todo el país)
+`)
+
 escribir('llms.txt', `# V1TR0 POS
 
-> Punto de venta (POS) en la nube para pequeños negocios en Colombia. Funciona desde el celular, la tableta o el computador, también sin internet. Lo desarrolla V1TR0 (https://v1tr0.com).
+> Punto de venta (POS) en la nube para pequeños negocios en Colombia (con sede en Pitalito, Huila y cobertura nacional). Funciona desde el celular, la tableta o el computador, también sin internet. Lo desarrolla V1TR0 (https://v1tr0.com).
 
 ## Datos clave
 - Sitio: ${SITE}
-- Para quién: tiendas de barrio, minimercados, droguerías, papelerías, ferreterías, panaderías, tiendas de mascotas y negocios que venden al detal y por mayor.
-- Funciones: ventas al detal y por mayor, inventario con fotos y escáner con la cámara, alertas de bajo stock, caja con apertura y cierre, recibos impresos (58 mm), por correo o como imagen, catálogo en línea con pedidos, compras, proveedores y cuentas por pagar, panel de ventas y ganancias, usuarios cajeros, funciona sin internet.
-- Precios: plan Estándar $39.900 COP al mes o $400.000 al año. Plan Premium $54.900 COP al mes o $570.000 al año, con facturación electrónica DIAN (100 facturas al año; 8 por mes en el plan mensual). Prueba gratis 7 días sin tarjeta.
+- Planes y precios detallados: ${SITE}/pricing.md
+- Feed RSS del blog: ${SITE}/blog/feed.xml
+- Sitemap XML: ${SITE}/sitemap.xml
+- Para quién: tiendas de barrio, minimercados, droguerías, papelerías, ferreterías, panaderías, tiendas de mascotas y negocios que venden al detal y por mayor en Pitalito, el Huila y toda Colombia.
+- Funciones: ventas al detal y por mayor, inventario con fotos y escáner con la cámara, alertas de bajo stock, caja con apertura y cierre, recibos impresos (58 mm), por correo o como imagen, catálogo en línea con pedidos por WhatsApp, compras, proveedores y cuentas por pagar, panel de ventas y ganancias, usuarios cajeros, funciona sin internet.
+- Precios: plan Estándar $39.900 COP al mes o $400.000 al año. Plan Premium $54.900 COP al mes o $570.000 al año, con facturación electrónica DIAN (100 facturas al año; 8 por mes en el plan mensual; recarga de 100 por $170.000). Prueba gratis 7 días sin tarjeta en ${SITE}/registro.
 - Contacto: Telegram @V1tr0 (${TELEGRAM}) · correo ${CORREO}
 
 ## Guías del blog
