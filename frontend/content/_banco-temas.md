@@ -6,7 +6,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 
 ## Inventario
 - [x] Cómo hacer un inventario de una tienda de barrio paso a paso | cómo hacer un inventario de una tienda | tienda de barrio → como-hacer-un-inventario-de-una-tienda (2026-11-22)
-- [ ] Control de inventario en Excel o en app: qué conviene | control de inventario en Excel | comparativa
+- [x] Control de inventario en Excel o en app: qué conviene | control de inventario en Excel | comparativa → control-de-inventario-en-excel-o-en-app-que-conviene (2026-11-26)
 - [x] Cómo evitar que se pierda mercancía en tu negocio | pérdida de mercancía | todos → como-evitar-que-se-pierda-mercancia-en-tu-negocio (2026-11-23)
 - [ ] Productos vencidos: cómo controlarlos en una droguería o minimercado | control de productos vencidos | droguería
 - [ ] Stock mínimo: cuánto pedir y cuándo | stock mínimo | todos
@@ -16,7 +16,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 
 ## Caja y dinero
 - [x] Cómo cuadrar la caja de un negocio al final del día | cómo cuadrar caja | todos → como-cuadrar-la-caja-de-un-negocio (2026-11-22)
-- [ ] Por qué no te cuadra la caja: 7 causas y cómo evitarlas | descuadre de caja | todos
+- [x] Por qué no te cuadra la caja: 7 causas y cómo evitarlas | descuadre de caja | todos → por-que-no-te-cuadra-la-caja-causas-y-como-evitarlas (2026-11-26)
 - [x] Cómo recibir pagos con Nequi en tu tienda sin errores | recibir pagos Nequi tienda | tienda de barrio → como-recibir-pagos-con-nequi-en-tu-tienda (2026-11-23)
 - [ ] Base de caja: cuánto dejar y cómo controlarla | base de caja | todos
 - [ ] Cómo controlar a los cajeros sin desconfiar de ellos | control de cajeros | minimercado
@@ -26,7 +26,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 ## Ventas, precios y márgenes
 - [x] Cómo calcular el precio de venta de un producto | cómo calcular precio de venta | todos → como-calcular-el-precio-de-venta-de-un-producto (2026-11-22)
 - [x] Margen de ganancia de una tienda de barrio en Colombia | margen de ganancia tienda | tienda de barrio → margen-de-ganancia-de-una-tienda-de-barrio-en-colombia (2026-11-24)
-- [ ] Vender al por mayor y al detal en el mismo negocio | vender al por mayor y al detal | distribuidora
+- [x] Vender al por mayor y al detal en el mismo negocio | vender al por mayor y al detal | distribuidora → vender-al-por-mayor-y-al-detal-en-el-mismo-negocio (2026-11-26)
 - [ ] Cómo saber qué productos dejan más ganancia | productos que más ganancia dejan | todos
 - [ ] Promociones que sí funcionan en una tienda pequeña | promociones para tiendas | todos
 - [ ] Cómo vender más en una tienda de barrio | cómo vender más en una tienda | tienda de barrio
@@ -34,7 +34,7 @@ Territorio: operación diaria de tiendas y pequeños negocios en Colombia (ver s
 ## Facturación electrónica DIAN
 - [x] Facturación electrónica para tiendas: quién está obligado | facturación electrónica tienda | todos → facturacion-electronica-para-tiendas-quien-esta-obligado (2026-11-22)
 - [x] Factura electrónica o documento equivalente POS: diferencias | documento equivalente POS | todos → factura-electronica-o-documento-equivalente-pos-diferencias (2026-11-23)
-- [ ] Cómo emitir una factura electrónica desde el celular | factura electrónica desde el celular | todos
+- [x] Cómo emitir una factura electrónica desde el celular | factura electrónica desde el celular | todos → como-emitir-una-factura-electronica-desde-el-celular (2026-11-26)
 - [ ] Régimen simple y facturación electrónica: lo básico | régimen simple facturación | todos
 - [ ] Errores comunes al empezar con la facturación electrónica | errores facturación electrónica | todos
 
