@@ -112,7 +112,7 @@ function leer() {
 }
 
 const CSS = `
-:root{--bg:#070b12;--bg2:#0d1117;--card:#111827;--line:#1f2937;--txt:#e5e7eb;--muted:#9ca3af;--ind:#6366f1;--cyan:#22d3ee;--tg:#229ED9}
+:root{--bg:#070b12;--bg2:#0d1117;--card:#111827;--line:#1f2937;--txt:#e5e7eb;--muted:#9ca3af;--ind:#6366f1;--cyan:#22d3ee;--tg:#1673a3}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--txt);font:17px/1.7 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
 a{color:var(--cyan)}img{max-width:100%;height:auto}
@@ -121,7 +121,7 @@ a{color:var(--cyan)}img{max-width:100%;height:auto}
 .marca{display:flex;align-items:center;gap:10px;color:#fff;text-decoration:none;font-weight:800;font-size:18px}
 .marca img{width:34px;height:34px}.top nav{margin-left:auto;display:flex;gap:16px;align-items:center}
 .top nav a{color:var(--muted);text-decoration:none;font-weight:600;font-size:15px}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;font-weight:700;text-decoration:none;color:#fff!important;background:linear-gradient(135deg,var(--ind),var(--cyan))}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:12px;font-weight:700;text-decoration:none;color:#fff!important;background:linear-gradient(135deg,#4f46e5,#0e7490)}
 .btn.tg{background:var(--tg)}
 main{max-width:760px;margin:0 auto;padding:28px 20px 40px}
 .migas{font-size:14px;color:var(--muted)}.migas a{color:var(--muted)}

@@ -431,6 +431,15 @@ r = client.get("/api/v1/auth/subscription", headers=trial_headers)
 check("prueba vencida -> subscription_active False", r.status_code == 200 and r.json().get("subscription_active") is False, r.text[:200])
 r = client.post("/api/v1/auth/login", data={"username": "trial@smoketest.com", "password": "trialsecreto123"})
 check("con la prueba vencida aún puede iniciar sesión (para ver el aviso de planes)", r.status_code == 200 and r.json()["user"].get("subscription_active") is False, r.text[:200])
+for _method, _path in [("get", "products/"), ("get", "sales/"), ("get", "dashboard/summary"), ("get", "cash/current"),
+                      ("get", "suppliers/"), ("get", "purchases/"), ("get", "auth/tenant"), ("get", "auth/collaborators")]:
+    r = getattr(client, _method)(f"/api/v1/{_path}", headers=trial_headers)
+    check(f"prueba vencida -> {_path} bloqueado (402)", r.status_code == 402, f"{r.status_code} {r.text[:200]}")
+r = client.post("/api/v1/sales/sync", json={"sales": []}, headers=trial_headers)
+check("prueba vencida -> no sincroniza ventas (402)", r.status_code == 402, f"{r.status_code} {r.text[:200]}")
+trial_slug = trial_user.get("slug")
+r = client.get(f"/api/v1/products/public/{trial_slug}")
+check("prueba vencida -> catálogo público apagado (403), sin datos", r.status_code == 403 and "products" not in r.json(), f"{r.status_code} {r.text[:200]}")
 
 with _Session(_engine) as s:
     t = s.exec(_select(_Tenant).where(_Tenant.name == "Negocio Prueba Trial")).first()
@@ -438,6 +447,16 @@ with _Session(_engine) as s:
     s.add(t); s.commit()
 r = client.get("/api/v1/auth/subscription", headers=trial_headers)
 check("al activarlo el superadmin, la app lo ve vigente sin reingresar", r.json().get("subscription_active") is True and r.json().get("plan_name") == "standard", r.text[:200])
+r = client.get("/api/v1/products/", headers=trial_headers)
+check("plan activado -> vuelve a tener acceso", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+r = client.get(f"/api/v1/products/public/{trial_slug}")
+check("plan activado -> catálogo público vuelve a verse", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+with _Session(_engine) as s:
+    t = s.exec(_select(_Tenant).where(_Tenant.name == "Negocio Prueba Trial")).first()
+    t.is_active = False
+    s.add(t); s.commit()
+r = client.get(f"/api/v1/products/public/{trial_slug}")
+check("negocio suspendido -> catálogo público apagado (403)", r.status_code == 403, f"{r.status_code} {r.text[:200]}")
 
 # --- 11c. Factura electronica SIN proveedor configurado: no se simula nada ---
 # Antes se generaba un CUFE local y un QR con la URL de la DIAN (parecia una

@@ -18,11 +18,11 @@ interface SuperAdminViewProps {
 // ── Planes ────────────────────────────────────────────────────
 const PLANES = [
   // id = opción del panel; key = plan_name que se guarda en el negocio
-  { id: 'free',         key: 'free',     label: 'Gratis — 7 días',                       color: '#9ca3af', bg: 'rgba(156,163,175,0.12)', dias: 7,   precio: 0,      folios: 0,   incluye_facturacion: false },
-  { id: 'standard_mes', key: 'standard', label: 'Estándar mensual — $39.900 COP / mes',  color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 30,  precio: 39900,  folios: 0,   incluye_facturacion: false },
-  { id: 'standard',     key: 'standard', label: 'Estándar anual — $400.000 COP / año',   color: '#60a5fa', bg: 'rgba(96,165,250,0.12)',  dias: 365, precio: 400000, folios: 0,   incluye_facturacion: false },
-  { id: 'premium_mes',  key: 'premium',  label: 'Premium mensual — $54.900 COP / mes',   color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 30,  precio: 54900,  folios: 8,   incluye_facturacion: true  },
-  { id: 'premium',      key: 'premium',  label: 'Premium anual — $570.000 COP / año',    color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  dias: 365, precio: 570000, folios: 100, incluye_facturacion: true  },
+  { id: 'free',         key: 'free',     label: 'Gratis — 7 días',                       color: 'var(--text-secondary)', bg: 'rgba(156,163,175,0.12)', dias: 7,   precio: 0,      folios: 0,   incluye_facturacion: false },
+  { id: 'standard_mes', key: 'standard', label: 'Estándar mensual — $39.900 COP / mes',  color: 'var(--blue-text)', bg: 'rgba(96,165,250,0.12)',  dias: 30,  precio: 39900,  folios: 0,   incluye_facturacion: false },
+  { id: 'standard',     key: 'standard', label: 'Estándar anual — $400.000 COP / año',   color: 'var(--blue-text)', bg: 'rgba(96,165,250,0.12)',  dias: 365, precio: 400000, folios: 0,   incluye_facturacion: false },
+  { id: 'premium_mes',  key: 'premium',  label: 'Premium mensual — $54.900 COP / mes',   color: 'var(--amber-text)', bg: 'rgba(251,191,36,0.12)',  dias: 30,  precio: 54900,  folios: 8,   incluye_facturacion: true  },
+  { id: 'premium',      key: 'premium',  label: 'Premium anual — $570.000 COP / año',    color: 'var(--amber-text)', bg: 'rgba(251,191,36,0.12)',  dias: 365, precio: 570000, folios: 100, incluye_facturacion: true  },
 ];
 const FOLIO_PACK_SIZE  = 100;
 const FOLIO_PACK_PRICE = 170000;
@@ -107,13 +107,13 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
     finally { setSaving(false); }
   };
 
-  const inp = { padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text)', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' as const };
+  const inp = { padding: '9px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', fontSize: '0.88rem', width: '100%', boxSizing: 'border-box' as const };
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
       <div className="sa-modal" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '16px', padding: '28px', width: '100%', maxWidth: '500px', boxShadow: '0 24px 64px rgba(0,0,0,0.5)', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ margin: '0 0 4px', fontSize: '1.1rem', fontWeight: 800 }}>Gestionar suscripción</h3>
-        <p style={{ margin: '0 0 20px', color: 'var(--primary)', fontWeight: 600 }}>{tenant.name}</p>
+        <p style={{ margin: '0 0 20px', color: 'var(--primary-text)', fontWeight: 600 }}>{tenant.name}</p>
         {tenant.owner_email && <p style={{ margin: '-14px 0 18px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>✉️ {tenant.owner_email}</p>}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -124,7 +124,7 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
               <label key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px', borderRadius: '8px', cursor: 'pointer', border: `2px solid ${planId === p.id ? p.color : 'var(--border)'}`, background: planId === p.id ? p.bg : 'var(--bg-elevated)', marginBottom: '6px', transition: 'all 0.15s' }}>
                 <input type="radio" name="plan" value={p.id} checked={planId === p.id} onChange={() => handlePlanChange(p.id)} style={{ accentColor: p.color }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.87rem', color: planId === p.id ? p.color : 'var(--text)' }}>{p.label}</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.87rem', color: planId === p.id ? p.color : 'var(--text-primary)' }}>{p.label}</div>
                   <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)' }}>{durationLabel(p.dias)} · {p.incluye_facturacion ? `${p.folios} folios DIAN` : 'sin DIAN'}</div>
                 </div>
               </label>
@@ -136,7 +136,7 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
             <Calendar size={14} color="#34d399" />
             <div>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Nueva fecha de vencimiento</div>
-              <div style={{ fontWeight: 700, color: '#34d399', fontSize: '0.9rem' }}>{fmt(nuevaFecha)} (+{durationLabel(plan.dias)} desde hoy)</div>
+              <div style={{ fontWeight: 700, color: 'var(--success)', fontSize: '0.9rem' }}>{fmt(nuevaFecha)} (+{durationLabel(plan.dias)} desde hoy)</div>
             </div>
           </div>
 
@@ -153,14 +153,14 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
                 <input type="number" min={0} max={50} value={foliosExtra / FOLIO_PACK_SIZE} onChange={e => setFoliosExtra(Math.max(0, +e.target.value) * FOLIO_PACK_SIZE)} style={{ ...inp, padding: '6px 10px' }} />
               </div>
             </div>
-            {foliosExtra > 0 && <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#a78bfa', background: 'rgba(167,139,250,0.1)', borderRadius: '6px', padding: '8px' }}>+{foliosExtra} folios → Total {foliosFinal} · Costo: {cop(foliosExtra / FOLIO_PACK_SIZE * FOLIO_PACK_PRICE)}</div>}
+            {foliosExtra > 0 && <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--violet-text)', background: 'rgba(167,139,250,0.1)', borderRadius: '6px', padding: '8px' }}>+{foliosExtra} folios → Total {foliosFinal} · Costo: {cop(foliosExtra / FOLIO_PACK_SIZE * FOLIO_PACK_PRICE)}</div>}
             <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '6px' }}>{cop(FOLIO_PACK_PRICE)} / {FOLIO_PACK_SIZE} folios</div>
           </div>
 
           {/* Toggles */}
           {[
-            { label: 'Facturación electrónica DIAN', sub: 'Transmisión a la DIAN', val: hasElectronic, set: setHasElectronic, activeColor: '#34d399', inactiveColor: 'var(--text-muted)' },
-            { label: 'Negocio activo', sub: 'Si inactivo, el login queda bloqueado', val: isActive, set: setIsActive, activeColor: '#34d399', inactiveColor: '#f87171' },
+            { label: 'Facturación electrónica DIAN', sub: 'Transmisión a la DIAN', val: hasElectronic, set: setHasElectronic, activeColor: 'var(--success)', inactiveColor: 'var(--text-muted)' },
+            { label: 'Negocio activo', sub: 'Si inactivo, el login queda bloqueado', val: isActive, set: setIsActive, activeColor: 'var(--success)', inactiveColor: 'var(--danger)' },
           ].map((t, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--bg-elevated)', borderRadius: '8px', border: '1px solid var(--border)' }}>
               <div>
@@ -175,13 +175,13 @@ function EditPlanModal({ tenant, token, onClose, onSaved }: EditModalProps) {
 
           {/* Resumen */}
           <div style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.2)', borderRadius: '8px', padding: '10px', fontSize: '0.8rem' }}>
-            <div style={{ fontWeight: 700, color: '#818cf8', marginBottom: '5px' }}>Resumen</div>
+            <div style={{ fontWeight: 700, color: 'var(--primary-text)', marginBottom: '5px' }}>Resumen</div>
             <div style={{ color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              <div>📦 Plan: <strong style={{ color: 'var(--text)' }}>{plan.label}</strong></div>
-              <div>📅 Vence: <strong style={{ color: 'var(--text)' }}>{fmt(nuevaFecha)}</strong></div>
-              <div>📄 Folios: <strong style={{ color: 'var(--text)' }}>{foliosFinal}</strong></div>
-              <div>⚡ DIAN: <strong style={{ color: 'var(--text)' }}>{hasElectronic ? 'Sí' : 'No'}</strong></div>
-              <div>🔒 Estado: <strong style={{ color: isActive ? '#34d399' : '#f87171' }}>{isActive ? 'Activo' : 'Suspendido'}</strong></div>
+              <div>📦 Plan: <strong style={{ color: 'var(--text-primary)' }}>{plan.label}</strong></div>
+              <div>📅 Vence: <strong style={{ color: 'var(--text-primary)' }}>{fmt(nuevaFecha)}</strong></div>
+              <div>📄 Folios: <strong style={{ color: 'var(--text-primary)' }}>{foliosFinal}</strong></div>
+              <div>⚡ DIAN: <strong style={{ color: 'var(--text-primary)' }}>{hasElectronic ? 'Sí' : 'No'}</strong></div>
+              <div>🔒 Estado: <strong style={{ color: isActive ? 'var(--success)' : 'var(--danger)' }}>{isActive ? 'Activo' : 'Suspendido'}</strong></div>
             </div>
           </div>
         </div>
@@ -227,12 +227,12 @@ function DeleteModal({ tenant, token, onClose, onDeleted }: DeleteModalProps) {
           </div>
           <div>
             <div style={{ fontWeight: 800, fontSize: '1rem' }}>Eliminar negocio</div>
-            <div style={{ color: '#f87171', fontSize: '0.82rem', fontWeight: 600 }}>{tenant.name}</div>
+            <div style={{ color: 'var(--danger)', fontSize: '0.82rem', fontWeight: 600 }}>{tenant.name}</div>
           </div>
         </div>
 
         <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '12px', marginBottom: '16px', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-          ⚠️ Esta acción es <strong style={{ color: '#f87171' }}>irreversible</strong>. Se eliminará el negocio y todos sus datos:
+          ⚠️ Esta acción es <strong style={{ color: 'var(--danger)' }}>irreversible</strong>. Se eliminará el negocio y todos sus datos:
           <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
             <li>{tenant.product_count || 0} productos</li>
             <li>{tenant.sale_count_total || 0} ventas</li>
@@ -242,13 +242,13 @@ function DeleteModal({ tenant, token, onClose, onDeleted }: DeleteModalProps) {
 
         <div style={{ marginBottom: '16px' }}>
           <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-            Escribe <strong style={{ color: 'var(--text)' }}>{tenant.name}</strong> para confirmar:
+            Escribe <strong style={{ color: 'var(--text-primary)' }}>{tenant.name}</strong> para confirmar:
           </label>
           <input
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
             placeholder={tenant.name}
-            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text)', fontSize: '0.88rem', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', fontSize: '0.88rem', boxSizing: 'border-box' }}
           />
         </div>
 
@@ -322,14 +322,14 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
     withBilling: tenants.filter(t => t.has_electronic_billing).length,
   };
 
-  const sel = { padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text)', fontSize: '0.83rem', cursor: 'pointer' };
+  const sel = { padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', fontSize: '0.83rem', cursor: 'pointer' };
 
   return (
     <div className="sa-view" style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px' }}>
-        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(124,58,237,0.4)' }}>
+        <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'linear-gradient(135deg, #7c3aed, #4f46e5)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 12px rgba(124,58,237,0.4)' }}>
           <Shield size={22} color="white" />
         </div>
         <div>
@@ -341,12 +341,12 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '22px' }}>
         {[
-          { icon: <Building2 size={15} />, label: 'Negocios', value: stats.total,      color: '#60a5fa' },
-          { icon: <CheckCircle size={15} />, label: 'Activos',  value: stats.active,     color: '#34d399' },
-          { icon: <AlertCircle size={15} />, label: 'Vencidos', value: stats.expired,    color: '#f87171' },
-          { icon: <TrendingUp size={15} />, label: 'Vendiendo', value: stats.selling,    color: '#fbbf24' },
-          { icon: <CreditCard size={15} />, label: 'Premium',   value: stats.premium,    color: '#a78bfa' },
-          { icon: <FileText size={15} />,   label: 'Con DIAN',  value: stats.withBilling, color: '#34d399' },
+          { icon: <Building2 size={15} />, label: 'Negocios', value: stats.total,      color: 'var(--blue-text)' },
+          { icon: <CheckCircle size={15} />, label: 'Activos',  value: stats.active,     color: 'var(--success)' },
+          { icon: <AlertCircle size={15} />, label: 'Vencidos', value: stats.expired,    color: 'var(--danger)' },
+          { icon: <TrendingUp size={15} />, label: 'Vendiendo', value: stats.selling,    color: 'var(--amber-text)' },
+          { icon: <CreditCard size={15} />, label: 'Premium',   value: stats.premium,    color: 'var(--violet-text)' },
+          { icon: <FileText size={15} />,   label: 'Con DIAN',  value: stats.withBilling, color: 'var(--success)' },
         ].map((s, i) => (
           <div key={i} style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ color: s.color }}>{s.icon}</div>
@@ -399,7 +399,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {filtered.map(tenant => {
             const plan = PLANES.find(p => p.key === tenant.plan_name);
-            const planColor = plan?.color || '#9ca3af';
+            const planColor = plan?.color || 'var(--text-secondary)';
             const planBg   = plan?.bg    || 'rgba(156,163,175,0.1)';
             const expired  = isExpired(tenant.subscription_ends_at);
             const dl       = daysLeft(tenant.subscription_ends_at);
@@ -412,7 +412,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                 background: 'var(--bg-card)',
                 border: `1px solid ${!tenant.is_active ? 'rgba(239,68,68,0.3)' : expired ? 'rgba(251,191,36,0.25)' : 'var(--border)'}`,
                 borderRadius: '14px', padding: '16px 20px',
-                opacity: tenant.is_active ? 1 : 0.65, transition: 'all 0.2s'
+                borderStyle: tenant.is_active ? 'solid' : 'dashed', transition: 'all 0.2s'
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flexWrap: 'wrap' }}>
 
@@ -421,9 +421,9 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                     {/* Nombre + badges de estado */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '7px', flexWrap: 'wrap', marginBottom: '2px' }}>
                       <span style={{ fontWeight: 800, fontSize: '1rem' }}>{tenant.name}</span>
-                      {!tenant.is_active && <span style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', borderRadius: '5px', padding: '1px 7px', fontSize: '0.68rem', fontWeight: 700 }}>SUSPENDIDO</span>}
-                      {expired && tenant.is_active && <span style={{ background: 'rgba(251,191,36,0.15)', color: '#fbbf24', borderRadius: '5px', padding: '1px 7px', fontSize: '0.68rem', fontWeight: 700 }}>VENCIDO</span>}
-                      {lowFolios && <span style={{ background: 'rgba(239,68,68,0.1)', color: '#fca5a5', borderRadius: '5px', padding: '1px 7px', fontSize: '0.68rem', fontWeight: 700 }}>FOLIOS BAJOS</span>}
+                      {!tenant.is_active && <span style={{ background: 'var(--danger-bg)', color: 'var(--danger)', borderRadius: '5px', padding: '1px 7px', fontSize: '0.68rem', fontWeight: 700 }}>SUSPENDIDO</span>}
+                      {expired && tenant.is_active && <span style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber-text)', borderRadius: '5px', padding: '1px 7px', fontSize: '0.68rem', fontWeight: 700 }}>VENCIDO</span>}
+                      {lowFolios && <span style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', borderRadius: '5px', padding: '1px 7px', fontSize: '0.68rem', fontWeight: 700 }}>FOLIOS BAJOS</span>}
                     </div>
 
                     {/* Email del dueño */}
@@ -444,10 +444,10 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                       <span style={{ background: planBg, color: planColor, borderRadius: '6px', padding: '3px 9px', fontSize: '0.74rem', fontWeight: 600 }}>
                         {plan?.label || tenant.plan_name}
                       </span>
-                      <span style={{ background: expired ? 'rgba(239,68,68,0.1)' : dl <= 5 ? 'rgba(251,191,36,0.1)' : 'rgba(52,211,153,0.08)', color: expired ? '#f87171' : dl <= 5 ? '#fbbf24' : '#34d399', borderRadius: '6px', padding: '3px 9px', fontSize: '0.74rem' }}>
+                      <span style={{ background: expired ? 'rgba(239,68,68,0.1)' : dl <= 5 ? 'rgba(251,191,36,0.1)' : 'rgba(52,211,153,0.08)', color: expired ? 'var(--danger)' : dl <= 5 ? 'var(--amber-text)' : 'var(--success)', borderRadius: '6px', padding: '3px 9px', fontSize: '0.74rem' }}>
                         {expired ? `Vencido ${fmt(tenant.subscription_ends_at)}` : `${dl}d · ${fmt(tenant.subscription_ends_at)}`}
                       </span>
-                      {tenant.has_electronic_billing && <span style={{ background: 'rgba(167,139,250,0.1)', color: '#a78bfa', borderRadius: '6px', padding: '3px 9px', fontSize: '0.74rem' }}>⚡ DIAN</span>}
+                      {tenant.has_electronic_billing && <span style={{ background: 'rgba(167,139,250,0.1)', color: 'var(--violet-text)', borderRadius: '6px', padding: '3px 9px', fontSize: '0.74rem' }}>⚡ DIAN</span>}
                     </div>
 
                     {/* Stats: productos, ventas, usuarios */}
@@ -461,8 +461,8 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                         <span>{tenant.sale_count_total ?? '—'} ventas totales</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
-                        <ShoppingBag size={13} style={{ color: selling ? '#34d399' : '#6b7280' }} />
-                        <span style={{ color: selling ? '#34d399' : 'var(--text-muted)', fontWeight: selling ? 700 : 400 }}>
+                        <ShoppingBag size={13} style={{ color: selling ? 'var(--success)' : 'var(--text-muted)' }} />
+                        <span style={{ color: selling ? 'var(--success)' : 'var(--text-muted)', fontWeight: selling ? 700 : 400 }}>
                           {selling ? `${tenant.sale_count_30d} ventas (30d) ✓` : 'Sin ventas (30d)'}
                         </span>
                       </div>
@@ -481,11 +481,11 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                   {tenant.has_electronic_billing && (
                     <div style={{ minWidth: '120px' }}>
                       <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginBottom: '3px', fontWeight: 600 }}>Folios e-factura</div>
-                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: lowFolios ? '#f87171' : 'var(--text)', marginBottom: '4px' }}>
+                      <div style={{ fontWeight: 800, fontSize: '1.05rem', color: lowFolios ? 'var(--danger)' : 'var(--text-primary)', marginBottom: '4px' }}>
                         {tenant.folios_remaining}<span style={{ color: 'var(--text-muted)', fontSize: '0.76rem', fontWeight: 400 }}> / {tenant.folios_total}</span>
                       </div>
                       <div style={{ height: '5px', background: 'var(--bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
-                        <div style={{ height: '100%', borderRadius: '3px', width: `${Math.min(100, foliosPct)}%`, background: foliosPct > 30 ? '#34d399' : foliosPct > 10 ? '#fbbf24' : '#f87171', transition: 'width 0.4s' }} />
+                        <div style={{ height: '100%', borderRadius: '3px', width: `${Math.min(100, foliosPct)}%`, background: foliosPct > 30 ? 'var(--success)' : foliosPct > 10 ? 'var(--amber-text)' : 'var(--danger)', transition: 'width 0.4s' }} />
                       </div>
                     </div>
                   )}
@@ -495,7 +495,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                     {/* Ver catálogo público */}
                     {tenant.slug && (
                       <a href={`/${tenant.slug}`} target="_blank" rel="noopener noreferrer"
-                        style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '7px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text)', textDecoration: 'none', cursor: 'pointer' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '7px 12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-primary)', textDecoration: 'none', cursor: 'pointer' }}>
                         <ExternalLink size={12} /> Catálogo
                       </a>
                     )}
@@ -511,7 +511,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
                     )}
                     {/* Eliminar */}
                     <button onClick={() => setDeletingTenant(tenant)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '7px 12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: '#f87171', cursor: 'pointer' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', padding: '7px 12px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.06)', color: 'var(--danger)', cursor: 'pointer' }}>
                       <Trash2 size={12} /> Eliminar
                     </button>
                   </div>
@@ -530,7 +530,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
           {PLANES.map(p => (
-            <div key={p.id} style={{ padding: '10px', borderRadius: '8px', border: `1px solid ${p.color}40`, background: p.bg }}>
+            <div key={p.id} style={{ padding: '10px', borderRadius: '8px', border: `1px solid color-mix(in srgb, ${p.color} 25%, transparent)`, background: p.bg }}>
               <div style={{ fontWeight: 700, color: p.color, fontSize: '0.82rem', marginBottom: '3px' }}>{p.key.toUpperCase()}{p.dias === 30 ? ' · MENSUAL' : p.dias === 365 ? ' · ANUAL' : ''}</div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <div>{p.precio > 0 ? `${cop(p.precio)} / ${p.dias === 30 ? 'mes' : 'año'}` : 'Gratis'} · {durationLabel(p.dias)}</div>
@@ -539,7 +539,7 @@ export function SuperAdminView({ token }: SuperAdminViewProps) {
             </div>
           ))}
           <div style={{ padding: '10px', borderRadius: '8px', border: '1px solid rgba(167,139,250,0.3)', background: 'rgba(167,139,250,0.08)' }}>
-            <div style={{ fontWeight: 700, color: '#a78bfa', fontSize: '0.82rem', marginBottom: '3px' }}>RECARGA</div>
+            <div style={{ fontWeight: 700, color: 'var(--violet-text)', fontSize: '0.82rem', marginBottom: '3px' }}>RECARGA</div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
               <div>{cop(FOLIO_PACK_PRICE)} / pack</div>
               <div>✅ {FOLIO_PACK_SIZE} folios</div>

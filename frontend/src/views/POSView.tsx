@@ -441,7 +441,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
               border: '1px solid rgba(16,185,129,0.15)',
               padding: '0 12px',
               borderRadius: '12px',
-              color: '#10b881',
+              color: 'var(--success)',
               fontSize: '11px',
               fontWeight: 600,
               letterSpacing: '0.2px',
@@ -839,7 +839,7 @@ export function POSView({ products, token, isOnline, onSaleComplete }: POSViewPr
         <div className="modal-backdrop animate-fade">
           <div className="modal-content glass animate-slide-up" style={{ maxWidth: '380px' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 style={{ color: '#10b881', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <h3 style={{ color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
                 <CheckCircle size={20} /> Venta Registrada
               </h3>
             </div>

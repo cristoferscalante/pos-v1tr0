@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Generator
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -15,7 +16,32 @@ reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login"
 )
 
-def get_current_user(
+PLAN_EXPIRED_DETAIL = (
+    "Tu prueba gratis o tu plan terminó. Escríbenos por Telegram (@V1tr0) para activar un plan."
+)
+
+def tenant_plan_expired(tenant: Tenant) -> bool:
+    """True si la prueba o el plan ya vencieron. Sin fecha = sin límite."""
+    ends = tenant.subscription_ends_at
+    if ends is None:
+        return False
+    if ends.tzinfo is not None:
+        ends = ends.astimezone(timezone.utc).replace(tzinfo=None)
+    return ends <= datetime.utcnow()
+
+def ensure_plan_active(session: Session, user: User) -> None:
+    """Con la prueba o el plan vencidos el negocio no puede usar nada (402) hasta
+    que el superadmin active un plan. El superadmin nunca se bloquea."""
+    if user.is_superadmin or not user.tenant_id:
+        return
+    tenant = session.get(Tenant, user.tenant_id)
+    if tenant and tenant_plan_expired(tenant):
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=PLAN_EXPIRED_DETAIL,
+        )
+
+def get_authenticated_user(
     session: Session = Depends(get_session),
     token: str = Depends(reusable_oauth2)
 ) -> User:
@@ -45,6 +71,15 @@ def get_current_user(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="El usuario se encuentra inactivo"
         )
+    return user
+
+def get_current_user(
+    session: Session = Depends(get_session),
+    user: User = Depends(get_authenticated_user),
+) -> User:
+    """Usuario autenticado y con plan vigente. Es la dependencia por defecto;
+    get_authenticated_user solo se usa donde un plan vencido debe poder entrar."""
+    ensure_plan_active(session, user)
     return user
 
 def require_admin(current_user: User = Depends(get_current_user)) -> User:
@@ -99,5 +134,8 @@ def get_current_tenant_id(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="El negocio se encuentra suspendido o inactivo",
         )
+
+    if user_id is not None:
+        ensure_plan_active(session, user)
 
     return tenant_uuid

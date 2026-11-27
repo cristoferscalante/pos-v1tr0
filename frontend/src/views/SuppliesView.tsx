@@ -375,13 +375,13 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
       {loading ? (
         <div className="loading-state">
-          <RefreshCw size={32} className="spin" style={{ color: 'var(--primary)' }} />
+          <RefreshCw size={32} className="spin" style={{ color: 'var(--primary-text)' }} />
           <p>Cargando módulo de compras...</p>
         </div>
       ) : (
         <>
           <div className="stats-row">
-            <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(99,102,241,0.15)' }}><Building2 size={20} style={{ color: 'var(--primary)' }} /></div><div><p className="stat-value">{suppliers.length}</p><p className="stat-label">Proveedores</p></div></div>
+            <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(99,102,241,0.15)' }}><Building2 size={20} style={{ color: 'var(--primary-text)' }} /></div><div><p className="stat-value">{suppliers.length}</p><p className="stat-label">Proveedores</p></div></div>
             <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(16,185,129,0.15)' }}><ShoppingBag size={20} style={{ color: 'var(--success)' }} /></div><div><p className="stat-value">{purchases.length}</p><p className="stat-label">Compras</p></div></div>
             <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(34,211,238,0.15)' }}><History size={20} style={{ color: 'var(--accent)' }} /></div><div><p className="stat-value">{movements.length}</p><p className="stat-label">Movimientos</p></div></div>
             <div className="stat-card glass"><div className="stat-icon-wrap" style={{ background: 'rgba(245,158,11,0.15)' }}><Wallet size={20} style={{ color: 'var(--warning)' }} /></div><div><p className="stat-value">${purchases.reduce((sum, p) => sum + Number(p.balance_due || 0), 0).toLocaleString('es-CO')}</p><p className="stat-label">Cuentas por pagar</p></div></div>
@@ -422,7 +422,7 @@ export function SuppliesView({ token, isOnline, onProductsChange }: SuppliesView
 
           <div className="settings-grid">
             <div className="settings-card glass">
-              <div className="settings-card-header"><Building2 size={18} style={{ color: 'var(--primary)' }} /><h2 className="settings-card-title">{editingSupplierId ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2></div>
+              <div className="settings-card-header"><Building2 size={18} style={{ color: 'var(--primary-text)' }} /><h2 className="settings-card-title">{editingSupplierId ? 'Editar Proveedor' : 'Nuevo Proveedor'}</h2></div>
               <div className="pos-form">
                 <div className="form-group"><label className="form-label">Nombre</label><input className="form-input" value={supplierForm.name} onChange={e => setSupplierForm(prev => ({ ...prev, name: e.target.value }))} /></div>
                 <div className="form-grid-2">

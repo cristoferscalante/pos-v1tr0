@@ -60,7 +60,7 @@ export function BusinessReceiptSettings({ token, user, onUserUpdate }: Props) {
   return (
     <div className="settings-card glass" style={{ gridColumn: 'span 2' }}>
       <div className="settings-card-header">
-        <ReceiptText size={18} style={{ color: 'var(--primary)' }} />
+        <ReceiptText size={18} style={{ color: 'var(--primary-text)' }} />
         <h2 className="settings-card-title">Datos del negocio para recibos</h2>
       </div>
       <p style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.5 }}>

@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 import uuid
 
 from app.core.db import get_session
-from app.api.deps import get_current_tenant_id, get_current_user
+from app.api.deps import get_current_tenant_id, get_current_user, tenant_plan_expired
 from app.models.product import Product, ProductCreate, ProductRead, ProductUpdate
 from app.models.purchase import InventoryMovement
 from app.models.user import User
@@ -209,6 +209,19 @@ def get_public_catalog(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El negocio no existe o el catálogo no está activo"
+        )
+
+    # Negocio suspendido o con el plan vencido: el catálogo también se apaga. El
+    # negocio del superadmin nunca se bloquea. El mensaje lo ve el cliente final,
+    # por eso no menciona pagos.
+    blocked = not tenant.is_active or (
+        tenant_plan_expired(tenant)
+        and not session.exec(select(User).where(User.tenant_id == tenant.id, User.is_superadmin == True)).first()
+    )
+    if blocked:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Este catálogo no está disponible por ahora."
         )
 
     products = session.exec(select(Product).where(Product.tenant_id == tenant.id, Product.is_archived == False)).all()

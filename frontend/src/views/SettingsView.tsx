@@ -432,7 +432,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         {/* Business Info */}
         <div className="settings-card glass">
           <div className="settings-card-header">
-            <Building2 size={18} style={{ color: 'var(--primary)' }} />
+            <Building2 size={18} style={{ color: 'var(--primary-text)' }} />
             <h2 className="settings-card-title">Información del Negocio</h2>
           </div>
           <div className="settings-info-grid">
@@ -485,7 +485,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         {user?.role === 'admin' && (
           <div className="settings-card glass" style={{ gridColumn: 'span 2' }}>
             <div className="settings-card-header">
-              <Globe size={18} style={{ color: 'var(--primary)' }} />
+              <Globe size={18} style={{ color: 'var(--primary-text)' }} />
               <h2 className="settings-card-title">Configuración del Catálogo Público</h2>
             </div>
             <form onSubmit={handleTenantUpdate} className="pos-form grid-collapse" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
@@ -496,7 +496,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                     href={catalogUrl} 
                     target="_blank" 
                     rel="noreferrer" 
-                    style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                    style={{ color: 'var(--primary-text)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
                   >
                     {catalogUrl}
                     <ExternalLink size={13} />
@@ -742,8 +742,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: '#ef4444',
-                            opacity: 0.7,
+                            color: 'var(--danger)',
                             cursor: 'pointer',
                             padding: '6px',
                             borderRadius: '6px'
@@ -808,7 +807,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
         {user?.role === 'admin' && (
           <div className="settings-card glass" style={{ gridColumn: 'span 2' }}>
             <div className="settings-card-header">
-              <Mail size={18} style={{ color: 'var(--primary)' }} />
+              <Mail size={18} style={{ color: 'var(--primary-text)' }} />
               <h2 className="settings-card-title">Correos y Notificaciones</h2>
             </div>
 
@@ -1051,7 +1050,7 @@ export function SettingsView({ user, token, onUserUpdate }: SettingsViewProps) {
                   height: '40px',
                   background: 'rgba(16,185,129,0.1)',
                   border: '1px solid rgba(16,185,129,0.2)',
-                  color: '#10b881'
+                  color: 'var(--success)'
                 }}
               >
                 <Printer size={16} />

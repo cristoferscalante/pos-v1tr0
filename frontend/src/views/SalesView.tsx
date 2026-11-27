@@ -190,7 +190,7 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
       <div className="stats-row">
         <div className="stat-card glass">
           <div className="stat-icon-wrap" style={{ background: 'rgba(99,102,241,0.15)' }}>
-            <BarChart2 size={20} style={{ color: 'var(--primary)' }} />
+            <BarChart2 size={20} style={{ color: 'var(--primary-text)' }} />
           </div>
           <div>
             <p className="stat-value">{filtered.length}</p>
@@ -260,7 +260,7 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
       {/* Sales List */}
       {loading ? (
         <div className="loading-state">
-          <RefreshCw size={32} className="spin" style={{ color: 'var(--primary)' }} />
+          <RefreshCw size={32} className="spin" style={{ color: 'var(--primary-text)' }} />
           <p>Cargando ventas...</p>
         </div>
       ) : filtered.length === 0 ? (
@@ -375,12 +375,12 @@ export function SalesView({ token, isOnline }: SalesViewProps) {
                       {sale.meta_data?.factus_bill_number && <div><strong>Número FE:</strong> {sale.meta_data.factus_bill_number}</div>}
                       {sale.meta_data?.cufe && <div style={{ wordBreak: 'break-all' }}><strong>CUFE:</strong> {sale.meta_data.cufe}</div>}
                       {sale.meta_data?.qr_url && (
-                        <a href={sale.meta_data.qr_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <a href={sale.meta_data.qr_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary-text)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <ExternalLink size={13} /> Ver QR DIAN
                         </a>
                       )}
                       {sale.meta_data?.factus_public_url && (
-                        <a href={sale.meta_data.factus_public_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <a href={sale.meta_data.factus_public_url} target="_blank" rel="noreferrer" style={{ color: 'var(--primary-text)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                           <ExternalLink size={13} /> Abrir factura en Factus
                         </a>
                       )}

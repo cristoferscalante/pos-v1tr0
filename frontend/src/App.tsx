@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { db, requestPersistentStorage } from './db/pos-db';
-import { authApi, salesApi, mediaApi, setUnauthorizedHandler } from './api/client';
+import { authApi, salesApi, mediaApi, setUnauthorizedHandler, setPlanExpiredHandler } from './api/client';
 import { ToastProvider, useToast } from './components/Toast';
 import { Sidebar } from './components/Sidebar';
 import { POSView } from './views/POSView';
@@ -14,10 +14,11 @@ import { PublicCatalogView } from './views/PublicCatalogView';
 import type { AuthResponse, AuthUser, LocalProduct, View } from './types';
 import { LandingView } from './views/LandingView';
 import { AuthView } from './views/AuthView';
-import { PlanExpiredScreen, PlanReminder, isPlanExpired } from './components/PlanGate';
+import { PlanExpiredModal, PlanReminder, isPlanExpired } from './components/PlanGate';
 import { getProductCategory } from './utils/productCategories';
 import { normalizeProduct } from './utils/pricing';
 import { dataUrlToBlob } from './utils/imageUpload';
+import { brandThemeVars } from './utils/contrast';
 
 const LEGACY_DEMO_PRODUCT_HINTS = [
   'vacuna parvovirus',
@@ -61,6 +62,15 @@ function AppInner() {
     JSON.parse(localStorage.getItem('pos_user') || 'null')
   );
 
+  // Prueba o plan vencido: la app queda bloqueada y no sincroniza nada. El reloj
+  // vuelve a evaluar la fecha para bloquear aunque la app lleve horas abierta.
+  const [, setClock] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(n => n + 1), 30 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const planExpired = isPlanExpired(user);
+
   // --- App State ---
   const [view, setView] = useState<View>('pos');
   const [products, setProducts] = useState<LocalProduct[]>([]);
@@ -77,10 +87,11 @@ function AppInner() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem('pos_theme', theme);
     const brandColor = user?.meta_data?.brand_color;
-    if (brandColor) {
-      document.documentElement.style.setProperty('--primary', brandColor);
-    } else {
-      document.documentElement.style.removeProperty('--primary');
+    const { style } = document.documentElement;
+    ['--primary', '--primary-hover', '--primary-text', '--primary-rgb'].forEach(name => style.removeProperty(name));
+    // '#6366f1' es el valor por defecto de Configuración: se usa la paleta del tema
+    if (brandColor && brandColor.toLowerCase() !== '#6366f1') {
+      Object.entries(brandThemeVars(brandColor, theme)).forEach(([name, value]) => style.setProperty(name, value));
     }
   }, [theme, user?.meta_data?.brand_color]);
 
@@ -97,6 +108,7 @@ function AppInner() {
 
   // ---- Pull products from server ----
   const pullProducts = useCallback(async (authToken: string) => {
+    if (planExpired) return;
     try {
       const { productsApi } = await import('./api/client');
       const serverProducts = await productsApi.list(authToken);
@@ -142,11 +154,11 @@ function AppInner() {
       }
       loadProducts();
     } catch { /* offline OK */ }
-  }, [loadProducts, checkPending]);
+  }, [loadProducts, checkPending, planExpired]);
 
   // ---- Sync pending sales ----
   const syncProducts = useCallback(async () => {
-    if (!isOnline || !token) return;
+    if (!isOnline || !token || planExpired) return;
 
     const pendingProducts = (await db.products.toArray()).filter((product) => product.sync_status === 'pending');
     if (pendingProducts.length === 0) return;
@@ -183,10 +195,10 @@ function AppInner() {
     }
 
     await loadProducts();
-  }, [isOnline, token, loadProducts]);
+  }, [isOnline, token, planExpired, loadProducts]);
 
   const syncSales = useCallback(async () => {
-    if (!isOnline || !token || isSyncing) return;
+    if (!isOnline || !token || isSyncing || planExpired) return;
     await syncProducts();
     const pending = await db.sales.where('sync_status').equals('pending').toArray();
     if (pending.length === 0) {
@@ -242,7 +254,7 @@ function AppInner() {
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, token, isSyncing, success, showError, checkPending, syncProducts]);
+  }, [isOnline, token, isSyncing, planExpired, success, showError, checkPending, syncProducts]);
 
   useEffect(() => {
     void requestPersistentStorage();
@@ -349,7 +361,10 @@ function AppInner() {
   const [checkingPlan, setCheckingPlan] = useState(false);
   const refreshSubscription = useCallback(async (manual = false) => {
     const currentToken = localStorage.getItem('pos_token');
-    if (!currentToken || !navigator.onLine) return;
+    if (!currentToken || !navigator.onLine) {
+      if (manual) info('Necesitas internet para revisar tu plan.');
+      return;
+    }
     if (manual) setCheckingPlan(true);
     try {
       const sub = await authApi.getSubscription(currentToken);
@@ -363,7 +378,10 @@ function AppInner() {
         if (sub.subscription_active) success('¡Tu plan está activo! Gracias por confiar en V1TR0 POS');
         else info('Todavía no vemos tu plan activo. Si ya pagaste, escríbenos por Telegram.');
       }
-    } catch { /* sin conexión: se usa el último estado guardado */ }
+    } catch {
+      // sin conexión: se usa el último estado guardado
+      if (manual) info('No pudimos revisar tu plan. Intenta de nuevo en un momento.');
+    }
     finally { if (manual) setCheckingPlan(false); }
   }, [success, info]);
 
@@ -375,6 +393,31 @@ function AppInner() {
     const id = window.setInterval(() => refreshSubscription(), 10 * 60 * 1000);
     return () => window.clearInterval(id);
   }, [token, isOnline, refreshSubscription, isAuthPath]);
+
+  // El servidor respondió 402: bloquear de inmediato
+  useEffect(() => {
+    setPlanExpiredHandler(() => {
+      setUser(prev => {
+        if (!prev || prev.is_superadmin || prev.subscription_active === false) return prev;
+        const next = { ...prev, subscription_active: false };
+        localStorage.setItem('pos_user', JSON.stringify(next));
+        return next;
+      });
+    });
+    return () => setPlanExpiredHandler(null);
+  }, []);
+
+  // Bloqueada: revisar seguido para desbloquear apenas activen el plan
+  useEffect(() => {
+    if (!token || !planExpired) return;
+    const check = () => { if (document.visibilityState === 'visible') void refreshSubscription(); };
+    const id = window.setInterval(check, 60 * 1000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [token, planExpired, refreshSubscription]);
 
   // ---- Cashier View Restrictions ----
   useEffect(() => {
@@ -431,17 +474,34 @@ function AppInner() {
     );
   }
 
-  // ========================
-  // PLAN VENCIDO: "Compra tu plan"
-  // ========================
-  if (isPlanExpired(user)) {
+  // Plan vencido: no se monta ninguna vista (ni escáner ni atajos); solo queda
+  // el menú inerte detrás del popup para pedir un plan.
+  const sidebar = (
+    <Sidebar
+      currentView={view}
+      onNavigate={setView}
+      user={user}
+      isOnline={isOnline}
+      pendingSync={pendingSync}
+      isSyncing={isSyncing}
+      onSync={syncSales}
+      onLogout={handleLogout}
+      theme={theme}
+      onToggleTheme={handleToggleTheme}
+    />
+  );
+
+  if (planExpired) {
     return (
-      <PlanExpiredScreen
-        user={user!}
-        checking={checkingPlan}
-        onRefresh={() => refreshSubscription(true)}
-        onLogout={handleLogout}
-      />
+      <div className="app-layout">
+        <div inert>{sidebar}</div>
+        <PlanExpiredModal
+          user={user!}
+          checking={checkingPlan}
+          onRefresh={() => refreshSubscription(true)}
+          onLogout={handleLogout}
+        />
+      </div>
     );
   }
 
@@ -450,18 +510,7 @@ function AppInner() {
   // ========================
   return (
     <div className="app-layout">
-      <Sidebar
-        currentView={view}
-        onNavigate={setView}
-        user={user}
-        isOnline={isOnline}
-        pendingSync={pendingSync}
-        isSyncing={isSyncing}
-        onSync={syncSales}
-        onLogout={handleLogout}
-        theme={theme}
-        onToggleTheme={handleToggleTheme}
-      />
+      {sidebar}
       <main className="app-main">
         <PlanReminder user={user} />
         {view === 'pos' && (

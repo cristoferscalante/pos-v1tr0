@@ -32,6 +32,12 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   onUnauthorized = handler;
 }
 
+// 402: la prueba o el plan vencieron. App.tsx registra aquí cómo bloquear la app.
+let onPlanExpired: (() => void) | null = null;
+export function setPlanExpiredHandler(handler: (() => void) | null) {
+  onPlanExpired = handler;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
@@ -49,6 +55,7 @@ async function request<T>(
     // La sesión expiró o fue revocada: limpiar y volver al login.
     onUnauthorized();
   }
+  if (res.status === 402 && token) onPlanExpired?.();
 
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;

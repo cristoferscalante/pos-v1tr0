@@ -168,7 +168,7 @@ export function DashboardView({ token, isOnline }: DashboardViewProps) {
 
       {loading ? (
         <div className="loading-state">
-          <RefreshCw size={36} className="spin" style={{ color: 'var(--primary)' }} />
+          <RefreshCw size={36} className="spin" style={{ color: 'var(--primary-text)' }} />
           <p>Cargando métricas...</p>
         </div>
       ) : !summary ? (
@@ -181,7 +181,7 @@ export function DashboardView({ token, isOnline }: DashboardViewProps) {
         <>
           {/* KPI Cards */}
           <div className="kpi-grid">
-            <div className="kpi-card glass" style={{ '--kpi-color': 'var(--primary)' } as React.CSSProperties}>
+            <div className="kpi-card glass" style={{ '--kpi-color': 'var(--primary-text)' } as React.CSSProperties}>
               <div className="kpi-icon-wrap">
                 <ShoppingCart size={22} />
               </div>
@@ -203,7 +203,7 @@ export function DashboardView({ token, isOnline }: DashboardViewProps) {
               </div>
             </div>
 
-            <div className="kpi-card glass" style={{ '--kpi-color': '#10b981' } as React.CSSProperties}>
+            <div className="kpi-card glass" style={{ '--kpi-color': 'var(--success)' } as React.CSSProperties}>
               <div className="kpi-icon-wrap">
                 <TrendingUp size={22} />
               </div>
@@ -275,7 +275,7 @@ export function DashboardView({ token, isOnline }: DashboardViewProps) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div className="grid-collapse" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                     <div className="stat-card glass" style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary-text)' }}>
                         <Wallet size={16} />
                         <span style={{ fontSize: '12px' }}>Base</span>
                       </div>

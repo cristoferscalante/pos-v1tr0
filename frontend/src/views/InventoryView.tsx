@@ -607,7 +607,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
       <div className="stats-row">
         <div className="stat-card glass">
           <div className="stat-icon-wrap" style={{ background: 'rgba(99,102,241,0.15)' }}>
-            <Package size={20} style={{ color: 'var(--primary)' }} />
+            <Package size={20} style={{ color: 'var(--primary-text)' }} />
           </div>
           <div>
             <p className="stat-value">{products.length}</p>
@@ -844,7 +844,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                   type="button"
                   onClick={discardDraft}
                   style={{
-                    background: 'transparent', border: 'none', color: 'var(--primary)',
+                    background: 'transparent', border: 'none', color: 'var(--primary-text)',
                     fontFamily: 'inherit', fontSize: '12.5px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                   }}
                 >
@@ -1157,7 +1157,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                   <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <label className="form-label">Código de barras</label>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: '#10b881', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px', color: 'var(--success)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10b881', display: 'inline-block', boxShadow: '0 0 8px #10b881', animation: 'pulse 1.5s infinite' }} />
                         Pistola lista
                       </span>
@@ -1171,7 +1171,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                           placeholder="Escanear o escribir"
                           style={{ paddingRight: '36px' }}
                         />
-                        <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#10b881', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
+                        <div style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--success)', display: 'flex', alignItems: 'center', pointerEvents: 'none' }}>
                           <Barcode size={16} />
                         </div>
                       </div>
@@ -1211,7 +1211,7 @@ export function InventoryView({ products, token, isOnline, onProductsChange, use
                         setArchivedSuggestion(null);
                         success('Sugerencia cargada en el formulario');
                       }}
-                      style={{ background: '#6366f1', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.74rem' }}
+                      style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '4px 10px', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontSize: '0.74rem' }}
                     >
                       Sugerir datos
                     </button>

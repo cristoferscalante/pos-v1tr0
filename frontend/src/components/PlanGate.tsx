@@ -1,6 +1,5 @@
-import { Check, Clock, LogOut, RefreshCw, Send } from 'lucide-react';
-import { BrandLogo } from './BrandLogo';
-import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, SALES_EMAIL, formatCOP, contactLink, emailLink } from '../utils/plans';
+import { Clock, LogOut, RefreshCw, Send } from 'lucide-react';
+import { PUBLIC_PLANS, SALES_CONTACT_DISPLAY, formatCOP, contactLink } from '../utils/plans';
 import type { AuthUser } from '../types';
 import { parseServerDate } from '../utils/dates';
 
@@ -11,15 +10,16 @@ export function daysLeft(user: AuthUser | null): number | null {
 }
 
 /**
- * La app se bloquea si el plan venció. subscription_active viene del servidor;
- * si la sesión es anterior a este cambio (no lo trae) se deja pasar y se
- * actualiza al consultar /auth/subscription. El superadmin nunca se bloquea.
+ * La app se bloquea si el plan venció. subscription_active viene del servidor,
+ * pero además se compara la fecha en el equipo: así se bloquea en el momento
+ * exacto, aunque la app lleve horas abierta o esté sin internet.
+ * El superadmin nunca se bloquea.
  */
 export function isPlanExpired(user: AuthUser | null): boolean {
   if (!user || user.is_superadmin) return false;
   if (user.subscription_active === false) return true;
-  const left = daysLeft(user);
-  return left !== null && left <= 0 && user.subscription_active !== true;
+  if (!user.subscription_ends_at) return false;
+  return parseServerDate(user.subscription_ends_at).getTime() <= Date.now();
 }
 
 interface ExpiredProps {
@@ -29,8 +29,11 @@ interface ExpiredProps {
   onLogout: () => void;
 }
 
-/** Pantalla "Compra tu plan": precios y contacto por Telegram. La activación es manual. */
-export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: ExpiredProps) {
+/**
+ * Popup que no se puede cerrar: para seguir hay que pedir un plan por Telegram.
+ * La activación es manual (superadmin).
+ */
+export function PlanExpiredModal({ user, checking, onRefresh, onLogout }: ExpiredProps) {
   const wasTrial = (user.plan_name || 'free') === 'free';
   const isCashier = user.role === 'cashier';
   const message = (planName?: string) =>
@@ -38,49 +41,39 @@ export function PlanExpiredScreen({ user, checking, onRefresh, onLogout }: Expir
   const paidPlans = PUBLIC_PLANS.filter(p => p.price > 0);
 
   return (
-    <div className="plan-gate">
-      <div className="plan-gate-card">
-        <BrandLogo size={44} />
-        <div className="plan-gate-icon"><Clock size={28} /></div>
-        <h1>{wasTrial ? 'Tu prueba gratis terminó' : 'Tu plan se venció'}</h1>
-        <p className="plan-gate-lead">
+    <div className="plan-lock">
+      <div className="plan-lock-card" role="alertdialog" aria-modal="true" aria-labelledby="plan-lock-title" aria-describedby="plan-lock-text">
+        <div className="plan-lock-icon"><Clock size={28} /></div>
+        <h1 id="plan-lock-title">{wasTrial ? 'Tu prueba gratis terminó' : 'Tu plan se venció'}</h1>
+        <p id="plan-lock-text" className="plan-lock-lead">
           {isCashier
             ? 'Pídele al administrador del negocio que active un plan para seguir vendiendo.'
-            : <>Compra tu plan para seguir usando V1TR0 POS en <strong>{user.business_name}</strong>. Todo lo que registraste está guardado.</>}
+            : <>Para seguir usando V1TR0 POS en <strong>{user.business_name}</strong>, pide uno de los planes por Telegram. Tus datos están guardados.</>}
         </p>
 
-        <div className="plan-gate-plans">
-          {paidPlans.map(plan => (
-            <article key={plan.key} className={`plan-gate-plan ${plan.highlight ? 'featured' : ''}`}>
-              <div className="plan-gate-plan-head">
-                <h2>{plan.name}</h2>
-                <div>{plan.monthlyPrice ? <><strong>{formatCOP(plan.monthlyPrice)}</strong> <span>al mes · o {formatCOP(plan.price)} al año</span></> : <><strong>{formatCOP(plan.price)}</strong> <span>{plan.period}</span></>}</div>
-              </div>
-              <ul>
-                {plan.features.slice(0, 4).map(f => <li key={f}><Check size={15} /> {f}</li>)}
-              </ul>
-              {!isCashier && (
-                <a href={contactLink(message(plan.name))} target="_blank" rel="noreferrer" className={`${plan.highlight ? 'btn-primary' : 'btn-secondary'} plan-gate-cta`}>
-                  <Send size={17} /> Quiero el plan {plan.name}
+        {!isCashier && (
+          <>
+            <div className="plan-lock-plans">
+              {paidPlans.map(plan => (
+                <a key={plan.key} href={contactLink(message(plan.name))} target="_blank" rel="noreferrer" className={`plan-lock-plan ${plan.highlight ? 'featured' : ''}`}>
+                  <span className="plan-lock-plan-info">
+                    <strong>Plan {plan.name}</strong>
+                    <span>{plan.monthlyPrice ? `${formatCOP(plan.monthlyPrice)} al mes · ${formatCOP(plan.price)} al año` : `${formatCOP(plan.price)} ${plan.period}`}</span>
+                    {plan.key === 'premium' && <span>Incluye facturación electrónica DIAN</span>}
+                  </span>
+                  <span className="plan-lock-plan-go">Pedir <Send size={15} /></span>
                 </a>
-              )}
-            </article>
-          ))}
-        </div>
-
-        {!isCashier && (
-          <a href={contactLink(message())} target="_blank" rel="noreferrer" className="plan-gate-wa">
-            <Send size={20} /> Escríbenos por Telegram al {SALES_CONTACT_DISPLAY}
-          </a>
+              ))}
+            </div>
+            <a href={contactLink(message())} target="_blank" rel="noreferrer" className="plan-lock-telegram">
+              <Send size={20} /> Escribir por Telegram a {SALES_CONTACT_DISPLAY}
+            </a>
+          </>
         )}
-        {!isCashier && (
-          <p className="plan-gate-note">
-            ¿Prefieres correo? <a href={emailLink('Activar mi plan de V1TR0 POS', message())}>{SALES_EMAIL}</a>
-          </p>
-        )}
-        <p className="plan-gate-note">Cuando confirmemos tu pago activamos tu plan y la app se desbloquea sola.</p>
 
-        <div className="plan-gate-actions">
+        <p className="plan-lock-note">Cuando confirmemos tu pago activamos tu plan y la app se desbloquea sola.</p>
+
+        <div className="plan-lock-actions">
           <button type="button" className="btn-secondary" onClick={onRefresh} disabled={checking}>
             <RefreshCw size={16} className={checking ? 'spin' : ''} /> {checking ? 'Revisando…' : 'Ya pagué, revisar'}
           </button>

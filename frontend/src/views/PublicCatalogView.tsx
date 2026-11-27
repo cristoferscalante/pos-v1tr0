@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ShoppingBag, Search, Plus, Minus, Store, X, MessageCircle, ArrowRight, ScanLine, Check } from 'lucide-react';
-import { publicCatalogApi, API_URL } from '../api/client';
+import { publicCatalogApi, API_URL, ApiError } from '../api/client';
 import type { ApiProduct } from '../types';
 import { getBusinessTypeLabel } from '../components/BusinessTypeSelect';
 import { getProductCategory } from '../utils/productCategories';
 import { QrScannerModal } from '../components/QrScannerModal';
 import { useToast } from '../components/Toast';
+import { fillForWhiteText } from '../utils/contrast';
 import '../styles/public-catalog.css';
 
 interface PublicCatalogViewProps {
@@ -58,6 +59,7 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
   const { warning } = useToast();
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const [tenant, setTenant] = useState<any>(null);
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -77,10 +79,13 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
       try {
         setLoading(true);
         setErrorMsg(null);
+        setUnavailable(false);
         const data = await publicCatalogApi.fetch(slug);
         setTenant(data.tenant);
         setProducts(data.products);
       } catch (err: any) {
+        // 403: el negocio existe pero su catálogo está apagado (plan vencido o suspendido)
+        setUnavailable(err instanceof ApiError && err.status === 403);
         setErrorMsg(err.message || 'No se pudo cargar el catálogo del negocio.');
       } finally {
         setLoading(false);
@@ -208,7 +213,7 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
     return (
       <div className="catalog-error-view">
         <Store size={64} style={{ color: 'var(--text-muted)', marginBottom: '16px' }} />
-        <h1>Negocio no encontrado</h1>
+        <h1>{unavailable ? 'Catálogo no disponible' : 'Negocio no encontrado'}</h1>
         <p className="error-detail">{errorMsg || 'El catálogo solicitado no existe.'}</p>
         <a href="/" className="btn-primary" style={{ marginTop: '16px', display: 'inline-flex', textDecoration: 'none' }}>
           Ir a V1TR0 POS
@@ -314,7 +319,7 @@ export function PublicCatalogView({ slug }: PublicCatalogViewProps) {
   );
 
   return (
-    <div className="pcat" style={brandColor ? ({ ['--pcat-accent' as string]: brandColor } as React.CSSProperties) : undefined}>
+    <div className="pcat" style={brandColor ? ({ ['--pcat-accent' as string]: fillForWhiteText(brandColor) } as React.CSSProperties) : undefined}>
       <header className="pcat-header">
         <div className="pcat-header-inner">
           <div className="pcat-brand">

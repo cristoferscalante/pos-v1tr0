@@ -74,7 +74,7 @@ export function Sidebar({
             <img src={user.meta_data.logo_url} alt={user.meta_data.display_name || user.business_name} style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: 6 }} />
           </div>
         ) : (
-          <div className="logo-badge-sm" style={user?.meta_data?.brand_color ? { background: user.meta_data.brand_color } : undefined}>
+          <div className="logo-badge-sm">
             <QrCode size={18} />
           </div>
         )}
@@ -110,7 +110,7 @@ export function Sidebar({
                 key={item.view}
                 onClick={() => onNavigate(item.view)}
                 className={`sidebar-nav-item nav-secondary ${currentView === item.view ? 'active' : ''}`}
-                style={{ color: currentView === item.view ? undefined : '#a78bfa' }}
+                style={{ color: currentView === item.view ? undefined : 'var(--violet-text)' }}
               >
                 <span className="nav-icon">{item.icon}</span>
                 <span className="nav-label">{item.label}</span>

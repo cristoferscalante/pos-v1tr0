@@ -92,7 +92,7 @@
   font-size: 15px;
   color: var(--pcat-ink);
 }
-.pcat-search-field input::placeholder { color: #7A776F; }
+.pcat ::placeholder { color: #6B6862; }
 .pcat-scan {
   width: 48px;
   height: 48px;

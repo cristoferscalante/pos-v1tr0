@@ -10,7 +10,7 @@ from app.core.security import verify_password, get_password_hash, create_access_
 from app.models.tenant import SECRET_MASK, Tenant, TenantRead, tenant_read_without_secrets
 from app.models.user import User, UserCreate, UserRead
 from pydantic import BaseModel, EmailStr, TypeAdapter
-from app.api.deps import get_current_user
+from app.api.deps import get_authenticated_user, get_current_user
 from app.models.notification import NotificationRuleRead, NotificationRuleUpdate, NotificationTestRequest
 from app.services.notifications import ensure_default_notification_rules, get_notification_rules, send_test_notification
 from app.services.password_reset import send_password_reset_email, validate_password_reset_token
@@ -244,7 +244,7 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), se
 @router.get("/subscription")
 def get_subscription(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_authenticated_user),
 ):
     """Estado del plan del negocio del usuario (la app lo consulta para mostrar
     el aviso de "compra tu plan" y desbloquearse cuando el superadmin lo activa)."""

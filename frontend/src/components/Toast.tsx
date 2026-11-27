@@ -27,9 +27,9 @@ export function useConfirm() {
 
 function ConfirmDialog({ state, onClose }: { state: ConfirmState; onClose: (val: boolean) => void }) {
   const variantColors = {
-    danger:  { bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.3)',  btn: '#ef4444', icon: <Trash2 size={18} color="#f87171" /> },
-    warning: { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)', btn: '#f59e0b', icon: <AlertTriangle size={18} color="#fbbf24" /> },
-    info:    { bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.3)', btn: '#6366f1', icon: <Info size={18} color="#818cf8" /> },
+    danger:  { bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.3)',  btn: '#dc2626', icon: <Trash2 size={18} color="var(--danger)" /> },
+    warning: { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.3)', btn: '#b45309', icon: <AlertTriangle size={18} color="var(--amber-text)" /> },
+    info:    { bg: 'rgba(99,102,241,0.12)', border: 'rgba(99,102,241,0.3)', btn: '#4f46e5', icon: <Info size={18} color="var(--primary-text)" /> },
   };
   const v = variantColors[state.variant || 'warning'];
 
@@ -273,12 +273,12 @@ export function ErrorBanner({ message, onDismiss }: { message: string; onDismiss
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '12px 16px', borderRadius: '10px',
       background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-      color: '#fca5a5', fontSize: '0.85rem', marginBottom: '12px',
+      color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '12px',
     }}>
       <AlertCircle size={16} style={{ flexShrink: 0 }} />
       <span style={{ flex: 1 }}>{message}</span>
       {onDismiss && (
-        <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fca5a5', padding: 2, display: 'flex' }}>
+        <button onClick={onDismiss} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', padding: 2, display: 'flex' }}>
           <X size={14} />
         </button>
       )}
